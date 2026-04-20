@@ -292,17 +292,64 @@ function getQualityLabel(q) {
 }
 
 /* ═══════════════════════════════════════
-   STORAGE
+   STORAGE (INDEXEDDB)
 ═══════════════════════════════════════ */
-function save() {
-  localStorage.setItem('demo_v3', JSON.stringify({words: W, stats: STATS}));
+const DB_NAME = 'DemostenesDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'appData';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
 }
-function load() {
+
+async function save() {
   try {
-    const d = JSON.parse(localStorage.getItem('demo_v3') || '{}');
-    W = d.words || [];
-    STATS = d.stats || {streak: 0, lastStudy: 0, totalSessions: 0, totalReviews: 0, history: []};
-  } catch(e) { W = []; STATS = {streak:0,lastStudy:0,totalSessions:0,totalReviews:0,history:[]}; }
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      // Salva os dados usando a mesma chave antiga para manter o padrão
+      store.put({ words: W, stats: STATS }, 'demo_v3');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    console.error("Erro ao salvar no IndexedDB", e);
+  }
+}
+
+async function load() {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get('demo_v3');
+      req.onsuccess = () => {
+        const d = req.result || {};
+        W = d.words || [];
+        STATS = d.stats || {streak: 0, lastStudy: 0, totalSessions: 0, totalReviews: 0, history: []};
+        resolve();
+      };
+      req.onerror = () => {
+        W = []; STATS = {streak:0,lastStudy:0,totalSessions:0,totalReviews:0,history:[]};
+        resolve();
+      };
+    });
+  } catch (e) {
+    console.error("Erro ao carregar do IndexedDB", e);
+    W = []; STATS = {streak:0,lastStudy:0,totalSessions:0,totalReviews:0,history:[]};
+  }
 }
 
 /* ═══════════════════════════════════════
@@ -1347,7 +1394,7 @@ function renderStudy() {
    INIT
 ═══════════════════════════════════════ */
 (async function init() {
-  load();
+  await load(); // ✨ ADICIONE A PALAVRA "await" AQUI
   await new Promise(r => setTimeout(r, 900));
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
