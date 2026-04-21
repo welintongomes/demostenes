@@ -104,7 +104,7 @@ select.inp{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.
 .fc-face{position:absolute;width:100%;min-height:220px;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r2);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px;text-align:center;}
 .fc-face.back{transform:rotateY(180deg);background:var(--bg4);}
 .fc-type{font-family:'Cinzel',serif;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--stone);margin-bottom:12px;}
-.fc-word{font-family:'Cinzel',serif;font-size:26px;font-weight:700;color:var(--gold2);line-height:1.2;margin-bottom:8px;}
+.fc-word{display: flex; align-items: baseline;font-family:'Cinzel',serif;font-size:26px;font-weight:700;color:var(--gold2);line-height:1.2;margin-bottom:8px;}
 .fc-phonetic{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--stone2);margin-bottom:4px;font-style:normal;}
 .fc-definition{font-size:17px;color:var(--ink);line-height:1.6;font-style:italic;}
 .fc-example{font-size:14px;color:var(--stone3);line-height:1.7;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
@@ -192,7 +192,7 @@ svg.ring{transform:rotate(-90deg);}
 .ring-bg{fill:none;stroke:rgba(255,255,255,.06);}
 .ring-fill{fill:none;stroke:var(--gold);stroke-linecap:round;transition:stroke-dashoffset .6s ease;}
 .ring-label{font-family:'Cinzel',serif;font-size:22px;font-weight:700;fill:var(--gold2);}
-.ring-sub{font-size:11px;fill:var(--stone);font-family:'Cinzel',serif;text-transform:uppercase;letter-spacing:1px;}
+.ring-sub{font-size:10px;fill:var(--stone);font-family:'Cinzel',serif;text-transform:uppercase;letter-spacing:1px;}
 
 /* ── STREAKS / CALENDAR ── */
 .streak-dots{display:flex;flex-wrap:wrap;gap:4px;}
@@ -361,6 +361,7 @@ let currentTab = 'study';
 let studySession = null;
 let studyMode = 'flash'; // flash | choice | type | context
 let modalStack = [];
+let wordDisplayLimit = 50; // Limite inicial de palavras exibidas
 
 /* ═══════════════════════════════════════
    WORD FACTORY
@@ -415,12 +416,32 @@ function nextIntervals(card) {
 /* ═══════════════════════════════════════
    STUDY SESSION
 ═══════════════════════════════════════ */
+//adapta o modo de estudo para cada palavra
+function getAdaptiveMode(card) {
+  const ivl = card.interval;
+  const rep = card.repetitions;
+  
+  if (rep === 0 || ivl <= 3) {
+    // Fase 1: Reconhecimento (Palavras Novas ou muito difíceis)
+    const modes = ['flash', 'choice', 'tf'];
+    return modes[Math.floor(Math.random() * modes.length)];
+  } else if (ivl <= 14) {
+    // Fase 2: Recuperação (Ganhando tração - 4 a 14 dias)
+    const modes = ['revchoice', 'scramble'];
+    return modes[Math.floor(Math.random() * modes.length)];
+  } else {
+    // Fase 3: Domínio (Palavras consolidadas, +15 dias)
+    const modes = ['type', 'context'];
+    return modes[Math.floor(Math.random() * modes.length)];
+  }
+}
+
 function startSession(mode) {
   const due = dueCards();
   if (!due.length) { toast('Nenhum card para revisar agora!'); return; }
   studyMode = mode || studyMode;
   studySession = {
-    queue: [...due],
+    queue: [...due].sort(() => Math.random() - 0.5),
     current: 0,
     answered: 0,
     correct: 0,
@@ -447,6 +468,7 @@ function setTab(t) {
   currentTab = t;
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('on', el.dataset.tab === t));
   studySession = null;
+  wordDisplayLimit = 15;
   render();
 }
 
@@ -486,13 +508,22 @@ function buildStudyTab() {
       <div class="card-head"><div class="card-title">⚡ Revisão Pendente</div><span class="badge due">${due.length} card${due.length > 1 ? 's' : ''}</span></div>
       <div class="card-body">
         <div class="quote" style="margin-bottom:14px">"A perseverança é a virtude dos fortes." — Demóstenes</div>
+        
         <div class="btn-row" style="flex-wrap:wrap;gap:8px">
-          <button class="btn gold" onclick="startSession('flash')" style="flex:2;min-width:140px">⚡ Flashcard</button>
-          <button class="btn" onclick="startSession('choice')" style="flex:1;min-width:100px">📝 Múltipla escolha</button>
+          <button class="btn gold" onclick="startSession('adaptive')" style="flex:100%;font-size:14px;padding:14px;letter-spacing:2px">🧠 Estudo Inteligente</button>
         </div>
-        <div class="btn-row" style="margin-top:8px">
-          <button class="btn" onclick="startSession('type')" style="flex:1">⌨ Digitar</button>
-          <button class="btn" onclick="startSession('context')" style="flex:1">📜 Contexto</button>
+        <div class="sep" style="margin:12px 0"></div>
+        <div style="font-size:10px;color:var(--stone2);margin-bottom:8px;text-align:center;text-transform:uppercase;letter-spacing:1px">Treinamento Específico:</div>
+        <div class="btn-row" style="flex-wrap:wrap;gap:6px">
+          <button class="btn ghost sm" onclick="startSession('flash')" style="flex:1">⚡ Flash</button>
+          <button class="btn ghost sm" onclick="startSession('choice')" style="flex:1">📝 Múltipla</button>
+          <button class="btn ghost sm" onclick="startSession('tf')" style="flex:1">⚖ V/F</button>
+        </div>
+        <div class="btn-row" style="flex-wrap:wrap;gap:6px;margin-top:6px">
+          <button class="btn ghost sm" onclick="startSession('revchoice')" style="flex:1">🔄 Inversa</button>
+          <button class="btn ghost sm" onclick="startSession('scramble')" style="flex:1">🔀 Embaralhado</button>
+          <button class="btn ghost sm" onclick="startSession('type')" style="flex:1">⌨ Digitar</button>
+          <button class="btn ghost sm" onclick="startSession('context')" style="flex:1">📜 Contexto</button>
         </div>
       </div>
     </div>`;
@@ -554,15 +585,31 @@ function buildStudyCard() {
   const intervals = nextIntervals(card);
 
   let inner = '';
-  
-  if (studyMode === 'flash') {
+  let activeMode = studyMode;
+
+  // ✨ SE FOR ADAPTATIVO, ELE CALCULA O MODO IDEAL PARA ESTE CARD ESPECÍFICO
+  if (studyMode === 'adaptive') {
+    if (!sess.currentAdaptiveMode) {
+      sess.currentAdaptiveMode = getAdaptiveMode(card);
+    }
+    activeMode = sess.currentAdaptiveMode;
+  }
+
+  // ✨ AGORA SUBSTITUA "studyMode" POR "activeMode" NAS COMPARAÇÕES ABAIXO:
+  if (activeMode === 'flash') {
     inner = buildFlashMode(card, intervals);
-  } else if (studyMode === 'choice') {
+  } else if (activeMode === 'choice') {
     inner = buildChoiceMode(card);
-  } else if (studyMode === 'type') {
+  } else if (activeMode === 'type') {
     inner = buildTypeMode(card);
-  } else if (studyMode === 'context') {
+  } else if (activeMode === 'context') {
     inner = buildContextMode(card);
+  } else if (activeMode === 'tf') {
+    inner = buildTFMode(card);
+  } else if (activeMode === 'revchoice') {
+    inner = buildRevChoiceMode(card);
+  } else if (activeMode === 'scramble') {
+    inner = buildScrambleMode(card);
   }
 
   return `
@@ -576,7 +623,7 @@ function buildStudyCard() {
     <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
     ${inner}
     <div style="display:flex;gap:8px;justify-content:center;margin-top:6px">
-      <span style="font-size:11px;color:var(--stone);font-style:italic">Acertos: ${sess.correct} | Modo: ${modeLabel(studyMode)}</span>
+      <span style="font-size:11px;color:var(--stone);font-style:italic">Acertos: ${sess.correct} | Modo: ${modeLabel(activeMode)} ${studyMode === 'adaptive' ? '🧠' : ''}</span>
     </div>`;
 }
 
@@ -587,7 +634,7 @@ function buildFlashMode(card, intervals) {
       <div class="flashcard${flipped ? ' flipped' : ''}" id="flashcard">
         <div class="fc-face front">
           <div class="fc-type">Palavra</div>
-          <div class="fc-word">${esc(card.word)}</div>
+          <div class="fc-word">${esc(card.word)} <button class="mini-btn" style="border:none" onclick="event.stopPropagation(); ouvirPalavra('${esc(card.word)}')">🔊</button></div>
           ${card.phonetic ? `<div class="fc-phonetic">[${esc(card.phonetic)}]</div>` : ''}
           ${card.wordClass ? `<div class="fc-class">${esc(card.wordClass)}</div>` : ''}
           ${card.category !== 'geral' ? `<span class="badge learning" style="margin-top:8px">${esc(card.category)}</span>` : ''}
@@ -709,6 +756,152 @@ function buildContextMode(card) {
     </div>`}`;
 }
 
+/* ── MODO: ESCOLHA INVERSA ── */
+function buildRevChoiceMode(card) {
+  const sess = studySession;
+  if (!sess.revChoices) {
+    const others = W.filter(w => w.id !== card.id);
+    const shuffled = others.sort(() => Math.random() - .5).slice(0, 3);
+    sess.revChoices = [...shuffled.map(w => w.word), card.word].sort(() => Math.random() - .5);
+  }
+  const answered = sess.revChoiceAnswered;
+
+  return `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-body" style="text-align:center">
+        <div class="fc-type" style="margin-bottom:10px">Qual é a palavra para esta definição:</div>
+        <div class="fc-definition" style="font-size:18px;line-height:1.6">${esc(card.definition)}</div>
+      </div>
+    </div>
+    <div id="choices">
+      ${sess.revChoices.map((ch, i) => {
+        let cls = 'choice-opt';
+        if (answered) {
+          if (ch === card.word) cls += ' correct';
+          else if (ch === sess.revChoiceSelected) cls += ' wrong reveal';
+          else cls += ' reveal';
+        }
+        return `<div class="${cls}" style="font-family:'Cinzel',serif;font-style:normal;font-weight:600;text-align:center;font-size:16px" onclick="${answered ? '' : `revChoiceAnswer(${i})`}">${esc(ch)}</div>`;
+      }).join('')}
+    </div>
+    ${answered ? `
+    <div style="margin-top:6px">
+      <div class="rating-row">
+        <button class="rating-btn r1" onclick="rateCard(0)"><span class="rating-lbl">De novo</span></button>
+        <button class="rating-btn r${sess.revChoiceCorrect ? '4' : '2'}" onclick="rateCard(${sess.revChoiceCorrect ? 3 : 1})">
+          <span class="rating-lbl">${sess.revChoiceCorrect ? 'Fácil ✓' : 'Difícil'}</span>
+        </button>
+      </div>
+    </div>` : ''}`;
+}
+
+function revChoiceAnswer(idx) {
+  const sess = studySession;
+  if (!sess || sess.revChoiceAnswered) return;
+  const card = sess.queue[sess.current];
+  sess.revChoiceSelected = sess.revChoices[idx];
+  sess.revChoiceCorrect = sess.revChoices[idx] === card.word;
+  sess.revChoiceAnswered = true;
+  render();
+}
+
+/* ── MODO: VERDADEIRO OU FALSO ── */
+function buildTFMode(card) {
+  const sess = studySession;
+  if (!sess.tfSetup) {
+    const isCorrect = Math.random() > 0.5;
+    let def = card.definition;
+    if (!isCorrect && W.length > 1) {
+      const others = W.filter(w => w.id !== card.id && w.definition);
+      def = others[Math.floor(Math.random() * others.length)]?.definition || card.definition;
+      sess.tfIsCorrect = def === card.definition;
+    } else {
+      sess.tfIsCorrect = true;
+    }
+    sess.tfDefinition = def;
+    sess.tfSetup = true;
+  }
+  const answered = sess.tfAnswered;
+
+  return `
+    <div class="card" style="margin-bottom:12px;border:2px solid ${answered ? (sess.tfUserCorrect ? 'var(--green)' : 'var(--red)') : 'var(--border)'}">
+      <div class="card-body" style="text-align:center;padding:24px 16px">
+        <div class="fc-word" style="font-size:32px;margin-bottom:16px">${esc(card.word)}</div>
+        <div style="font-size:13px;color:var(--stone2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Significa:</div>
+        <div class="fc-definition" style="font-size:18px;">"${esc(sess.tfDefinition)}"</div>
+      </div>
+    </div>
+    ${!answered ? `
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn success" style="padding:14px;font-size:14px" onclick="checkTF(true)">✓ Verdadeiro</button>
+      <button class="btn danger" style="padding:14px;font-size:14px" onclick="checkTF(false)">✕ Falso</button>
+    </div>` : `
+    <div class="type-result ${sess.tfUserCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px">
+      ${sess.tfUserCorrect ? '✓ Acertou!' : `✗ Errou. A resposta era <b>${sess.tfIsCorrect ? 'Verdadeiro' : 'Falso'}</b>.`}
+    </div>
+    ${!sess.tfIsCorrect && !sess.tfUserCorrect ? `<div class="quote" style="margin-bottom:10px">Definição real: ${esc(card.definition)}</div>` : ''}
+    <div class="rating-row">
+      <button class="rating-btn r1" onclick="rateCard(0)"><span class="rating-lbl">De novo</span></button>
+      <button class="rating-btn r${sess.tfUserCorrect ? '4' : '2'}" onclick="rateCard(${sess.tfUserCorrect ? 3 : 1})">
+        <span class="rating-lbl">${sess.tfUserCorrect ? 'Correto ✓' : 'Difícil'}</span>
+      </button>
+    </div>`}`;
+}
+
+function checkTF(guess) {
+  const sess = studySession;
+  if (!sess || sess.tfAnswered) return;
+  sess.tfUserCorrect = (guess === sess.tfIsCorrect);
+  sess.tfAnswered = true;
+  render();
+}
+
+/* ── MODO: EMBARALHADO ── */
+function buildScrambleMode(card) {
+  const sess = studySession;
+  if (!sess.scrambledWord) {
+    const letters = card.word.replace(/\s/g,'').split('');
+    sess.scrambledWord = letters.sort(() => Math.random() - 0.5).join('  ').toUpperCase();
+  }
+  const answered = sess.scrambleAnswered;
+
+  return `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-body" style="text-align:center">
+        <div class="fc-type" style="margin-bottom:8px">Desembaralhe as letras:</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:24px;color:var(--gold2);letter-spacing:4px;margin-bottom:14px;padding:10px;background:rgba(0,0,0,0.3);border-radius:var(--r)">${esc(sess.scrambledWord)}</div>
+        <div class="fc-definition" style="font-size:16px;">${esc(card.definition)}</div>
+      </div>
+    </div>
+    ${!answered ? `
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input class="inp" id="scrambleInput" placeholder="Digite a palavra..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')checkScramble()">
+      <button class="btn gold" style="width:auto;padding:10px 16px" onclick="checkScramble()">→</button>
+    </div>` : `
+    <div class="type-result ${sess.scrambleCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px">
+      ${sess.scrambleCorrect ? `✓ Perfeito! "${esc(card.word)}"` : `✗ A palavra correta é: "${esc(card.word)}"`}
+    </div>
+    <div class="rating-row">
+      <button class="rating-btn r1" onclick="rateCard(0)"><span class="rating-lbl">De novo</span></button>
+      <button class="rating-btn r${sess.scrambleCorrect ? '4' : '2'}" onclick="rateCard(${sess.scrambleCorrect ? 3 : 1})">
+        <span class="rating-lbl">${sess.scrambleCorrect ? 'Correto ✓' : 'Difícil'}</span>
+      </button>
+    </div>`}`;
+}
+
+function checkScramble() {
+  const sess = studySession;
+  if (!sess || sess.scrambleAnswered) return;
+  const card = sess.queue[sess.current];
+  const inp = document.getElementById('scrambleInput');
+  if (!inp) return;
+  const ans = inp.value.trim().toLowerCase();
+  const correct = card.word.toLowerCase();
+  sess.scrambleCorrect = ans === correct || levenshtein(ans, correct) <= 1;
+  sess.scrambleAnswered = true;
+  render();
+}
+
 function buildSessionEnd() {
   const sess = studySession;
   const time = Math.round((Date.now() - sess.startTime) / 60000);
@@ -739,34 +932,28 @@ function buildSessionEnd() {
 }
 
 /* ── WORDS TAB ── */
+
 function buildWordsTab() {
-  const q = (document.getElementById('wordSearch')?.value || '').toLowerCase();
+  const q = (document.getElementById('wordSearch')?.value || '');
   const cat = document.getElementById('wordCat')?.value || '';
   const sort = document.getElementById('wordSort')?.value || 'alpha';
-  
-  let list = [...W];
-  if (q) list = list.filter(w => w.word.toLowerCase().includes(q) || w.definition.toLowerCase().includes(q) || (w.tags||'').toLowerCase().includes(q));
-  if (cat) list = list.filter(w => w.category === cat);
-  
-  if (sort === 'alpha') list.sort((a,b) => a.word.localeCompare(b.word));
-  else if (sort === 'due') list.sort((a,b) => a.nextReview - b.nextReview);
-  else if (sort === 'new') list.sort((a,b) => b.createdAt - a.createdAt);
-  else if (sort === 'hard') list.sort((a,b) => a.easeFactor - b.easeFactor);
-
   const cats = [...new Set(W.map(w => w.category).filter(Boolean))];
+
+  // Aciona a atualização da lista apenas após o HTML principal estar na tela
+  setTimeout(updateWordList, 0);
 
   return `
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
       <div class="search-wrap">
         <span class="search-ico">⌕</span>
-        <input class="inp search-inp" id="wordSearch" placeholder="Buscar palavras..." value="${q}" oninput="render()" autocomplete="off">
+        <input class="inp search-inp" id="wordSearch" placeholder="Buscar palavras..." value="${esc(q)}" oninput="handleSearchInput()" autocomplete="off">
       </div>
       <div style="display:flex;gap:6px">
-        <select class="inp" id="wordCat" onchange="render()" style="flex:1">
+        <select class="inp" id="wordCat" onchange="handleFilterChange()" style="flex:1">
           <option value="">Todas categorias</option>
           ${cats.map(c => `<option value="${esc(c)}" ${cat===c?'selected':''}>${esc(c)}</option>`).join('')}
         </select>
-        <select class="inp" id="wordSort" onchange="render()" style="flex:1">
+        <select class="inp" id="wordSort" onchange="handleFilterChange()" style="flex:1">
           <option value="alpha" ${sort==='alpha'?'selected':''}>A → Z</option>
           <option value="due" ${sort==='due'?'selected':''}>Mais urgente</option>
           <option value="new" ${sort==='new'?'selected':''}>Mais recente</option>
@@ -775,25 +962,77 @@ function buildWordsTab() {
       </div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--stone);text-transform:uppercase;letter-spacing:1px">${list.length} palavra${list.length !== 1 ? 's' : ''}</span>
+      <span id="wordCountLbl" style="font-family:'Cinzel',serif;font-size:11px;color:var(--stone);text-transform:uppercase;letter-spacing:1px">...</span>
       <button class="btn ghost sm" onclick="openAddModal()">✦ Nova</button>
     </div>
-    ${!list.length ? `<div class="empty"><div class="empty-icon">📖</div><div class="empty-title">Léxico vazio</div><div class="empty-desc">Adicione palavras para construir seu arsenal retórico.</div></div>` : `
-    <div class="card" style="margin-bottom:0">
-      ${list.map(w => `<div class="word-row" onclick="openWordDetail('${w.id}')">
-        <div class="word-row-main">
-          <div class="word-row-word">${esc(w.word)}</div>
-          <div class="word-row-def">${esc(w.definition)}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
-          <span class="badge ${getStatus(w)}">${statusLabel(getStatus(w))}</span>
-          <div class="word-actions" onclick="event.stopPropagation()">
-            <button class="mini-btn edit" onclick="openEditModal('${w.id}')">✏</button>
-            <button class="mini-btn danger" onclick="confirmDelete('${w.id}')">✕</button>
-          </div>
-        </div>
-      </div>`).join('')}
-    </div>`}`;
+    <div id="wordListCont"></div> `;
+}
+
+function handleSearchInput() {
+  wordDisplayLimit = 15; // Volta para os primeiros 50 ao pesquisar
+  updateWordList(); // Atualiza SÓ a lista, mantendo o foco no campo de busca!
+}
+
+function handleFilterChange() {
+  wordDisplayLimit = 15;
+  updateWordList();
+}
+
+function loadMoreWords() {
+  wordDisplayLimit += 15; // Aumenta o limite de 50 em 50
+  updateWordList();
+}
+
+function updateWordList() {
+  const cont = document.getElementById('wordListCont');
+  const countLbl = document.getElementById('wordCountLbl');
+  if (!cont || !countLbl) return;
+
+  const q = (document.getElementById('wordSearch')?.value || '').toLowerCase();
+  const cat = document.getElementById('wordCat')?.value || '';
+  const sort = document.getElementById('wordSort')?.value || 'alpha';
+
+  let list = [...W];
+  if (q) list = list.filter(w => w.word.toLowerCase().includes(q) || w.definition.toLowerCase().includes(q) || (w.tags||'').toLowerCase().includes(q));
+  if (cat) list = list.filter(w => w.category === cat);
+
+  if (sort === 'alpha') list.sort((a,b) => a.word.localeCompare(b.word));
+  else if (sort === 'due') list.sort((a,b) => a.nextReview - b.nextReview);
+  else if (sort === 'new') list.sort((a,b) => b.createdAt - a.createdAt);
+  else if (sort === 'hard') list.sort((a,b) => a.easeFactor - b.easeFactor);
+
+  countLbl.textContent = `${list.length} palavra${list.length !== 1 ? 's' : ''}`;
+
+  if (!list.length) {
+    cont.innerHTML = `<div class="empty"><div class="empty-icon">📖</div><div class="empty-title">Léxico vazio</div><div class="empty-desc">Nenhum resultado encontrado.</div></div>`;
+    return;
+  }
+
+  // Corta a lista para mostrar apenas até o limite atual
+  const visibleList = list.slice(0, wordDisplayLimit);
+
+  let html = `<div class="card" style="margin-bottom:0">`;
+  html += visibleList.map(w => `<div class="word-row" onclick="openWordDetail('${w.id}')">
+    <div class="word-row-main">
+      <div class="word-row-word">${esc(w.word)}</div>
+      <div class="word-row-def">${esc(w.definition)}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+      <span class="badge ${getStatus(w)}">${statusLabel(getStatus(w))}</span>
+      <div class="word-actions" onclick="event.stopPropagation()">
+        <button class="mini-btn edit" onclick="openEditModal('${w.id}')">✏</button>
+        <button class="mini-btn danger" onclick="confirmDelete('${w.id}')">✕</button>
+      </div>
+    </div>
+  </div>`).join('');
+  html += `</div>`;
+
+  // Adiciona o botão "Carregar mais" se ainda houver palavras ocultas
+  if (list.length > wordDisplayLimit) {
+    html += `<button class="btn ghost" style="margin-top:12px" onclick="loadMoreWords()">↓ Carregar mais (${list.length - wordDisplayLimit} ocultas)</button>`;
+  }
+
+  cont.innerHTML = html;
 }
 
 /* ── ADD TAB ── */
@@ -1048,13 +1287,18 @@ if (quality === 0) {
   
   sess.answered++;
   if (quality >= 2) sess.correct++;
-  sess.current++;
+sess.current++;
   sess.flipped = false;
-  sess.choices = null;
-  sess.choiceAnswered = false;
-  sess.typeAnswered = false;
-  sess.contextAnswered = false;
   
+  // Limpa estados dos modos antigos
+  sess.choices = null; sess.choiceAnswered = false;
+  sess.typeAnswered = false; sess.contextAnswered = false;
+  
+  // Limpa estados dos modos novos ✨
+  sess.tfSetup = false; sess.tfAnswered = false;
+  sess.revChoices = null; sess.revChoiceAnswered = false;
+  sess.scrambledWord = null; sess.scrambleAnswered = false;
+  sess.currentAdaptiveMode = null; // ✨ ZERA O MODO ADAPTATIVO PARA RECALCULAR NO PRÓXIMO CARD
   save();
   render();
 }
@@ -1350,7 +1594,10 @@ function statusLabel(s) {
   return {new:'Novo',learning:'Aprendendo',review:'Revisão',due:'Para revisar',mastered:'Dominado'}[s]||s;
 }
 function modeLabel(m) {
-  return {flash:'Flashcard',choice:'Múltipla escolha',type:'Digitação',context:'Contexto'}[m]||m;
+  return {
+    flash:'Flashcard', choice:'Múltipla escolha', type:'Digitação', context:'Contexto',
+    tf:'V / F', revchoice:'Inversa', scramble:'Embaralhado'
+  }[m]||m;
 }
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
@@ -1389,7 +1636,12 @@ function renderStudy() {
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('on', el.dataset.tab === 'study'));
   render();
 }
-
+function ouvirPalavra(texto) {
+  const fala = new SpeechSynthesisUtterance(texto);
+  fala.lang = 'pt-BR'; // Pode mudar para 'en-US' se for termo em inglês
+  fala.rate = 0.9; // Velocidade um pouco mais lenta para entender bem
+  window.speechSynthesis.speak(fala);
+}
 /* ═══════════════════════════════════════
    INIT
 ═══════════════════════════════════════ */
