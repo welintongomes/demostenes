@@ -104,7 +104,7 @@ select.inp{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.
 .fc-face{position:absolute;width:100%;min-height:220px;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r2);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px;text-align:center;}
 .fc-face.back{transform:rotateY(180deg);background:var(--bg4);}
 .fc-type{font-family:'Cinzel',serif;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--stone);margin-bottom:12px;}
-.fc-word{display: flex; align-items: baseline;font-family:'Cinzel',serif;font-size:26px;font-weight:700;color:var(--gold2);line-height:1.2;margin-bottom:8px;}
+.fc-word{display: flex; flex-direction: column;font-family:'Cinzel',serif;font-size:26px;font-weight:700;color:var(--gold2);line-height:1.2;margin-bottom:8px;}
 .fc-phonetic{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--stone2);margin-bottom:4px;font-style:normal;}
 .fc-definition{font-size:17px;color:var(--ink);line-height:1.6;font-style:italic;}
 .fc-example{font-size:14px;color:var(--stone3);line-height:1.7;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
@@ -192,7 +192,7 @@ svg.ring{transform:rotate(-90deg);}
 .ring-bg{fill:none;stroke:rgba(255,255,255,.06);}
 .ring-fill{fill:none;stroke:var(--gold);stroke-linecap:round;transition:stroke-dashoffset .6s ease;}
 .ring-label{font-family:'Cinzel',serif;font-size:22px;font-weight:700;fill:var(--gold2);}
-.ring-sub{font-size:10px;fill:var(--stone);font-family:'Cinzel',serif;text-transform:uppercase;letter-spacing:1px;}
+.ring-sub{font-size:9px;fill:var(--stone);font-family:'Cinzel',serif;text-transform:uppercase;letter-spacing:1px;}
 
 /* ── STREAKS / CALENDAR ── */
 .streak-dots{display:flex;flex-wrap:wrap;gap:4px;}
@@ -232,7 +232,10 @@ svg.ring{transform:rotate(-90deg);}
     <div class="header-top">
       <div>
         <div class="app-title">Demóstenes</div>
-        <div class="app-subtitle">Mestre da Retórica</div>
+        <div class="app-subtitle" style="display:flex;align-items:center;gap:8px">
+          Mestre da Retórica
+          <button id="btnAudio" onclick="toggleAudio()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:0.4" title="Leitura Automática">🔈</button>
+        </div>
       </div>
       <div class="header-stats">
         <div class="hstat"><div class="hstat-val" id="hDue">0</div><div class="hstat-lbl">Hoje</div></div>
@@ -363,6 +366,7 @@ let studyMode = 'flash'; // flash | choice | type | context
 let modalStack = [];
 let wordDisplayLimit = 50; // Limite inicial de palavras exibidas
 let confirmCallback = null;
+let autoPlayAudio = false;//faz leitura em voz alta
 
 /* ═══════════════════════════════════════
    WORD FACTORY
@@ -378,6 +382,8 @@ function mkCard(data) {
     category: data.category || 'geral',
     wordClass: data.wordClass || '',
     tags: data.tags || '',
+    langWord: data.langWord || 'pt-BR', // ✨ NOVA
+    langDef: data.langDef || 'pt-BR',   // ✨ NOVA
     // SM-2
     interval: 1,
     repetitions: 0,
@@ -418,20 +424,25 @@ function nextIntervals(card) {
    STUDY SESSION
 ═══════════════════════════════════════ */
 //adapta o modo de estudo para cada palavra
+
 function getAdaptiveMode(card) {
   const ivl = card.interval;
   const rep = card.repetitions;
   
   if (rep === 0 || ivl <= 3) {
-    // Fase 1: Reconhecimento (Palavras Novas ou muito difíceis)
+    // Fase 1 (Reconhecimento): 0 a 3 dias
     const modes = ['flash', 'choice', 'tf'];
     return modes[Math.floor(Math.random() * modes.length)];
+  } else if (ivl <= 7) {
+    // Fase 2 (Recuperação Guiada): 4 a 7 dias ✨ NOVO NÍVEL
+    const modes = ['revchoice', 'spell'];
+    return modes[Math.floor(Math.random() * modes.length)];
   } else if (ivl <= 14) {
-    // Fase 2: Recuperação (Ganhando tração - 4 a 14 dias)
-    const modes = ['revchoice', 'scramble'];
+    // Fase 3 (Recuperação Ativa): 8 a 14 dias
+    const modes = ['scramble'];
     return modes[Math.floor(Math.random() * modes.length)];
   } else {
-    // Fase 3: Domínio (Palavras consolidadas, +15 dias)
+    // Fase 4 (Domínio): 15+ dias
     const modes = ['type', 'context'];
     return modes[Math.floor(Math.random() * modes.length)];
   }
@@ -452,6 +463,7 @@ function startSession(mode) {
     typeAnswered: false,
     typeCorrect: false,
   };
+  setTimeout(playQuestionAudio, 200);
   renderStudy();
 }
 
@@ -522,6 +534,7 @@ function buildStudyTab() {
         </div>
         <div class="btn-row" style="flex-wrap:wrap;gap:6px;margin-top:6px">
           <button class="btn ghost sm" onclick="startSession('revchoice')" style="flex:1">🔄 Inversa</button>
+          <button class="btn ghost sm" onclick="startSession('spell')" style="flex:1">🅰️ Letras</button>
           <button class="btn ghost sm" onclick="startSession('scramble')" style="flex:1">🔀 Embaralhado</button>
           <button class="btn ghost sm" onclick="startSession('type')" style="flex:1">⌨ Digitar</button>
           <button class="btn ghost sm" onclick="startSession('context')" style="flex:1">📜 Contexto</button>
@@ -609,6 +622,8 @@ function buildStudyCard() {
     inner = buildTFMode(card);
   } else if (activeMode === 'revchoice') {
     inner = buildRevChoiceMode(card);
+  } else if (activeMode === 'spell') {
+    inner = buildSpellMode(card); // ✨ NOVA ROTA
   } else if (activeMode === 'scramble') {
     inner = buildScrambleMode(card);
   }
@@ -635,7 +650,7 @@ function buildFlashMode(card, intervals) {
       <div class="flashcard${flipped ? ' flipped' : ''}" id="flashcard">
         <div class="fc-face front">
           <div class="fc-type">Palavra</div>
-          <div class="fc-word">${esc(card.word)} <button class="mini-btn" style="border:none" onclick="event.stopPropagation(); ouvirPalavra('${esc(card.word)}')">🔊</button></div>
+          <button class="mini-btn" style="border:none" onclick="event.stopPropagation(); ouvirPalavra('${esc(card.word)}', '${card.langWord || 'pt-BR'}')">🔊${esc(card.word)}</button>
           ${card.phonetic ? `<div class="fc-phonetic">[${esc(card.phonetic)}]</div>` : ''}
           ${card.wordClass ? `<div class="fc-class">${esc(card.wordClass)}</div>` : ''}
           ${card.category !== 'geral' ? `<span class="badge learning" style="margin-top:8px">${esc(card.category)}</span>` : ''}
@@ -855,6 +870,7 @@ function checkTF(guess) {
   sess.tfUserCorrect = (guess === sess.tfIsCorrect);
   sess.tfAnswered = true;
   render();
+  setTimeout(playAnswerAudio, 100);
 }
 
 /* ── MODO: EMBARALHADO ── */
@@ -890,6 +906,83 @@ function buildScrambleMode(card) {
     </div>`}`;
 }
 
+/* ── MODO: LETRAS (BOTÕES) ── */
+function buildSpellMode(card) {
+  const sess = studySession;
+  if (!sess.spellSetup) {
+    // Tira os espaços e transforma a palavra em um array de letras
+    const chars = card.word.replace(/\s/g,'').toUpperCase().split('');
+    // Cria objetos únicos para cada letra e embaralha
+    sess.spellPool = chars.map((char, i) => ({ id: i, char })).sort(() => Math.random() - 0.5);
+    sess.spellAnswer = []; // Aqui guardaremos os IDs das letras clicadas
+    sess.spellSetup = true;
+  }
+  const answered = sess.spellAnswered;
+
+  // Monta o HTML das letras que o usuário já clicou
+  const ansHtml = sess.spellAnswer.map(id => {
+    const item = sess.spellPool.find(p => p.id === id);
+    return `<button class="btn gold sm" style="width:38px;height:38px;padding:0;font-size:18px;font-weight:700" onclick="${answered ? '' : `spellRemove(${id})`}">${item.char}</button>`;
+  }).join('');
+
+  // Monta o HTML das letras que ainda estão sobrando no banco
+  const availHtml = sess.spellPool.filter(p => !sess.spellAnswer.includes(p.id)).map(item => {
+    return `<button class="btn ghost sm" style="width:38px;height:38px;padding:0;font-size:18px;font-weight:700;border-color:var(--border2)" onclick="${answered ? '' : `spellAdd(${item.id})`}">${item.char}</button>`;
+  }).join('');
+
+  return `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-body" style="text-align:center">
+        <div class="fc-type" style="margin-bottom:8px">Toque para formar a palavra:</div>
+        <div class="fc-definition" style="font-size:16px;margin-bottom:16px">${esc(card.definition)}</div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;min-height:54px;padding:8px;background:rgba(0,0,0,0.3);border-radius:var(--r);border:1px dashed var(--border3);margin-bottom:16px">
+          ${ansHtml}
+        </div>
+
+        ${!answered ? `
+        <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">
+          ${availHtml}
+        </div>` : ''}
+      </div>
+    </div>
+
+    ${!answered ? `
+    <div style="display:flex;gap:8px">
+      <button class="btn ghost" style="flex:1" onclick="spellClear()">⟲ Limpar</button>
+      <button class="btn gold" style="flex:2" onclick="checkSpell()">Verificar →</button>
+    </div>` : `
+    <div class="type-result ${sess.spellCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px">
+      ${sess.spellCorrect ? `✓ Excelente! "${esc(card.word)}"` : `✗ A palavra correta é: "${esc(card.word)}"`}
+    </div>
+    <div class="rating-row">
+      <button class="rating-btn r1" onclick="rateCard(0)"><span class="rating-lbl">De novo</span></button>
+      <button class="rating-btn r${sess.spellCorrect ? '4' : '2'}" onclick="rateCard(${sess.spellCorrect ? 3 : 1})">
+        <span class="rating-lbl">${sess.spellCorrect ? 'Correto ✓' : 'Difícil'}</span>
+      </button>
+    </div>`}
+  `;
+}
+
+// Funções de clique do Modo Letras
+function spellAdd(id) { if(!studySession)return; studySession.spellAnswer.push(id); render(); }
+function spellRemove(id) { if(!studySession)return; studySession.spellAnswer = studySession.spellAnswer.filter(i => i !== id); render(); }
+function spellClear() { if(!studySession)return; studySession.spellAnswer = []; render(); }
+function checkSpell() {
+  const sess = studySession;
+  if (!sess || sess.spellAnswered) return;
+  const card = sess.queue[sess.current];
+  
+  // Junta as letras que o usuário clicou e compara com a palavra original
+  const userWord = sess.spellAnswer.map(id => sess.spellPool.find(p=>p.id===id).char).join('').toLowerCase();
+  const correctWord = card.word.replace(/\s/g,'').toLowerCase();
+
+  sess.spellCorrect = (userWord === correctWord);
+  sess.spellAnswered = true;
+  setTimeout(playAnswerAudio, 100); // Toca o áudio se acertar ou errar!
+  render();
+} 
+
 function checkScramble() {
   const sess = studySession;
   if (!sess || sess.scrambleAnswered) return;
@@ -901,6 +994,7 @@ function checkScramble() {
   sess.scrambleCorrect = ans === correct || levenshtein(ans, correct) <= 1;
   sess.scrambleAnswered = true;
   render();
+  setTimeout(playAnswerAudio, 100);
 }
 
 function buildSessionEnd() {
@@ -1058,7 +1152,7 @@ function buildAddTab() {
           palavra | definição | exemplo | sinônimos | categoria<br><br>
           <b>Formato Anki/CSV</b> (tabulação):<br>
           palavra[tab]definição[tab]exemplo<br><br>
-          <b>Aceita também</b>: ; ou :: como separadores
+          <span style="color:var(--gold2)">Aviso:</span> Use APENAS a barra reta ( <b>|</b> ) ou tabulação para separar os itens.
         </div>
         <div class="form-group">
           <label class="lbl">Cole suas palavras aqui</label>
@@ -1067,15 +1161,22 @@ eloquência | arte de falar com efeito e beleza | Sua eloquência encantou a pla
 hodierno | relativo ao dia de hoje; atual, contemporâneo
 indelével | que não se apaga; permanente"></textarea>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-          <select class="inp" id="importCat" style="flex:1">
-            <option value="geral">Categoria padrão: Geral</option>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+          <select class="inp" id="importLangWord" style="flex:1;min-width:120px">
+            <option value="pt-BR">Palavras: PT-BR</option>
+            <option value="en-US">Palavras: Inglês</option>
+            <option value="es-ES">Palavras: Espanhol</option>
+          </select>
+          <select class="inp" id="importLangDef" style="flex:1;min-width:120px">
+            <option value="pt-BR">Definições: PT-BR</option>
+            <option value="en-US">Definições: Inglês</option>
+            <option value="es-ES">Definições: Espanhol</option>
+          </select>
+          <select class="inp" id="importCat" style="flex:1;min-width:120px">
+            <option value="geral">Categoria: Geral</option>
             <option value="retórica">Retórica</option>
-            <option value="filosofia">Filosofia</option>
-            <option value="literatura">Literatura</option>
-            <option value="erudição">Erudição</option>
-            <option value="dialética">Dialética</option>
-            <option value="jurídico">Jurídico</option>
+            <option value="inglês">Inglês</option>
+            <option value="mecânica">Mecânica</option>
           </select>
         </div>
         <div class="btn-row">
@@ -1111,7 +1212,23 @@ function buildWordForm(word) {
   const w = word || {};
   const cats = ['geral','retórica','filosofia','literatura','erudição','dialética','jurídico','política','ciência','cotidiano'];
   const classes = ['','substantivo','verbo','adjetivo','advérbio','expressão','locução'];
+  const langs = [['pt-BR','Português'],['en-US','Inglês'],['es-ES','Espanhol'],['fr-FR','Francês'],['de-DE','Alemão'],['it-IT','Italiano']];
+  
   return `
+    <div style="display:flex;gap:8px">
+      <div class="form-group" style="flex:1">
+        <label class="lbl">Idioma da Palavra</label>
+        <select class="inp" id="fw_lang_word">
+          ${langs.map(([v,l]) => `<option value="${v}" ${(w.langWord||'pt-BR')===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="lbl">Idioma da Definição</label>
+        <select class="inp" id="fw_lang_def">
+          ${langs.map(([v,l]) => `<option value="${v}" ${(w.langDef||'pt-BR')===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+      </div>
+    </div>
     <div class="form-group">
       <label class="lbl">Palavra *</label>
       <input class="inp" id="fw_word" value="${esc(w.word||'')}" placeholder="Ex: indelével" autocomplete="off" autocorrect="off">
@@ -1257,11 +1374,12 @@ function flipCard() {
   // 1. Aplica a classe para iniciar a animação CSS do giro
   const fc = document.getElementById('flashcard');
   if (fc) fc.classList.add('flipped');
-
+  
   // 2. Dá um pequeno atraso para a animação acontecer antes de recarregar a interface
   setTimeout(() => {
     render(); // Recarrega a tela para exibir os botões de avaliação
   }, 250); 
+  setTimeout(playAnswerAudio, 250);
 }
 
 function rateCard(quality) {
@@ -1278,6 +1396,7 @@ function rateCard(quality) {
   W[idx].totalReviews = (W[idx].totalReviews || 0) + 1;
   if (quality >= 2) W[idx].correctStreak = (W[idx].correctStreak || 0) + 1;
   else W[idx].correctStreak = 0;
+  setTimeout(playQuestionAudio, 200);
 }
 
 // ✨ ADICIONE ISSO AQUI ✨
@@ -1299,6 +1418,7 @@ sess.current++;
   sess.tfSetup = false; sess.tfAnswered = false;
   sess.revChoices = null; sess.revChoiceAnswered = false;
   sess.scrambledWord = null; sess.scrambleAnswered = false;
+  sess.spellSetup = false; sess.spellAnswered = false;
   sess.currentAdaptiveMode = null; // ✨ ZERA O MODO ADAPTATIVO PARA RECALCULAR NO PRÓXIMO CARD
   save();
   render();
@@ -1312,6 +1432,7 @@ function choiceAnswer(idx) {
   sess.choiceCorrect = sess.choices[idx] === card.definition;
   sess.choiceAnswered = true;
   render();
+  setTimeout(playAnswerAudio, 100);
 }
 
 function checkType() {
@@ -1325,6 +1446,7 @@ function checkType() {
   sess.typeCorrect = ans === correct || levenshtein(ans, correct) <= 1;
   sess.typeAnswered = true;
   render();
+  setTimeout(playAnswerAudio, 100);
 }
 
 function checkContext() {
@@ -1356,6 +1478,8 @@ function saveNewWord() {
     example: gv('fw_ex'), synonyms: gv('fw_syn'),
     phonetic: gv('fw_ph'), category: gv('fw_cat'),
     wordClass: gv('fw_class'), tags: gv('fw_tags'),
+    langWord: gv('fw_lang_word'), // ✨ CAPTURA IDIOMA DA PALAVRA
+    langDef: gv('fw_lang_def')    // ✨ CAPTURA IDIOMA DA DEFINIÇÃO
   });
   W.push(card);
   save();
@@ -1366,23 +1490,38 @@ function saveNewWord() {
 
 function importWords() {
   const raw = document.getElementById('importTA')?.value || '';
-  const cat = document.getElementById('importCat')?.value || 'geral';
+  const dropdownCat = document.getElementById('importCat')?.value || 'geral'; // Pega o que está no seletor
+  const langWord = document.getElementById('importLangWord')?.value || 'pt-BR'; // ✨
+  const langDef = document.getElementById('importLangDef')?.value || 'pt-BR'; // ✨
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
   let added = 0, skipped = 0;
   
   lines.forEach(line => {
-    const parts = line.split(/\s*[\|\;\:]{1,2}\s*|\t/).map(p => p.trim());
-    const word = parts[0]; const def = parts[1];
+    // Nova regra: separa APENAS por '|' ou Tabulação (\t)
+    const parts = line.split(/\s*\|\s*|\t/).map(p => p.trim());
+    const word = parts[0]; 
+    const def = parts[1];
+    
     if (!word || !def) { skipped++; return; }
     if (W.find(w => w.word.toLowerCase() === word.toLowerCase())) { skipped++; return; }
+    
+    // INTELIGÊNCIA DA CATEGORIA
+    // Se parts[4] existir e não for vazio, usa ele. Se não, usa o dropdownCat.
+    const inlineCat = parts[4];
+    const finalCategory = (inlineCat && inlineCat !== '') ? inlineCat : dropdownCat;
+
     W.push(mkCard({
-      word, definition: def,
+      word: word, 
+      definition: def,
       example: parts[2] || '',
       synonyms: parts[3] || '',
-      category: parts[4] || cat,
+      category: finalCategory, // Usa a categoria decidida acima
+      langWord: langWord, // ✨
+      langDef: langDef    // ✨
     }));
     added++;
   });
+  
   save();
   toast(`${added} palavras importadas! (${skipped} ignoradas)`, added > 0 ? 'gold' : 'err');
   document.getElementById('importPreview').innerHTML = '';
@@ -1394,12 +1533,16 @@ function previewImport() {
   const raw = document.getElementById('importTA')?.value || '';
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
   const prev = document.getElementById('importPreview');
+  
   if (!prev) return;
   if (!lines.length) { prev.innerHTML = ''; return; }
+  
   const items = lines.slice(0, 5).map(line => {
-    const parts = line.split(/\s*[\|\;\:]{1,2}\s*|\t/).map(p => p.trim());
+    // Usa a mesma regra de separação nova: '|' ou Tab
+    const parts = line.split(/\s*\|\s*|\t/).map(p => p.trim());
     return `<div style="padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:var(--gold2);font-family:'Cinzel',serif">${esc(parts[0]||'')}</span> — <span style="font-style:italic;color:var(--stone2)">${esc(parts[1]||'')}</span></div>`;
   }).join('');
+  
   prev.innerHTML = `<div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--stone);margin-bottom:6px">Prévia (${lines.length} linhas):</div>${items}${lines.length > 5 ? `<div style="font-size:12px;color:var(--stone);margin-top:4px">...e mais ${lines.length - 5}</div>` : ''}`;
 }
 
@@ -1505,7 +1648,14 @@ function openAddModal() {
 function saveModalWord() {
   const word = gv('fw_word'), def = gv('fw_def');
   if (!word || !def) { toast('Preencha palavra e definição', 'err'); return; }
-  W.push(mkCard({word,definition:def,example:gv('fw_ex'),synonyms:gv('fw_syn'),phonetic:gv('fw_ph'),category:gv('fw_cat'),wordClass:gv('fw_class'),tags:gv('fw_tags')}));
+  W.push(mkCard({
+    word, definition: def,
+    example: gv('fw_ex'), synonyms: gv('fw_syn'),
+    phonetic: gv('fw_ph'), category: gv('fw_cat'),
+    wordClass: gv('fw_class'), tags: gv('fw_tags'),
+    langWord: gv('fw_lang_word'), // ✨ CAPTURA IDIOMA DA PALAVRA
+    langDef: gv('fw_lang_def')    // ✨ CAPTURA IDIOMA DA DEFINIÇÃO
+  }));
   save(); closeModal(); toast(`"${word}" adicionada!`, 'gold'); render();
 }
 
@@ -1526,7 +1676,14 @@ function saveEditWord(id) {
   if (idx < 0) return;
   const word = gv('fw_word'), def = gv('fw_def');
   if (!word || !def) { toast('Preencha palavra e definição', 'err'); return; }
-  Object.assign(W[idx], {word,definition:def,example:gv('fw_ex'),synonyms:gv('fw_syn'),phonetic:gv('fw_ph'),category:gv('fw_cat'),wordClass:gv('fw_class'),tags:gv('fw_tags')});
+  Object.assign(W[idx], {
+    word, definition: def,
+    example: gv('fw_ex'), synonyms: gv('fw_syn'),
+    phonetic: gv('fw_ph'), category: gv('fw_cat'),
+    wordClass: gv('fw_class'), tags: gv('fw_tags'),
+    langWord: gv('fw_lang_word'), // ✨ ATUALIZA IDIOMA DA PALAVRA
+    langDef: gv('fw_lang_def')    // ✨ ATUALIZA IDIOMA DA DEFINIÇÃO
+  });
   save(); closeModal(); toast('Palavra atualizada!', 'ok'); render();
 }
 
@@ -1593,10 +1750,11 @@ function today() {
 function statusLabel(s) {
   return {new:'Novo',learning:'Aprendendo',review:'Revisão',due:'Para revisar',mastered:'Dominado'}[s]||s;
 }
+// Atualize a modeLabel:
 function modeLabel(m) {
   return {
     flash:'Flashcard', choice:'Múltipla escolha', type:'Digitação', context:'Contexto',
-    tf:'V / F', revchoice:'Inversa', scramble:'Embaralhado'
+    tf:'V / F', revchoice:'Inversa', scramble:'Embaralhado', spell:'Letras' // ✨ ADICIONADO
   }[m]||m;
 }
 function levenshtein(a, b) {
@@ -1636,11 +1794,60 @@ function renderStudy() {
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('on', el.dataset.tab === 'study'));
   render();
 }
-function ouvirPalavra(texto) {
+// Substitua a função ouvirPalavra antiga por tudo isso:
+function ouvirPalavra(texto, lang = 'pt-BR') {
+  window.speechSynthesis.cancel(); // Corta a voz anterior se você clicar rápido
   const fala = new SpeechSynthesisUtterance(texto);
-  fala.lang = 'pt-BR'; // Pode mudar para 'en-US' se for termo em inglês
-  fala.rate = 0.9; // Velocidade um pouco mais lenta para entender bem
+  fala.lang = lang;
+  fala.rate = 0.9;
   window.speechSynthesis.speak(fala);
+}
+
+function toggleAudio() {
+  autoPlayAudio = !autoPlayAudio;
+  const b = document.getElementById('btnAudio');
+  if (b) {
+    b.textContent = autoPlayAudio ? '🔊' : '🔈';
+    b.style.opacity = autoPlayAudio ? '1' : '0.4';
+  }
+  toast(autoPlayAudio ? 'Leitura Automática: ON' : 'Leitura Automática: OFF', autoPlayAudio ? 'gold' : 'err');
+  
+  // Se ligou o áudio no meio da tela de estudo, já lê a pergunta atual
+  if (autoPlayAudio && studySession && !studySession.flipped && !studySession.choiceAnswered && !studySession.tfAnswered && !studySession.typeAnswered && !studySession.revChoiceAnswered && !studySession.scrambleAnswered && !studySession.contextAnswered) {
+    playQuestionAudio();
+  }
+}
+
+function playQuestionAudio() {
+  if (!autoPlayAudio || !studySession) return;
+  const card = studySession.queue[studySession.current];
+  if (!card) return;
+  
+  const mode = studySession.currentAdaptiveMode || studyMode;
+  // Modos onde a pergunta exibida é a PALAVRA
+  if (mode === 'flash' || mode === 'choice' || mode === 'tf') {
+    ouvirPalavra(card.word, card.langWord || 'pt-BR');
+  } 
+  // Modos onde a pergunta exibida é a DEFINIÇÃO
+  else {
+    ouvirPalavra(card.definition, card.langDef || 'pt-BR');
+  }
+}
+
+function playAnswerAudio() {
+  if (!autoPlayAudio || !studySession) return;
+  const card = studySession.queue[studySession.current];
+  if (!card) return;
+  
+  const mode = studySession.currentAdaptiveMode || studyMode;
+  // Modos onde a resposta descoberta é a DEFINIÇÃO
+  if (mode === 'flash' || mode === 'choice') {
+    ouvirPalavra(card.definition, card.langDef || 'pt-BR');
+  } 
+  // Modos onde a resposta descoberta é a PALAVRA
+  else {
+    ouvirPalavra(card.word, card.langWord || 'pt-BR');
+  }
 }
 /* ═══════════════════════════════════════
    INIT
