@@ -85,7 +85,7 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Crimson
 .inp,.ta,select.inp{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;color:var(--ink);font-family:'Crimson Pro',serif;font-size:15px;outline:none;transition:border-color .2s;appearance:none;}
 .inp:focus,.ta:focus{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,168,76,.1);}
 .ta{min-height:120px;resize:vertical;line-height:1.6;}
-.lbl{font-family:'Cinzel',serif;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--stone2);margin-bottom:6px;display:block;}
+.lbl{font-family:'Cinzel',serif;font-size:10px;font-weight:600;text-align: center;letter-spacing:1.5px;text-transform:uppercase;color:var(--stone2);margin-bottom:6px;display:block;}
 .form-group{margin-bottom:14px;}
 select.inp{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%238c8070' d='M5 6L0 0h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:30px;cursor:pointer;}
 
@@ -448,9 +448,20 @@ function getAdaptiveMode(card) {
   }
 }
 
-function startSession(mode) {
-  const due = dueCards();
-  if (!due.length) { toast('Nenhum card para revisar agora!'); return; }
+//filtra o estudo inteligente por categoria ou todos
+function startSession(mode, category = '') {
+  let due = dueCards();
+  
+  // Se o seletor enviou uma categoria, filtra a lista
+  if (category && category !== '') {
+    due = due.filter(w => w.category === category);
+  }
+
+  if (!due.length) { 
+    toast(category ? `Nenhum card de "${category}" para revisar!` : 'Nenhum card para revisar agora!'); 
+    return; 
+  }
+
   studyMode = mode || studyMode;
   studySession = {
     queue: [...due].sort(() => Math.random() - 0.5),
@@ -461,9 +472,12 @@ function startSession(mode) {
     flipped: false,
     choiceAnswered: false,
     typeAnswered: false,
-    typeCorrect: false,
+    filterCategory: category
   };
-  setTimeout(playQuestionAudio, 200);
+  
+  // Se o áudio automático estiver ligado, aciona na primeira carta
+  setTimeout(playQuestionAudio, 200); 
+  
   renderStudy();
 }
 
@@ -517,27 +531,39 @@ function buildStudyTab() {
 
   // Due now card
   if (due.length > 0) {
+    // ✨ NOVO: Identifica as categorias disponíveis apenas nos cards que estão vencidos hoje
+    const dueCats = [...new Set(due.map(w => w.category).filter(Boolean))];
+
     html += `<div class="card">
       <div class="card-head"><div class="card-title">⚡ Revisão Pendente</div><span class="badge due">${due.length} card${due.length > 1 ? 's' : ''}</span></div>
       <div class="card-body">
         <div class="quote" style="margin-bottom:14px">"A perseverança é a virtude dos fortes." — Demóstenes</div>
         
+        ${dueCats.length > 1 ? `
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="lbl">Focar em uma categoria? (Opcional)</label>
+          <select class="inp" id="studyCatFilter">
+            <option value="">📚 Estudar Tudo (${due.length})</option>
+            ${dueCats.map(c => `<option value="${esc(c)}">${esc(c)} (${due.filter(w=>w.category===c).length})</option>`).join('')}
+          </select>
+        </div>` : `<input type="hidden" id="studyCatFilter" value="">`}
+        
         <div class="btn-row" style="flex-wrap:wrap;gap:8px">
-          <button class="btn gold" onclick="startSession('adaptive')" style="flex:100%;font-size:14px;padding:14px;letter-spacing:2px">🧠 Estudo Inteligente</button>
+          <button class="btn gold" onclick="startSession('adaptive', document.getElementById('studyCatFilter')?.value)" style="flex:100%;font-size:14px;padding:14px;letter-spacing:2px">🧠 Estudo Inteligente</button>
         </div>
         <div class="sep" style="margin:12px 0"></div>
         <div style="font-size:10px;color:var(--stone2);margin-bottom:8px;text-align:center;text-transform:uppercase;letter-spacing:1px">Treinamento Específico:</div>
         <div class="btn-row" style="flex-wrap:wrap;gap:6px">
-          <button class="btn ghost sm" onclick="startSession('flash')" style="flex:1">⚡ Flash</button>
-          <button class="btn ghost sm" onclick="startSession('choice')" style="flex:1">📝 Múltipla</button>
-          <button class="btn ghost sm" onclick="startSession('tf')" style="flex:1">⚖ V/F</button>
+          <button class="btn ghost sm" onclick="startSession('flash', document.getElementById('studyCatFilter')?.value)" style="flex:1">⚡ Flash</button>
+          <button class="btn ghost sm" onclick="startSession('choice', document.getElementById('studyCatFilter')?.value)" style="flex:1">📝 Múltipla</button>
+          <button class="btn ghost sm" onclick="startSession('tf', document.getElementById('studyCatFilter')?.value)" style="flex:1">⚖ V/F</button>
         </div>
         <div class="btn-row" style="flex-wrap:wrap;gap:6px;margin-top:6px">
-          <button class="btn ghost sm" onclick="startSession('revchoice')" style="flex:1">🔄 Inversa</button>
-          <button class="btn ghost sm" onclick="startSession('spell')" style="flex:1">🅰️ Letras</button>
-          <button class="btn ghost sm" onclick="startSession('scramble')" style="flex:1">🔀 Embaralhado</button>
-          <button class="btn ghost sm" onclick="startSession('type')" style="flex:1">⌨ Digitar</button>
-          <button class="btn ghost sm" onclick="startSession('context')" style="flex:1">📜 Contexto</button>
+          <button class="btn ghost sm" onclick="startSession('revchoice', document.getElementById('studyCatFilter')?.value)" style="flex:1">🔄 Inversa</button>
+          <button class="btn ghost sm" onclick="startSession('spell', document.getElementById('studyCatFilter')?.value)" style="flex:1">🅰️ Letras</button>
+          <button class="btn ghost sm" onclick="startSession('scramble', document.getElementById('studyCatFilter')?.value)" style="flex:1">🔀 Embaralhado</button>
+          <button class="btn ghost sm" onclick="startSession('type', document.getElementById('studyCatFilter')?.value)" style="flex:1">⌨ Digitar</button>
+          <button class="btn ghost sm" onclick="startSession('context', document.getElementById('studyCatFilter')?.value)" style="flex:1">📜 Contexto</button>
         </div>
       </div>
     </div>`;
@@ -584,6 +610,16 @@ function buildStudyTab() {
     '"Quem governa a linguagem, governa o pensamento." — Wittgenstein',
     '"O vocabulário é a munição do pensamento." — Confúcio adaptado',
     '"Cada palavra nova é uma janela para um novo mundo." — Anatole France',
+    '"Os limites da minha linguagem significam os limites do meu mundo." — Wittgenstein',
+    '"A caneta é a língua da alma." — Miguel de Cervantes',
+    '"Pensar é o diálogo da alma consigo mesma." — Platã',
+    '"A palavra é o fio de prumo da inteligagem." — Victor Hugo',
+    '"O que não se pode dizer, deve-se calar." — Wittgenstein',
+    '"A língua é a chave da mente; se a perdes, ficas trancado fora de ti." — Provébio Árabe',
+    '"Uma palavra dita com clareza é meio caminho para a verdade." — Aristóteles',
+    '"A gramática é o sistema nervoso da liberdade." — Fernando Pessoa',
+    '"A palavra é o espelho da ação." — Sólon',
+    '"Quem domina os termos, domina os conceitos." — Francis Bacon adaptado',
   ];
   html += `<div class="quote" style="margin-top:4px">${quotes[new Date().getDate() % quotes.length]}</div>`;
   return html;
@@ -1032,7 +1068,14 @@ function buildWordsTab() {
   const q = (document.getElementById('wordSearch')?.value || '');
   const cat = document.getElementById('wordCat')?.value || '';
   const sort = document.getElementById('wordSort')?.value || 'alpha';
-  const cats = [...new Set(W.map(w => w.category).filter(Boolean))];
+  
+  // ✨ NOVO: Cria um mapa contando quantas palavras cada categoria tem no léxico inteiro
+  const catCounts = {};
+  W.forEach(w => { 
+    const c = w.category || 'geral';
+    catCounts[c] = (catCounts[c] || 0) + 1; 
+  });
+  const cats = Object.keys(catCounts).sort();
 
   // Aciona a atualização da lista apenas após o HTML principal estar na tela
   setTimeout(updateWordList, 0);
@@ -1045,8 +1088,8 @@ function buildWordsTab() {
       </div>
       <div style="display:flex;gap:6px">
         <select class="inp" id="wordCat" onchange="handleFilterChange()" style="flex:1">
-          <option value="">Todas categorias</option>
-          ${cats.map(c => `<option value="${esc(c)}" ${cat===c?'selected':''}>${esc(c)}</option>`).join('')}
+          <option value="">Todas categorias (${W.length})</option>
+          ${cats.map(c => `<option value="${esc(c)}" ${cat===c?'selected':''}>${esc(c)} (${catCounts[c]})</option>`).join('')}
         </select>
         <select class="inp" id="wordSort" onchange="handleFilterChange()" style="flex:1">
           <option value="alpha" ${sort==='alpha'?'selected':''}>A → Z</option>
@@ -1060,7 +1103,8 @@ function buildWordsTab() {
       <span id="wordCountLbl" style="font-family:'Cinzel',serif;font-size:11px;color:var(--stone);text-transform:uppercase;letter-spacing:1px">...</span>
       <button class="btn ghost sm" onclick="openAddModal()">✦ Nova</button>
     </div>
-    <div id="wordListCont"></div> `;
+    <div id="wordListCont"></div> 
+  `;
 }
 
 function handleSearchInput() {
@@ -1210,7 +1254,19 @@ indelével | que não se apaga; permanente"></textarea>
 
 function buildWordForm(word) {
   const w = word || {};
-  const cats = ['geral','retórica','filosofia','literatura','erudição','dialética','jurídico','política','ciência','cotidiano'];
+  
+  // ✨ NOVO: Puxa as categorias padrão E as categorias customizadas que já existem no seu banco
+  const defaultCats = ['geral','retórica','filosofia','literatura','erudição','dialética','jurídico','política','ciência','cotidiano'];
+  const existingCats = W.map(x => x.category).filter(Boolean);
+  
+  // Junta tudo, remove as duplicadas e coloca em ordem alfabética
+  const cats = [...new Set([...defaultCats, ...existingCats])].sort();
+
+  // Se por acaso a palavra tiver uma categoria isolada, garante que ela apareça
+  if (w.category && !cats.includes(w.category)) {
+    cats.push(w.category);
+  }
+  
   const classes = ['','substantivo','verbo','adjetivo','advérbio','expressão','locução'];
   const langs = [['pt-BR','Português'],['en-US','Inglês'],['es-ES','Espanhol'],['fr-FR','Francês'],['de-DE','Alemão'],['it-IT','Italiano']];
   
@@ -1255,7 +1311,7 @@ function buildWordForm(word) {
       <div class="form-group" style="flex:1">
         <label class="lbl">Categoria</label>
         <select class="inp" id="fw_cat">
-          ${cats.map(c => `<option value="${c}" ${(w.category||'geral')===c?'selected':''}>${c}</option>`).join('')}
+          ${cats.map(c => `<option value="${c}" ${(w.category||'geral')===c?'selected':''}>${esc(c)}</option>`).join('')}
         </select>
       </div>
       <div class="form-group" style="flex:1">
