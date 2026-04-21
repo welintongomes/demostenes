@@ -1088,7 +1088,7 @@ function buildWordsTab() {
       </div>
       <div style="display:flex;gap:6px">
         <select class="inp" id="wordCat" onchange="handleFilterChange()" style="flex:1">
-          <option value="">Todas categorias (${W.length})</option>
+          <option value="">Todas(${W.length})</option>
           ${cats.map(c => `<option value="${esc(c)}" ${cat===c?'selected':''}>${esc(c)} (${catCounts[c]})</option>`).join('')}
         </select>
         <select class="inp" id="wordSort" onchange="handleFilterChange()" style="flex:1">
