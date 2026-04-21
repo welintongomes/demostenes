@@ -362,6 +362,7 @@ let studySession = null;
 let studyMode = 'flash'; // flash | choice | type | context
 let modalStack = [];
 let wordDisplayLimit = 50; // Limite inicial de palavras exibidas
+let confirmCallback = null;
 
 /* ═══════════════════════════════════════
    WORD FACTORY
@@ -1530,11 +1531,12 @@ function saveEditWord(id) {
 }
 
 function openConfirmModal(msg, onConfirm) {
+  confirmCallback = onConfirm; // Salva a função na memória com o ID correto
   openModal(`
     <h3>Confirmar</h3>
     <div style="font-size:15px;color:var(--ink2);line-height:1.7;margin:8px 0">${esc(msg)}</div>
     <div class="btn-row">
-      <button class="btn danger" onclick="(${onConfirm.toString()})();closeModal()">Confirmar</button>
+      <button class="btn danger" onclick="if(confirmCallback)confirmCallback(); closeModal()">Confirmar</button>
       <button class="btn ghost sm" onclick="closeModal()">Cancelar</button>
     </div>`);
 }
@@ -1548,7 +1550,6 @@ function loadStarter() {
     ['indelével','Que não se pode apagar; eterno; permanente','Seu discurso deixou uma marca indelével na história','permanente, inapagável, eterno','retórica'],
     ['hodierno','Relativo ao dia de hoje; atual; contemporâneo','Os desafios hodiernos exigem soluções criativas','atual, contemporâneo, presente','dialética'],
     ['eloquência','Arte de falar com beleza, clareza e efeito; oratória','Sua eloquência encantou e convenceu toda a plateia','oratória, dicção, fluência','retórica'],
-    ['sophrosyne','Equilíbrio, autodomínio e moderação; virtude grega fundamental','A sophrosyne é a base da sabedoria clássica','moderação, temperança, equilíbrio','filosofia'],
     ['assertivo','Que afirma com confiança; que defende suas posições com firmeza','Um líder assertivo não recua diante da pressão','firme, decisivo, determinado','dialética'],
     ['silogismo','Raciocínio dedutivo com premissas que levam a uma conclusão','O silogismo aristotélico é a base da lógica clássica','dedução, argumento, lógica','filosofia'],
     ['veemência','Qualidade do que é intenso, ardente e imperioso; vigor','Defendeu sua causa com veemência e paixão','vigor, ardor, intensidade','retórica'],
@@ -1562,7 +1563,6 @@ function loadStarter() {
     ['inefável','Que não se pode exprimir por palavras; indizível','A experiência foi tão profunda que pareceu inefável','indizível, inexprimível, sublime','literatura'],
     ['pleonasmo','Uso de palavras redundantes; repetição desnecessária','Subir para cima é um pleonasmo clássico do cotidiano','redundância, repetição, tautologia','retórica'],
     ['epítome','Resumo fiel de uma obra; síntese; modelo perfeito','Aquele orador era o epítome da persuasão','resumo, síntese, modelo','literatura'],
-    ['serendipidade','Descoberta feliz por acaso; talento de encontrar o inesperado','A penicilina nasceu de uma serendipidade genial','acaso, fortuna, descoberta','ciência'],
     ['pragmático','Voltado para a prática e resultados; realista e objetivo','Um político pragmático busca soluções viáveis','prático, realista, objetivo','dialética'],
   ];
   let added = 0;
