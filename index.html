@@ -449,7 +449,7 @@ function getAdaptiveMode(card) {
 }
 
 //filtra o estudo inteligente por categoria ou todos
-function startSession(mode, category = '') {
+function startSession(mode, category = '', customArray = null) {
   let due = dueCards();
   
   // Se o seletor enviou uma categoria, filtra a lista
@@ -472,12 +472,11 @@ function startSession(mode, category = '') {
     flipped: false,
     choiceAnswered: false,
     typeAnswered: false,
-    filterCategory: category
+    filterCategory: category,
+    customModes: customArray // ✨ SALVA OS MODOS QUE VOCÊ MARCOU
   };
-  
   // Se o áudio automático estiver ligado, aciona na primeira carta
   setTimeout(playQuestionAudio, 200); 
-  
   renderStudy();
 }
 
@@ -548,8 +547,9 @@ function buildStudyTab() {
           </select>
         </div>` : `<input type="hidden" id="studyCatFilter" value="">`}
         
-        <div class="btn-row" style="flex-wrap:wrap;gap:8px">
-          <button class="btn gold" onclick="startSession('adaptive', document.getElementById('studyCatFilter')?.value)" style="flex:100%;font-size:14px;padding:14px;letter-spacing:2px">🧠 Estudo Inteligente</button>
+        <div class="btn-row" style="flex-wrap:nowrap;gap:8px">
+          <button class="btn gold" onclick="startSession('adaptive', document.getElementById('studyCatFilter')?.value)" style="flex:1;font-size:14px;padding:14px;letter-spacing:1px">🧠 Inteligente</button>
+          <button class="btn" onclick="openCustomModal()" style="flex:1;font-size:14px;padding:14px;letter-spacing:1px;border-color:var(--border2);color:var(--gold2)">🎛️ Seleções</button>
         </div>
         <div class="sep" style="margin:12px 0"></div>
         <div style="font-size:10px;color:var(--stone2);margin-bottom:8px;text-align:center;text-transform:uppercase;letter-spacing:1px">Treinamento Específico:</div>
@@ -596,8 +596,8 @@ function buildStudyTab() {
           <div class="stat-box"><div class="stat-val">${W.filter(w=>getStatus(w)==='mastered').length}</div><div class="stat-lbl">Dominados</div></div>
           <div class="stat-box"><div class="stat-val">${W.filter(w=>isDue(w)&&w.repetitions>0).length}</div><div class="stat-lbl">Para revisar</div></div>
         </div>
-        ${Object.keys(cats).length > 1 ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
-          ${Object.entries(cats).map(([k,v]) => `<span class="badge learning">${k}: ${v}</span>`).join('')}
+        ${Object.keys(cats).length > 1 ? `<div style="display:flex;flex-wrap:nowrap;gap:6px;margin-top:4px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;">
+          ${Object.entries(cats).map(([k,v]) => `<span class="badge learning" style="cursor:pointer;flex-shrink:0;" title="Estudar ${esc(k)}" onclick="startSession('adaptive', '${esc(k)}')">${esc(k)}: ${v}</span>`).join('')}
         </div>` : ''}
       </div>
     </div>`;
@@ -644,7 +644,14 @@ function buildStudyCard() {
     }
     activeMode = sess.currentAdaptiveMode;
   }
-
+  // ✨ SE FOR "SELEÇÕES", SORTEIA APENAS ENTRE OS MODOS QUE VOCÊ MARCOU!
+  else if (studyMode === 'custom') {
+    if (!sess.currentAdaptiveMode) {
+      // Pega um modo aleatório da sua lista de caixinhas marcadas
+      sess.currentAdaptiveMode = sess.customModes[Math.floor(Math.random() * sess.customModes.length)];
+    }
+    activeMode = sess.currentAdaptiveMode;
+  }
   // ✨ AGORA SUBSTITUA "studyMode" POR "activeMode" NAS COMPARAÇÕES ABAIXO:
   if (activeMode === 'flash') {
     inner = buildFlashMode(card, intervals);
@@ -675,8 +682,7 @@ function buildStudyCard() {
     <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
     ${inner}
     <div style="display:flex;gap:8px;justify-content:center;margin-top:6px">
-      <span style="font-size:11px;color:var(--stone);font-style:italic">Acertos: ${sess.correct} | Modo: ${modeLabel(activeMode)} ${studyMode === 'adaptive' ? '🧠' : ''}</span>
-    </div>`;
+<span style="font-size:11px;color:var(--stone);font-style:italic">Acertos: ${sess.correct} | Modo: ${modeLabel(activeMode)} ${studyMode === 'adaptive' ? '🧠' : (studyMode === 'custom' ? '🎛️' : '')}</span>    </div>`;
 }
 
 function buildFlashMode(card, intervals) {
@@ -1084,7 +1090,8 @@ function buildWordsTab() {
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
       <div class="search-wrap">
         <span class="search-ico">⌕</span>
-        <input class="inp search-inp" id="wordSearch" placeholder="Buscar palavras..." value="${esc(q)}" oninput="handleSearchInput()" autocomplete="off">
+        <input class="inp search-inp" id="wordSearch" placeholder="Buscar palavras..." value="${esc(q)}" oninput="handleSearchInput()" autocomplete="off" style="padding-right:34px">
+        <span id="clearSearchBtn" onclick="clearSearch()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--stone2);font-size:14px;padding:4px;display:${q ? 'block' : 'none'}">✕</span>
       </div>
       <div style="display:flex;gap:6px">
         <select class="inp" id="wordCat" onchange="handleFilterChange()" style="flex:1">
@@ -1108,8 +1115,21 @@ function buildWordsTab() {
 }
 
 function handleSearchInput() {
-  wordDisplayLimit = 15; // Volta para os primeiros 50 ao pesquisar
-  updateWordList(); // Atualiza SÓ a lista, mantendo o foco no campo de busca!
+  wordDisplayLimit = 15;// Volta para os primeiros 50 ao pesquisar
+  const inp = document.getElementById('wordSearch');
+  const btn = document.getElementById('clearSearchBtn');
+  // Mostra o 'X' só se tiver alguma letra digitada
+  if (btn && inp) btn.style.display = inp.value.length > 0 ? 'block' : 'none';
+  updateWordList();// Atualiza SÓ a lista, mantendo o foco no campo de busca!
+}
+
+function clearSearch() {
+  const inp = document.getElementById('wordSearch');
+  if (inp) {
+    inp.value = '';
+    handleSearchInput(); // Atualiza a lista para mostrar tudo de novo
+    inp.focus(); // Devolve o cursor piscando para a barra!
+  }
 }
 
 function handleFilterChange() {
@@ -1127,12 +1147,23 @@ function updateWordList() {
   const countLbl = document.getElementById('wordCountLbl');
   if (!cont || !countLbl) return;
 
-  const q = (document.getElementById('wordSearch')?.value || '').toLowerCase();
+  const rawQ = document.getElementById('wordSearch')?.value || '';
   const cat = document.getElementById('wordCat')?.value || '';
   const sort = document.getElementById('wordSort')?.value || 'alpha';
 
+  // Função mágica que remove acentos, 'ç', 'ã', 'é' e transforma em minúsculas
+  const normalize = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const q = normalize(rawQ);
+
   let list = [...W];
-  if (q) list = list.filter(w => w.word.toLowerCase().includes(q) || w.definition.toLowerCase().includes(q) || (w.tags||'').toLowerCase().includes(q));
+  if (q) {
+    list = list.filter(w => 
+      normalize(w.word).includes(q) || 
+      normalize(w.definition).includes(q) || 
+      normalize(w.tags).includes(q)
+    );
+  }
+
   if (cat) list = list.filter(w => w.category === cat);
 
   if (sort === 'alpha') list.sort((a,b) => a.word.localeCompare(b.word));
@@ -1699,6 +1730,49 @@ function openAddModal() {
       <button class="btn gold" onclick="saveModalWord()">✦ Adicionar</button>
       <button class="btn ghost sm" onclick="closeModal()">Cancelar</button>
     </div>`);
+}
+
+/* ── SELEÇÃO CUSTOMIZADA DE MODOS ── */
+function openCustomModal() {
+  const cat = document.getElementById('studyCatFilter')?.value || '';
+  const modes = [
+    {id:'flash', lbl:'⚡ Flashcard'}, {id:'choice', lbl:'📝 Múltipla Escolha'},
+    {id:'tf', lbl:'⚖ V / F'}, {id:'revchoice', lbl:'🔄 Inversa'},
+    {id:'spell', lbl:'🅰️ Letras'}, {id:'scramble', lbl:'🔀 Embaralhado'},
+    {id:'type', lbl:'⌨ Digitação'}, {id:'context', lbl:'📜 Contexto'}
+  ];
+  
+  openModal(`
+    <h3>🎛️ Modos Aleatórios</h3>
+    <div style="font-size:13px;color:var(--stone2);margin-bottom:12px;line-height:1.5">Selecione os modos que deseja incluir na rotação:</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      ${modes.map(m => `
+        <label style="display:flex;align-items:center;gap:8px;background:var(--bg3);padding:10px;border:1px solid var(--border2);border-radius:var(--r);cursor:pointer;transition:all 0.2s" onclick="this.style.borderColor = this.querySelector('input').checked ? 'var(--gold)' : 'var(--border2)'">
+          <input type="checkbox" class="custom-mode-cb" value="${m.id}" style="accent-color:var(--gold);width:16px;height:16px" >
+          <span style="font-size:12px;font-family:'Cinzel',serif;font-weight:600">${m.lbl}</span>
+        </label>
+      `).join('')}
+    </div>
+    <div class="btn-row">
+      <button class="btn gold" onclick="startCustomSession('${esc(cat)}')">Iniciar Sessão</button>
+      <button class="btn ghost sm" onclick="closeModal()">Cancelar</button>
+    </div>
+  `);
+}
+
+function startCustomSession(cat) {
+  // Pega todas as caixinhas que estão marcadas (checked)
+  const cbs = document.querySelectorAll('.custom-mode-cb:checked');
+  const selectedModes = Array.from(cbs).map(cb => cb.value);
+  
+  if (selectedModes.length === 0) { 
+    toast('Selecione pelo menos um modo!', 'err'); 
+    return; 
+  }
+  
+  closeModal();
+  // Inicia passando a matriz de modos escolhidos!
+  startSession('custom', cat, selectedModes);
 }
 
 function saveModalWord() {
