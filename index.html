@@ -398,11 +398,12 @@ function mkCard(data) {
 
 // ✨ FUNÇÃO AUXILIAR PARA PEGAR AS RESPOSTAS (FLEXIBILIDADE)
 function getValidAnswers(card) {
+  // Remove asteriscos das respostas para não poluir os botões do jogo
+  const d = clean(card.definition);
   if (card.cardType === 'sinônimo' || card.cardType === 'antônimo') {
-    // Separa os sinônimos por vírgula e limpa os espaços
-    return card.definition.split(',').map(s => s.trim()).filter(Boolean);
+    return d.split(',').map(s => s.trim()).filter(Boolean);
   }
-  return [card.definition]; // Se for carta normal, a resposta é a definição inteira
+  return [d];
 }
 
 function isDue(card) {
@@ -716,7 +717,7 @@ function buildFlashMode(card, intervals) {
         <div class="fc-face back">
           <button class="mini-btn" style="border:none" onclick="event.stopPropagation(); ouvirPalavra('${esc(card.word)}', '${card.langWord || 'pt-BR'}')">🔊${esc(card.word)}</button>
           <div class="fc-type">${isRel ? 'RESULTADOS' : 'DEFINIÇÃO'}</div>
-          <div class="fc-definition">${esc(card.definition)}</div>
+          <div class="fc-definition">${esc(clean(card.definition))}</div>
           ${card.example ? `<div class="fc-example">"${esc(card.example)}"</div>` : ''}
           ${card.synonyms ? `<div class="fc-synonym">≈ ${esc(card.synonyms)}</div>` : ''}
         </div>
@@ -1175,16 +1176,39 @@ function buildClozeMode(card) {
     let text = card.definition;
     let blanks = [];
     
-    // ✨ Inteligência: Se você cadastrou com asteriscos *palavra*, ele cria a lacuna ali.
+    // 1. Tenta encontrar palavras com asteriscos *exemplo*
     let matches = [...text.matchAll(/\*([^*]+)\*/g)];
+    
     if (matches.length > 0) {
-       matches.forEach(m => blanks.push(m[1]));
+       matches.forEach(m => blanks.push(m[1].trim()));
        text = text.replace(/\*([^*]+)\*/g, '___');
     } else {
-       // Se não tem asterisco, o app esconde 2 palavras longas aleatórias
-       let words = text.split(/\s+/).filter(w => w.length > 4);
-       let selected = words.sort(() => Math.random() - 0.5).slice(0, Math.min(2, words.length));
-       selected.forEach(w => { blanks.push(w); text = text.replace(w, '___'); });
+       // 2. Modo Automático (Sem asteriscos)
+       let words = text.split(/\s+/);
+       // Filtra palavras maiores que 4 letras (ignorando a pontuação)
+       let eligible = words.filter(w => w.replace(/[.,!?;:"'()]/g, '').length > 4);
+       // Sorteia até 2 palavras
+       let selectedToHide = eligible.sort(() => Math.random() - 0.5).slice(0, 2);
+       
+       let newTextArr = [];
+       // ✨ A MÁGICA DA ORDEM ESTÁ AQUI: Navegamos palavra por palavra na frase original!
+       words.forEach(w => {
+         if (selectedToHide.includes(w)) {
+           let cleanWord = w.replace(/[.,!?;:"'()]/g, '');
+           
+           // Salva a resposta limpa NA ORDEM EXATA da frase
+           blanks.push(cleanWord); 
+           
+           // Substitui só a palavra, mas MANTÉM a pontuação na tela (ex: 'humanidade;' vira '___;')
+           newTextArr.push(w.replace(cleanWord, '___'));
+           
+           // Remove da lista para não dar erro se houver palavras repetidas
+           selectedToHide.splice(selectedToHide.indexOf(w), 1);
+         } else {
+           newTextArr.push(w);
+         }
+       });
+       text = newTextArr.join(' ');
     }
     
     sess.clozeText = text; 
@@ -1232,10 +1256,14 @@ function buildClozeMode(card) {
     <div class="type-result ${sess.clozeCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px">
       ${sess.clozeCorrect ? `✓ Excelente!` : `✗ Incorreto.`}
     </div>
-    ${!sess.clozeCorrect ? `<div class="quote" style="margin-bottom:10px">${esc(card.definition.replace(/\*/g, ''))}</div>` : ''}
+    <div class="quote" style="margin-bottom:10px; border-color: ${sess.clozeCorrect ? 'var(--green)' : 'var(--red)'}">
+       ${esc(clean(card.definition))}
+    </div>
     <div class="rating-row">
       <button class="rating-btn r1" onclick="rateCard(0)"><span class="rating-lbl">De novo</span></button>
-      <button class="rating-btn r${sess.clozeCorrect ? '4' : '2'}" onclick="rateCard(${sess.clozeCorrect ? 3 : 1})"><span class="rating-lbl">${sess.clozeCorrect ? 'Correto ✓' : 'Difícil'}</span></button>
+      <button class="rating-btn r${sess.clozeCorrect ? '4' : '2'}" onclick="rateCard(${sess.clozeCorrect ? 3 : 1})">
+        <span class="rating-lbl">${sess.clozeCorrect ? 'Correto ✓' : 'Difícil'}</span>
+      </button>
     </div>`}
   `;
 }
@@ -1553,7 +1581,7 @@ function updateWordList() {
   html += visibleList.map(w => `<div class="word-row" onclick="openWordDetail('${w.id}')">
     <div class="word-row-main">
       <div class="word-row-word">${w.cardType === 'sinônimo' ? '🔗 ' : (w.cardType === 'antônimo' ? '⚖️ ' : '')}${esc(w.word)}</div>
-      <div class="word-row-def">${esc(w.definition)}</div>
+      <div class="word-row-def">${esc(clean(w.word))}: ${esc(clean(w.definition))}</div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
       <span class="badge ${getStatus(w)}">${statusLabel(getStatus(w))}</span>
@@ -2300,6 +2328,10 @@ function loadStarter() {
 /* ═══════════════════════════════════════
    UTILS
 ═══════════════════════════════════════ */
+// Remove os asteriscos para exibição visual
+function clean(s) {
+  return (s || '').replace(/\*/g, '');
+}
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
