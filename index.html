@@ -2628,13 +2628,22 @@ function playQuestionAudio() {
   if (!card) return;
   
   const mode = studySession.currentAdaptiveMode || studyMode;
-  // Modos onde a pergunta exibida é a PALAVRA
-  if (mode === 'flash' || mode === 'choice' || mode === 'tf') {
-    ouvirPalavra(card.word, card.langWord || 'pt-BR');
+  const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+
+  // 1. Modos onde a DICA (Pergunta) que está na tela é a DEFINIÇÃO
+  // Isso só acontece para cartas normais nos jogos de adivinhar a palavra
+  if (!isRel && (mode === 'type' || mode === 'spell' || mode === 'scramble' || mode === 'context')) {
+    // Usa o clean() para a voz nunca ler os *asteriscos* em voz alta
+    ouvirPalavra(clean(card.definition), card.langDef || 'pt-BR');
   }
-  // Modos onde a pergunta exibida é a DEFINIÇÃO
-   else {
-    ouvirPalavra(card.definition, card.langDef || 'pt-BR');
+  // A Inversa sempre mostra a definição como dica
+  else if (mode === 'revchoice') {
+    ouvirPalavra(clean(studySession.revChoicePrompt || card.definition), card.langDef || 'pt-BR');
+  }
+  // 2. Modos onde a DICA que está na tela é a PALAVRA (Flash, Lacunas, Sintaxe...)
+  // E também todos os jogos de Sinônimos/Antônimos (pois a palavra base fica no topo!)
+  else {
+    ouvirPalavra(card.word, card.langWord || 'pt-BR');
   }
 }
 
@@ -2644,15 +2653,45 @@ function playAnswerAudio() {
   if (!card) return;
   
   const mode = studySession.currentAdaptiveMode || studyMode;
-  // Modos onde a resposta descoberta é a DEFINIÇÃO
-    if (mode === 'flash' || mode === 'choice') {
-    ouvirPalavra(card.definition, card.langDef || 'pt-BR');
-  } 
-    // Modos onde a resposta descoberta é a PALAVRA
-  else {
-    ouvirPalavra(card.word, card.langWord || 'pt-BR');
+  const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+
+  // 1. Modos de Frase: A resposta revelada é a frase/definição inteira
+  if (mode === 'syntax') {
+     const texto = isRel ? card.definition : (studySession.syntaxTarget || card.definition);
+     ouvirPalavra(clean(texto), card.langDef || 'pt-BR');
+     return;
   }
+  if (mode === 'cloze') {
+     ouvirPalavra(clean(card.definition), card.langDef || 'pt-BR');
+     return;
+  }
+
+  // 2. Modos onde o Alvo era descobrir a PALAVRA ou um Sinônimo específico
+  if (mode === 'type' || mode === 'spell' || mode === 'scramble' || mode === 'context' || mode === 'revchoice') {
+     if (isRel && mode !== 'revchoice') {
+        // Se acertou um sinônimo específico, lê ele. Senão lê a lista toda.
+        if (mode === 'spell' && studySession.spellTarget) {
+            ouvirPalavra(clean(studySession.spellTarget), card.langDef || 'pt-BR');
+        } else if (mode === 'scramble' && studySession.scrambleTarget) {
+            ouvirPalavra(clean(studySession.scrambleTarget), card.langDef || 'pt-BR');
+        } else {
+            ouvirPalavra(clean(card.definition), card.langDef || 'pt-BR');
+        }
+     } else {
+        // Carta normal: lê a palavra que você acertou
+        let resposta = card.word;
+        if (mode === 'spell' && studySession.spellTarget) resposta = studySession.spellTarget;
+        if (mode === 'scramble' && studySession.scrambleTarget) resposta = studySession.scrambleTarget;
+        ouvirPalavra(clean(resposta), card.langWord || 'pt-BR');
+     }
+     return;
+  }
+
+  // 3. Modos Clássicos (Flash, Múltipla Escolha, V/F)
+  // A pergunta foi a Palavra, então a resposta lida é a Definição
+  ouvirPalavra(clean(card.definition), card.langDef || 'pt-BR');
 }
+
 /* ═══════════════════════════════════════
    INIT
 ═══════════════════════════════════════ */
