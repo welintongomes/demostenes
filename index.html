@@ -833,36 +833,75 @@ function buildTypeMode(card) {
 function buildContextMode(card) {
   const sess = studySession;
   const answered = sess.contextAnswered;
-  // Build context sentence with blank
-  const example = card.example || `Esta palavra significa: ${card.definition}`;
-  const blanked = example.replace(new RegExp(card.word, 'gi'), '______');
+  const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
   
-  return `
+  // ✨ CORREÇÃO: Separamos a lógica de quando TEM exemplo de quando NÃO TEM
+  let blanked = '';
+  let revealed = '';
+  
+  if (card.example) {
+    // Se você digitou um exemplo prático, ele esconde a palavra no meio da frase
+    blanked = esc(card.example).replace(new RegExp('('+escReg(card.word)+')', 'gi'), '______');
+    revealed = esc(card.example).replace(new RegExp('('+escReg(card.word)+')', 'gi'), '<mark>$1</mark>');
+  } else {
+    // Se não tem exemplo, criamos um formato à prova de falhas e mais bonito!
+    if (isRel) {
+      blanked = `<span style="font-size:14px;color:var(--stone)">Palavra base:</span><br><b style="color:var(--gold2);font-size:20px">${esc(card.word)}</b><br><br>Digite UM ${card.cardType}: ______`;
+      revealed = `<span style="font-size:14px;color:var(--stone)">Palavra base:</span><br><b style="color:var(--gold2);font-size:20px">${esc(card.word)}</b>`;
+    } else {
+      blanked = `<span style="font-size:14px;color:var(--stone)">Significa:</span><br><i>"${esc(card.definition)}"</i><br><br>A palavra é: ______`;
+      revealed = `<span style="font-size:14px;color:var(--stone)">Significa:</span><br><i>"${esc(card.definition)}"</i><br><br>A palavra é: <mark>${esc(card.word)}</mark>`;
+    }
+  }
+  
+  let html = `
     <div class="context-card">
-      <div class="context-q">Complete a lacuna:</div>
-      <div class="context-text" id="ctxText">${answered 
-        ? example.replace(new RegExp('('+escReg(card.word)+')', 'gi'), '<mark>$1</mark>')
-        : esc(blanked)}</div>
-    </div>
+      <div class="context-q">${isRel ? `Complete com UM ${card.cardType.toUpperCase()}:` : 'Complete a lacuna:'}</div>
+      <div class="context-text" id="ctxText">${answered ? revealed : blanked}</div>
+    </div>`;
+
+  // Esconde a "Definição contextual" se for Sinônimo/Antônimo (pois é spoiler)
+  if (!isRel) {
+    html += `
     <div style="margin-bottom:10px">
       <div class="lbl">Definição contextual</div>
       <div style="font-size:15px;color:var(--ink2);font-style:italic;line-height:1.7">${esc(card.definition)}</div>
-    </div>
-    ${!answered ? `
+    </div>`;
+  }
+
+  if (!answered) {
+    html += `
     <div style="display:flex;gap:8px">
       <input class="inp" id="ctxInput" placeholder="Escreva a palavra..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')checkContext()">
       <button class="btn gold" style="width:auto;padding:10px 16px" onclick="checkContext()">→</button>
     </div>
-    <button class="btn ghost" style="margin-top:8px" onclick="skipContext()">Ver resposta →</button>` : `
+    <button class="btn ghost" style="margin-top:8px" onclick="skipContext()">Ver resposta →</button>`;
+  } else {
+    html += `
     <div class="type-result ${sess.contextCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px">
-      ${sess.contextCorrect ? `✓ Excelente!` : `A palavra era: "${esc(card.word)}"`}
-    </div>
+      ${sess.contextCorrect ? `✓ Excelente!` : `✗ Incorreto.`}
+    </div>`;
+
+    // Mostra o gabarito organizado com a base e todos os sinônimos
+    if (isRel) {
+       html += `
+       <div class="quote" style="margin-bottom:10px; border-color: ${sess.contextCorrect ? 'var(--green)' : 'var(--red)'}">
+         <b>${card.cardType === 'sinônimo' ? 'Sinônimos' : 'Antônimos'} válidos:</b><br> 
+         <span style="color:var(--ink)">${esc(clean(card.definition))}</span>
+       </div>`;
+    } else if (!sess.contextCorrect) {
+       html += `<div class="quote" style="margin-bottom:10px; border-color: var(--red)">A palavra correta era: "${esc(card.word)}"</div>`;
+    }
+
+    html += `
     <div class="rating-row">
       <button class="rating-btn r1" onclick="rateCard(0)"><span class="rating-lbl">De novo</span></button>
       <button class="rating-btn r${sess.contextCorrect ? '4' : '2'}" onclick="rateCard(${sess.contextCorrect ? 3 : 1})">
         <span class="rating-lbl">${sess.contextCorrect ? 'Perfeito ✓' : 'Difícil'}</span>
       </button>
-    </div>`}`;
+    </div>`;
+  }
+  return html;
 }
 
 /* ── MODO: ESCOLHA INVERSA ── */
@@ -1109,16 +1148,50 @@ function spellAdd(id) { if(!studySession)return; studySession.spellAnswer.push(i
 function spellRemove(id) { if(!studySession)return; studySession.spellAnswer = studySession.spellAnswer.filter(i => i !== id); render(); }
 function spellClear() { if(!studySession)return; studySession.spellAnswer = []; render(); }
 /* ── MODO: SINTAXE (ORDENAR FRASE) ── */
+/* ── MODO: SINTAXE E SELEÇÃO MÚLTIPLA ── */
 function buildSyntaxMode(card) {
   const sess = studySession;
+  const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+
   if (!sess.syntaxSetup) {
-    const text = card.definition;
-    const words = text.split(/\s+/).filter(Boolean); // Quebra o texto por espaços
-    sess.syntaxTarget = text;
-    sess.syntaxPool = words.map((w, i) => ({ id: i, word: w })).sort(() => Math.random() - 0.5);
+    if (isRel && !card.example) {
+      // ✨ JOGO B: Modo "Pesque os Sinônimos" (Sem ordem)
+      const valids = getValidAnswers(card);
+      // Pega até 4 respostas corretas
+      const targetsToFind = valids.sort(() => Math.random() - 0.5).slice(0, 4);
+      // Exige que acerte no máximo 3 (ou menos, se a palavra tiver só 2 sinônimos)
+      sess.syntaxNeededCount = Math.min(3, targetsToFind.length);
+
+      // Busca palavras falsas no resto do banco de dados para confundir
+      let others = W.filter(w => w.id !== card.id).flatMap(w => w.cardType === 'sinônimo' || w.cardType === 'antônimo' ? getValidAnswers(w) : [w.word]);
+      
+      // Improviso caso seu banco ainda esteja pequeno
+      if (others.length < 6) others = [...others, "inefável", "assertivo", "prolixo", "efêmero", "pragmático", "eloquente"];
+      
+      const fakes = [...new Set(others)].filter(opt => !valids.includes(opt)).sort(() => Math.random() - 0.5).slice(0, 6);
+
+      // Mistura tudo
+      const poolWords = [...targetsToFind, ...fakes].sort(() => Math.random() - 0.5);
+      
+      sess.syntaxPool = poolWords.map((w, i) => ({ id: i, word: clean(w) }));
+      sess.syntaxTargetWords = valids; // Salva o gabarito original
+      sess.isSynonymMatch = true;
+      
+    } else {
+      // ✨ JOGO A: Modo "Ordene a Frase" normal
+      // Se tiver exemplo, usa o exemplo. Se não tiver (e for carta normal), usa a definição.
+      const textToOrder = card.example || card.definition;
+      const words = textToOrder.split(/\s+/).filter(Boolean);
+      
+      sess.syntaxTarget = textToOrder;
+      sess.syntaxPool = words.map((w, i) => ({ id: i, word: w })).sort(() => Math.random() - 0.5);
+      sess.isSynonymMatch = false;
+    }
+    
     sess.syntaxAnswer = [];
     sess.syntaxSetup = true;
   }
+  
   const answered = sess.syntaxAnswered;
 
   const ansHtml = sess.syntaxAnswer.map(id => {
@@ -1130,10 +1203,15 @@ function buildSyntaxMode(card) {
     return `<button class="btn ghost sm" style="padding:6px 12px;font-size:14px;width:auto;border-color:var(--border2);text-transform:none;letter-spacing:normal" onclick="${answered?'':`syntaxAdd(${item.id})`}">${esc(item.word)}</button>`;
   }).join('');
 
+  // Define os textos da tela dependendo do jogo
+  const promptTxt = sess.isSynonymMatch ? `Selecione pelo menos ${sess.syntaxNeededCount} ${card.cardType}s válidos:` : 'Ordene a frase/conceito:';
+  
+  let feedbackTxt = sess.isSynonymMatch ? `<b>Opções válidas:</b> ${esc(clean(card.definition))}` : `"${esc(sess.syntaxTarget)}"`;
+
   return `
     <div class="card" style="margin-bottom:12px">
       <div class="card-body" style="text-align:center">
-        <div class="fc-type" style="margin-bottom:8px">Ordene a frase/conceito:</div>
+        <div class="fc-type" style="margin-bottom:8px">${promptTxt}</div>
         ${card.cardType !== 'citação' ? `<div class="fc-word" style="font-size:20px;margin-bottom:12px">${esc(card.word)}</div>` : ''}
         
         <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;min-height:60px;padding:12px;background:rgba(0,0,0,0.3);border-radius:var(--r);border:1px dashed var(--border3);margin-bottom:16px">
@@ -1149,7 +1227,7 @@ function buildSyntaxMode(card) {
     </div>` : `
     <div class="type-result ${sess.syntaxCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px">
       ${sess.syntaxCorrect ? `✓ Excelente!` : `✗ Incorreto.`}
-      <div style="margin-top:6px;font-size:14px;color:var(--ink);font-style:italic">"${esc(sess.syntaxTarget)}"</div>
+      <div style="margin-top:6px;font-size:14px;color:var(--ink);font-style:italic">${feedbackTxt}</div>
     </div>
     <div class="rating-row">
       <button class="rating-btn r1" onclick="rateCard(0)"><span class="rating-lbl">De novo</span></button>
@@ -1164,57 +1242,120 @@ function syntaxClear() { if(!studySession)return; studySession.syntaxAnswer = []
 function checkSyntax() {
   const sess = studySession;
   if (!sess || sess.syntaxAnswered) return;
-  const userTxt = sess.syntaxAnswer.map(id => sess.syntaxPool.find(p=>p.id===id).word).join(' ');
-  sess.syntaxCorrect = (userTxt === sess.syntaxTarget);
-  sess.syntaxAnswered = true; setTimeout(playAnswerAudio, 100); render();
+
+  if (sess.isSynonymMatch) {
+    // ✨ VALIDAÇÃO DO MODO "PESCAR SINÔNIMOS"
+    const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    
+    // Pega as palavras que você escolheu e limpa acentos
+    const userWords = sess.syntaxAnswer.map(id => normalizeTxt(sess.syntaxPool.find(p=>p.id===id).word));
+    const targetWords = sess.syntaxTargetWords.map(w => normalizeTxt(w));
+
+    // Regra 1: TODAS as palavras que você escolheu precisam ser sinônimos reais (não pode clicar em farsa)
+    const allCorrect = userWords.every(w => targetWords.includes(w));
+    // Regra 2: Você precisa ter escolhido a quantidade mínima exigida (ex: 3)
+    const enoughCount = userWords.length >= sess.syntaxNeededCount;
+
+    // Se cumpriu as duas regras, passou!
+    sess.syntaxCorrect = userWords.length > 0 && allCorrect && enoughCount;
+    
+  } else {
+    // ✨ VALIDAÇÃO DO MODO "ORDENAR" NORMAL
+    const userTxt = sess.syntaxAnswer.map(id => sess.syntaxPool.find(p=>p.id===id).word).join(' ');
+    sess.syntaxCorrect = (userTxt === sess.syntaxTarget);
+  }
+
+  sess.syntaxAnswered = true;
+  setTimeout(playAnswerAudio, 100);
+  render();
 }
 
 /* ── MODO: LACUNAS AVANÇADAS (CLOZE) ── */
+
+/* ── MODO: LACUNAS AVANÇADAS (CLOZE) ── */
+/* ── MODO: LACUNAS AVANÇADAS (CLOZE) ── */
 function buildClozeMode(card) {
   const sess = studySession;
+  const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+
   if (!sess.clozeSetup) {
-    let text = card.definition;
+    let text = "";
     let blanks = [];
-    
-    // 1. Tenta encontrar palavras com asteriscos *exemplo*
-    let matches = [...text.matchAll(/\*([^*]+)\*/g)];
-    
-    if (matches.length > 0) {
-       matches.forEach(m => blanks.push(m[1].trim()));
-       text = text.replace(/\*([^*]+)\*/g, '___');
+    let poolWords = [];
+    let isRelList = false;
+
+    if (isRel && !card.example) {
+      // ✨ MODO B: Sinônimos sem exemplo (A ordem NÃO importa)
+      isRelList = true;
+      const valids = getValidAnswers(card);
+      const numBlanks = Math.min(3, valids.length);
+      blanks = valids.sort(() => Math.random() - 0.5).slice(0, numBlanks);
+      
+      text = Array(numBlanks).fill('___').join(' &nbsp;•&nbsp; ');
+      
+      let others = W.filter(w => w.id !== card.id).flatMap(w => w.cardType === 'sinônimo' || w.cardType === 'antônimo' ? getValidAnswers(w) : [w.word]);
+      if (others.length < 6) others = [...others, "inefável", "assertivo", "prolixo", "efêmero", "pragmático"];
+      const fakes = [...new Set(others)].filter(opt => !valids.includes(opt)).sort(() => Math.random() - 0.5).slice(0, 5);
+      
+      poolWords = [...blanks, ...fakes];
     } else {
-       // 2. Modo Automático (Sem asteriscos)
-       let words = text.split(/\s+/);
-       // Filtra palavras maiores que 4 letras (ignorando a pontuação)
-       let eligible = words.filter(w => w.replace(/[.,!?;:"'()]/g, '').length > 4);
-       // Sorteia até 2 palavras
-       let selectedToHide = eligible.sort(() => Math.random() - 0.5).slice(0, 2);
-       
-       let newTextArr = [];
-       // ✨ A MÁGICA DA ORDEM ESTÁ AQUI: Navegamos palavra por palavra na frase original!
-       words.forEach(w => {
-         if (selectedToHide.includes(w)) {
-           let cleanWord = w.replace(/[.,!?;:"'()]/g, '');
-           
-           // Salva a resposta limpa NA ORDEM EXATA da frase
-           blanks.push(cleanWord); 
-           
-           // Substitui só a palavra, mas MANTÉM a pontuação na tela (ex: 'humanidade;' vira '___;')
-           newTextArr.push(w.replace(cleanWord, '___'));
-           
-           // Remove da lista para não dar erro se houver palavras repetidas
-           selectedToHide.splice(selectedToHide.indexOf(w), 1);
-         } else {
-           newTextArr.push(w);
-         }
-       });
-       text = newTextArr.join(' ');
+      // ✨ MODO A: Frase Normal (Com Exemplo ou Definição)
+      text = isRel ? card.example : card.definition; 
+      
+      let matches = [...text.matchAll(/\*([^*]+)\*/g)];
+      if (matches.length > 0) {
+         matches.forEach(m => blanks.push(m[1].trim()));
+         text = text.replace(/\*([^*]+)\*/g, '___');
+      } else {
+         let words = text.split(/\s+/);
+         let eligible = words.filter(w => w.replace(/[.,!?;:"'()]/g, '').length > 4);
+         let selectedToHide = eligible.sort(() => Math.random() - 0.5).slice(0, 2); // Esconde 2 palavras
+         
+         let newTextArr = [];
+         words.forEach(w => {
+           if (selectedToHide.includes(w)) {
+             let cleanWord = w.replace(/[.,!?;:"'()]/g, '');
+             blanks.push(cleanWord); 
+             newTextArr.push(w.replace(cleanWord, '___'));
+             selectedToHide.splice(selectedToHide.indexOf(w), 1);
+           } else {
+             newTextArr.push(w);
+           }
+         });
+         text = newTextArr.join(' ');
+      }
+      
+      // ✨ A MÁGICA DA CONFUSÃO AQUI: Adicionamos "Iscas" para palavras normais!
+      // Pegamos palavras do seu próprio banco de dados para servirem de falsas respostas
+      let others = W.filter(w => w.id !== card.id).map(w => w.word);
+      
+      // Se não tiver muitas palavras no banco ainda, ele tira essas da manga:
+      if (others.length < 8) others = [...others, "intrínseco", "efêmero", "pragmático", "eloquente", "inefável", "prolixo", "sagaz", "peculiar"];
+      
+      // Sorteia de 4 a 5 palavras iscas que não sejam as respostas corretas
+      const numFakes = Math.max(4, 7 - blanks.length); 
+      const fakes = [...new Set(others)]
+        .filter(opt => !blanks.includes(clean(opt)) && clean(opt) !== clean(card.word))
+        .sort(() => Math.random() - 0.5)
+        .slice(0, numFakes);
+
+      poolWords = [...blanks, ...fakes];
+
+      // Se for Sinônimo com Exemplo, adiciona os outros sinônimos válidos para a regra flexível
+      if (isRel) {
+         const valids = getValidAnswers(card);
+         const extraSyns = valids.filter(v => !poolWords.includes(v));
+         poolWords = [...poolWords, ...extraSyns];
+      }
     }
     
     sess.clozeText = text; 
     sess.clozeAnswers = blanks; 
-    sess.clozePool = [...blanks].map((w,i)=>({id:i, word:w})).sort(() => Math.random() - 0.5);
+    
+    // Embaralha tudo de forma aleatória para a tela final
+    sess.clozePool = [...new Set(poolWords)].map((w,i)=>({id:i, word:clean(w)})).sort(() => Math.random() - 0.5);
     sess.clozeUserAnswers = []; 
+    sess.clozeIsRelList = isRelList;
     sess.clozeSetup = true;
   }
   
@@ -1237,13 +1378,15 @@ function buildClozeMode(card) {
     return `<button class="btn ghost sm" style="padding:6px 12px;font-size:14px;width:auto;border-color:var(--border2);text-transform:none;letter-spacing:normal" onclick="${answered?'':`clozeAdd(${item.id})`}">${esc(item.word)}</button>`;
   }).join('');
 
+  const promptTxt = sess.clozeIsRelList ? `Selecione ${sess.clozeAnswers.length} ${card.cardType}s:` : 'Preencha as lacunas na ordem:';
+
   return `
     <div class="card" style="margin-bottom:12px">
       <div class="card-body" style="text-align:center">
-        <div class="fc-type" style="margin-bottom:8px">Preencha as lacunas na ordem:</div>
+        <div class="fc-type" style="margin-bottom:8px">${promptTxt}</div>
         ${card.cardType !== 'citação' ? `<div class="fc-word" style="font-size:20px;margin-bottom:12px">${esc(card.word)}</div>` : ''}
-        <div style="font-size:18px;line-height:1.6;color:var(--ink);font-style:italic;margin-bottom:16px;text-align:left;padding:10px;background:rgba(0,0,0,0.2);border-radius:var(--r)">
-          "${displayText}"
+        <div style="font-size:18px;line-height:1.6;color:var(--ink);font-style:italic;margin-bottom:16px;text-align:${sess.clozeIsRelList ? 'center' : 'left'};padding:10px;background:rgba(0,0,0,0.2);border-radius:var(--r)">
+          ${sess.clozeIsRelList ? displayText : `"${displayText}"`}
         </div>
         ${!answered && availHtml ? `<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">${availHtml}</div>` : ''}
       </div>
@@ -1267,15 +1410,59 @@ function buildClozeMode(card) {
     </div>`}
   `;
 }
+
 function clozeAdd(id) { if(!studySession)return; studySession.clozeUserAnswers.push(id); render(); }
 function clozeRemove(id) { if(!studySession)return; studySession.clozeUserAnswers = studySession.clozeUserAnswers.filter(i => i !== id); render(); }
 function clozeClear() { if(!studySession)return; studySession.clozeUserAnswers = []; render(); }
+
 function checkCloze() {
   const sess = studySession;
   if (!sess || sess.clozeAnswered) return;
+  const card = sess.queue[sess.current];
+  
   const userWords = sess.clozeUserAnswers.map(id => sess.clozePool.find(p=>p.id===id).word);
-  sess.clozeCorrect = JSON.stringify(userWords) === JSON.stringify(sess.clozeAnswers);
-  sess.clozeAnswered = true; setTimeout(playAnswerAudio, 100); render();
+  const expectedWords = sess.clozeAnswers;
+  
+  const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  
+  if (sess.clozeIsRelList) {
+    // ✨ VALIDAÇÃO B: Lista de Sinônimos (A ordem NÃO importa)
+    const valids = getValidAnswers(card).map(normalizeTxt);
+    const userClean = userWords.map(normalizeTxt);
+    
+    const allCorrect = userClean.every(w => valids.includes(w));
+    const filledAll = userClean.length === expectedWords.length;
+    
+    sess.clozeCorrect = filledAll && allCorrect;
+  } else {
+    // ✨ VALIDAÇÃO A: Frase Normal (A ordem importa, MAS aceita sinônimos no lugar da palavra base)
+    const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+    let allCorrect = true;
+    
+    if (userWords.length !== expectedWords.length) {
+      allCorrect = false;
+    } else {
+      const valids = isRel ? [...getValidAnswers(card), card.word].map(normalizeTxt) : [];
+      
+      for (let i = 0; i < expectedWords.length; i++) {
+        const uW = normalizeTxt(userWords[i]);
+        const eW = normalizeTxt(expectedWords[i]);
+        
+        if (uW === eW) continue; // Acertou a palavra exata
+        
+        // Superpoder: Se a lacuna era um sinônimo, e você botou outro sinônimo da lista, está certo!
+        if (isRel && valids.includes(eW) && valids.includes(uW)) continue;
+        
+        allCorrect = false;
+        break;
+      }
+    }
+    sess.clozeCorrect = allCorrect;
+  }
+  
+  sess.clozeAnswered = true; 
+  setTimeout(playAnswerAudio, 100); 
+  render();
 }
 /* ═══════════════════════════════════════
    CHECKERS DE RESPOSTA
@@ -1375,15 +1562,27 @@ function checkContext() {
   const inp = document.getElementById('ctxInput');
   if (!inp) return;
   
-  // ✨ INTELIGÊNCIA DE ACENTOS
+  // Limpeza de acentos
   const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  
   const ans = normalizeTxt(inp.value);
-  const correctWord = normalizeTxt(card.word);
+  const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
   
-  // Compara ignorando acentos e tolerando 1 pequeno erro de digitação
-  sess.contextCorrect = ans === correctWord || levenshtein(ans, correctWord) <= 1;
+  if (isRel) {
+    // Pega todos os sinônimos possíveis da carta e os limpa
+    const valids = getValidAnswers(card).map(v => normalizeTxt(v));
+    // Dica de amigo: aceita também a própria palavra base, caso a pessoa digite ela!
+    valids.push(normalizeTxt(card.word));
+    
+    // Se o que o usuário digitou bater com QUALQUER sinônimo (ou tiver 1 letrinha de erro), é sucesso!
+    sess.contextCorrect = valids.some(v => ans === v || levenshtein(ans, v) <= 1);
+  } else {
+    // Modo normal: compara só com a palavra principal
+    const correctWord = normalizeTxt(card.word);
+    sess.contextCorrect = ans === correctWord || levenshtein(ans, correctWord) <= 1;
+  }
+  
   sess.contextAnswered = true;
+  setTimeout(playAnswerAudio, 100);
   render();
 }
 
@@ -1632,13 +1831,17 @@ function handleTypeChange() {
 
   // 2. Lógica para cada tipo de card
   if (type === 'sinônimo' || type === 'antônimo') {
-    opt.style.display = 'none'; // Esconde todos os extras
+    // Agora NÃO apagamos os opcionais inteiros (opt.style.display = 'none')
     if (hintObj) hintObj.style.display = 'none';
+    if (grpSynPh) grpSynPh.style.display = 'none'; // Esconde apenas Sinônimos Extras e Fonética
+    if (grpClass) grpClass.style.display = 'none'; // Esconde apenas Classe Gramatical
+    // O campo de Exemplo (grpEx) continua visível!
     
     lblWord.textContent = 'Palavra Base *';
     inpWord.placeholder = type === 'sinônimo' ? 'Ex: Lindo' : 'Ex: Quente';
     lblDef.textContent = `Lista de ${type}s (separados por vírgula) *`;
     inpDef.placeholder = type === 'sinônimo' ? 'Ex: belo, maravilhoso, deslumbrante' : 'Ex: feio, horrível, pavoroso';
+    if(inpEx) inpEx.placeholder = type === 'sinônimo' ? 'Ex: O quadro que você pintou ficou lindo.' : 'Ex: Hoje o clima está muito quente.';
 
   } else if (type === 'normal') {
     lblWord.textContent = 'Palavra *';
@@ -1719,6 +1922,10 @@ function handleImportTypeChange() {
 
 /* ── ADD TAB ── */
 function buildAddTab() {
+  // ✨ Puxa as categorias padrão e as que você já criou no banco de dados!
+  const defaultCats = ['geral','retórica','filosofia','literatura','erudição','dialética','jurídico','política','ciência','cotidiano'];
+  const existingCats = W.map(x => x.category).filter(Boolean);
+  const cats = [...new Set([...defaultCats, ...existingCats])].sort();
   return `
     <div class="card">
       <div class="card-head"><div class="card-title">✦ Nova Palavra</div></div>
@@ -1772,12 +1979,11 @@ eloquência | arte de falar com efeito e beleza | Sua eloquência encantou a pla
             <option value="en-US">Definições: Inglês</option>
             <option value="es-ES">Definições: Espanhol</option>
           </select>
-          <select class="inp" id="importCat" style="flex:1;min-width:120px">
-            <option value="geral">Categoria: Geral</option>
-            <option value="retórica">Retórica</option>
-            <option value="inglês">Inglês</option>
-            <option value="mecânica">Mecânica</option>
-          </select>
+          
+          <input class="inp" id="importCat" list="import_cat_list" style="flex:1;min-width:120px" placeholder="Categoria (ex: geral)" value="geral" autocomplete="off">
+          <datalist id="import_cat_list">
+             ${cats.map(c => `<option value="${esc(c)}">`).join('')}
+          </datalist>
         </div>
         <div class="btn-row">
           <button class="btn gold" onclick="importWords()" style="flex:2">📥 Importar Palavras</button>
@@ -1862,8 +2068,8 @@ function buildWordForm(word) {
       </div>
     </div>
     
-    <div id="fw_optional_fields" style="display:${w.cardType === 'sinônimo' || w.cardType === 'antônimo' || w.cardType === 'citação' ? 'none' : 'block'}">
-      
+    <div id="fw_optional_fields" style="display:${w.cardType === 'citação' ? 'none' : 'block'}">
+    
       <div class="form-group" id="grp_fw_ex">
         <label class="lbl" id="lbl_fw_ex">Exemplo de uso / Aplicação Prática</label>
         <textarea class="ta" id="fw_ex" style="min-height:60px" placeholder="Sua memória deixou uma marca indelével na história.">${esc(w.example||'')}</textarea>
@@ -1889,17 +2095,19 @@ function buildWordForm(word) {
     </div>
     
     <div style="display:flex;gap:8px">
-      <div class="form-group" style="flex:1">
-        <label class="lbl">Categoria</label>
-        <select class="inp" id="fw_cat">
-          ${cats.map(c => `<option value="${c}" ${(w.category||'geral')===c?'selected':''}>${esc(c)}</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-group" style="flex:1">
-        <label class="lbl">Tags</label>
-        <input class="inp" id="fw_tags" value="${esc(w.tags||'')}" placeholder="nível-c2, formal, política">
-      </div>
-    </div>`;
+          <div class="form-group" style="flex:1">
+            <label class="lbl">Categoria</label>
+            <input class="inp" id="fw_cat" list="fw_cat_list" value="${esc(w.category||'geral')}" placeholder="Criar ou escolher..." autocomplete="off">
+            <datalist id="fw_cat_list">
+              ${cats.map(c => `<option value="${esc(c)}">`).join('')}
+            </datalist>
+          </div>
+          
+          <div class="form-group" style="flex:1">
+            <label class="lbl">Tags</label>
+            <input class="inp" id="fw_tags" value="${esc(w.tags||'')}" placeholder="nível-c2, formal, política">
+          </div>
+        </div>`;
 }
 
 /* ── STATS TAB ── */
