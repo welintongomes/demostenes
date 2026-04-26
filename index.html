@@ -1896,27 +1896,30 @@ function handleImportTypeChange() {
   const ta = document.getElementById('importTA');
   if (!type || !hint || !ta) return;
 
+  // Texto universal explicando como pular campos!
+  const txtFull = `<br><br><b>Formato completo (Qualquer Modo)</b>:<br>palavra | definição | exemplo | sinônimos | categoria<br><span style="color:var(--stone2);font-size:10px">Para pular um campo e colocar a categoria, deixe vazio: <br><i>palavra | def | | | categoria</i></span>`;
+
   if (type === 'normal') {
-    hint.innerHTML = `<b>Formato básico</b> (uma por linha):<br>palavra | definição<br><br><b>Formato completo</b>:<br>palavra | definição | exemplo | sinônimos | categoria<br><br><span style="color:var(--gold2)">Dica:</span> Use *asteriscos* na definição para o Modo Lacunas.`;
-    ta.placeholder = `abnegar | renunciar, abrir mão por *altruísmo* | Ele decidiu abnegar seus privilégios.\neloquência | arte de falar com *efeito* e beleza | Sua eloquência encantou a plateia`;
+    hint.innerHTML = `<b>Formato básico</b>:<br>palavra | definição` + txtFull + `<br><br><span style="color:var(--gold2)">Dica:</span> Use *asteriscos* na definição para o Modo Lacunas.`;
+    ta.placeholder = `abnegar | renunciar por *altruísmo* | Ele decidiu abnegar seus privilégios | abdicar | retórica\neloquência | arte de falar bem | | | comunicação`;
   } else if (type === 'sinônimo') {
-    hint.innerHTML = `<b>Formato para Sinônimos</b>:<br>palavra | sinônimo1, sinônimo2, sinônimo3<br><br><b>Exemplo Prático:</b><br>Lindo | belo, maravilhoso, deslumbrante`;
-    ta.placeholder = `Lindo | belo, maravilhoso, deslumbrante\nInteligente | sagaz, astuto, brilhante`;
+    hint.innerHTML = `<b>Formato para Sinônimos</b>:<br>palavra | sinônimo1, sinônimo2` + txtFull;
+    ta.placeholder = `Lindo | belo, maravilhoso | O quadro que pintou ficou lindo | | artes\nInteligente | sagaz, astuto | | | adjetivos\nFeliz | alegre, contente`;
   } else if (type === 'antônimo') {
-    hint.innerHTML = `<b>Formato para Antônimos</b>:<br>palavra | antônimo1, antônimo2, antônimo3<br><br><b>Exemplo Prático:</b><br>Quente | frio, gelado, congelante`;
-    ta.placeholder = `Quente | frio, gelado, congelante\nRápido | lento, devagar, moroso`;
+    hint.innerHTML = `<b>Formato para Antônimos</b>:<br>palavra | antônimo1, antônimo2` + txtFull;
+    ta.placeholder = `Quente | frio, gelado | O café está muito quente | | clima\nRápido | lento, moroso | | | adjetivos`;
   } else if (type === 'conectivo') {
-    hint.innerHTML = `<b>Formato para Conectivos</b>:<br>expressão | função e uso<br><br><b>Exemplo Prático:</b><br>Outrossim | Serve para *adicionar* uma ideia com tom *formal*.<br><br><span style="color:var(--gold2)">Dica Mágica:</span> Use *asteriscos* nas palavras-chave!`;
-    ta.placeholder = `Outrossim | Serve para *adicionar* uma ideia com tom *formal*.\nPor conseguinte | Indica *conclusão* ou *consequência* lógica.`;
+    hint.innerHTML = `<b>Formato para Conectivos</b>:<br>expressão | função e uso` + txtFull;
+    ta.placeholder = `Outrossim | Serve para *adicionar* uma ideia. | Outrossim, destaco que... | | redação\nPor conseguinte | Indica *conclusão* lógica. | | | conectivos`;
   } else if (type === 'técnica') {
-    hint.innerHTML = `<b>Formato para Técnicas</b>:<br>nome da técnica | passo a passo<br><br><b>Exemplo Prático:</b><br>Feel, Felt, Found | Mostre que *entende*, diga que *outros* também, e o que *descobriram*.<br><br><span style="color:var(--gold2)">Dica Mágica:</span> Use *asteriscos* para esconder os passos chave!`;
-    ta.placeholder = `Feel, Felt, Found | Mostre que *entende*, diga que *outros* também, e o que *descobriram*.`;
+    hint.innerHTML = `<b>Formato para Técnicas</b>:<br>nome da técnica | passo a passo` + txtFull;
+    ta.placeholder = `Feel, Felt, Found | Mostre que *entende*, diga que *outros* também... | Entendo que ache caro. Outros também... | | vendas\nAncoragem | Dar um preço alto primeiro para... | | | negociação`;
   } else if (type === 'falácia') {
-    hint.innerHTML = `<b>Formato para Falácias</b>:<br>nome da falácia | explicação ou exemplo<br><br><b>Exemplo Prático:</b><br>Ad Hominem | Atacar a *pessoa* em vez de refutar o *argumento*.<br><br><span style="color:var(--gold2)">Dica Mágica:</span> Use *asteriscos* para o jogo de lacunas!`;
-    ta.placeholder = `Ad Hominem | Atacar a *pessoa* em vez de refutar o *argumento*.\nEspantalho | *Distorcer* a posição do adversário para torná-la mais fácil de *atacar*.`;
+    hint.innerHTML = `<b>Formato para Falácias</b>:<br>nome da falácia | explicação ou exemplo` + txtFull;
+    ta.placeholder = `Ad Hominem | Atacar a *pessoa* em vez do *argumento*. | Você diz isso porque é burro. | | debate\nEspantalho | Distorcer o que foi dito. | | | lógica`;
   } else if (type === 'citação') {
-    hint.innerHTML = `<b>Formato para Citações</b>:<br>autor | frase completa<br><br><b>Exemplo Prático:</b><br>Nietzsche | Quem tem um *porquê* suporta qualquer *como*.<br><br><span style="color:var(--gold2)">Dica Mágica:</span> Use *asteriscos* nas palavras mais fortes da frase!`;
-    ta.placeholder = `Nietzsche | Quem tem um *porquê* suporta qualquer *como*.\nSócrates | Só sei que *nada* sei.`;
+    hint.innerHTML = `<b>Formato para Citações</b>:<br>autor | frase completa` + txtFull;
+    ta.placeholder = `Nietzsche | Quem tem um *porquê* suporta qualquer *como*. | | | filosofia\nSócrates | Só sei que *nada* sei. | | | clássicos`;
   }
 }
 
@@ -2231,30 +2234,26 @@ function importWords() {
   let added = 0, skipped = 0;
   
   lines.forEach(line => {
-    // Nova regra: separa APENAS por '|' ou Tabulação (\t)
     const parts = line.split(/\s*\|\s*|\t/).map(p => p.trim());
     if (parts.length < 2) { skipped++; return; }
 
-    let cType = dropdownType; // Assume o tipo do seletor como padrão
+    let cType = dropdownType; 
     let word = '';
     let def = '';
     let catFinal = dropdownCat;
 
     const firstToken = parts[0].toLowerCase();
-    // Preserva a inteligência antiga se você digitar "s |" ou "a |" manualmente
+    
     if (firstToken === 's' || firstToken === 'a') {
       cType = firstToken === 's' ? 'sinônimo' : 'antônimo';
       word = parts[1];
-      def = parts.slice(2).filter(Boolean).join(', ');
+      def = parts[2]; // Pega só a segunda coluna como lista
+      catFinal = parts[5] || dropdownCat; // Ajuste para o legado
     } else {
       word = parts[0];
-      // Se você marcou Sinônimo/Antônimo no select, junta tudo o que vier depois da barra!
-      if (cType === 'sinônimo' || cType === 'antônimo') {
-         def = parts.slice(1).filter(Boolean).join(', ');
-      } else {
-         def = parts[1];
-         catFinal = parts[4] || dropdownCat;
-      }
+      def = parts[1];
+      // ✨ A MÁGICA AQUI: Agora TODOS os modos respeitam a coluna 4 para categoria!
+      catFinal = parts[4] || dropdownCat;
     }
     
     if (!word || !def) { skipped++; return; }
@@ -2263,11 +2262,11 @@ function importWords() {
     W.push(mkCard({
       word: word, 
       definition: def,
-      example: parts[2] || '',
-      synonyms: parts[3] || '',
-      category: catFinal,  // Usa a categoria decidida acima
-      langWord: langWord, // ✨
-      langDef: langDef, // ✨   
+      example: parts[2] || '', // ✨ Puxa o Exemplo
+      synonyms: parts[3] || '', // ✨ Puxa os extras (se houver)
+      category: catFinal,  // ✨ Puxa a Categoria da linha (ou cai no padrão)
+      langWord: langWord, 
+      langDef: langDef,    
       cardType: cType 
     }));
     added++;
