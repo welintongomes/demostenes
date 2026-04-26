@@ -1158,18 +1158,20 @@ function buildTFMode(card) {
 }
 
 /* ── MODO: EMBARALHADO ── */
+
 function buildScrambleMode(card) {
   const sess = studySession;
   if (!sess.scrambleSetup) {
-    // ✨ INTELIGÊNCIA: Se for sinônimo, sorteia uma palavra da lista!
     let target = card.word;
     if (card.cardType === 'sinônimo' || card.cardType === 'antônimo') {
       const valids = getValidAnswers(card);
       target = valids[Math.floor(Math.random() * valids.length)];
     }
-    sess.scrambleTarget = target; // Salva qual palavra o jogo escolheu
-
-    const letters = target.replace(/\s/g,'').split('');
+    
+    // ✨ CORREÇÃO: Normaliza os acentos para o embaralhador não quebrar
+    sess.scrambleTarget = target.normalize('NFC'); 
+    
+    const letters = sess.scrambleTarget.replace(/[\s\u200B-\u200D\uFEFF]/g, '').split('');
     sess.scrambledWord = letters.sort(() => Math.random() - 0.5).join('  ').toUpperCase();
     sess.scrambleSetup = true;
   }
@@ -1205,32 +1207,34 @@ function buildScrambleMode(card) {
 }
 
 /* ── MODO: LETRAS (BOTÕES) ── */
+
 function buildSpellMode(card) {
   const sess = studySession;
   if (!sess.spellSetup) {
-    // ✨ INTELIGÊNCIA: Se for sinônimo, sorteia uma palavra da lista!
     let target = card.word;
     if (card.cardType === 'sinônimo' || card.cardType === 'antônimo') {
       const valids = getValidAnswers(card);
       target = valids[Math.floor(Math.random() * valids.length)];
     }
-    sess.spellTarget = target; 
-
-    const chars = target.replace(/\s/g,'').toUpperCase().split('');
+    
+    // ✨ CORREÇÃO: O NFC cola os acentos nas letras, impedindo botões "vazios".
+    sess.spellTarget = target.normalize('NFC'); 
+    
+    // Filtro avançado: apaga espaços normais E espaços invisíveis (Zero-Width)
+    const chars = sess.spellTarget.replace(/[\s\u200B-\u200D\uFEFF]/g, '').toUpperCase().split('');
+    
     sess.spellPool = chars.map((char, i) => ({ id: i, char })).sort(() => Math.random() - 0.5);
     sess.spellAnswer = []; 
     sess.spellSetup = true;
   }
   const answered = sess.spellAnswered;
 
-  // Monta o HTML das letras que o usuário já clicou
-   const ansHtml = sess.spellAnswer.map(id => {
+  const ansHtml = sess.spellAnswer.map(id => {
     const item = sess.spellPool.find(p => p.id === id);
     return `<button class="btn gold sm" style="width:38px;height:38px;padding:0;font-size:18px;font-weight:700" onclick="${answered ? '' : `spellRemove(${id})`}">${item.char}</button>`;
   }).join('');
 
-  // Monta o HTML das letras que ainda estão sobrando no banco
-    const availHtml = sess.spellPool.filter(p => !sess.spellAnswer.includes(p.id)).map(item => {
+  const availHtml = sess.spellPool.filter(p => !sess.spellAnswer.includes(p.id)).map(item => {
     return `<button class="btn ghost sm" style="width:38px;height:38px;padding:0;font-size:18px;font-weight:700;border-color:var(--border2)" onclick="${answered ? '' : `spellAdd(${item.id})`}">${item.char}</button>`;
   }).join('');
 
@@ -1637,7 +1641,11 @@ function checkTF(guess) {
 function checkScramble() {
   const sess = studySession; if (!sess || sess.scrambleAnswered) return;
   const inp = document.getElementById('scrambleInput'); if (!inp) return;
-  const ans = inp.value.trim().toLowerCase(); const correct = sess.scrambleTarget.toLowerCase();
+  
+  // ✨ CORREÇÃO: Normaliza a digitação do usuário para alinhar com o alvo
+  const ans = inp.value.normalize('NFC').trim().toLowerCase(); 
+  const correct = sess.scrambleTarget.toLowerCase();
+  
   sess.scrambleCorrect = ans === correct || levenshtein(ans, correct) <= 1;
   sess.scrambleAnswered = true;
   playSfx(sess.scrambleCorrect ? 'ok' : 'fail');
@@ -1647,12 +1655,15 @@ function checkScramble() {
 function checkSpell() {
   const sess = studySession; if (!sess || sess.spellAnswered) return;
   const userWord = sess.spellAnswer.map(id => sess.spellPool.find(p=>p.id===id).char).join('').toLowerCase();
-  const correctWord = sess.spellTarget.replace(/\s/g,'').toLowerCase();
+  
+  // ✨ CORREÇÃO: Limpamos a palavra alvo exatamente do mesmo jeito na hora de checar
+  const correctWord = sess.spellTarget.replace(/[\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+  
   sess.spellCorrect = (userWord === correctWord);
   sess.spellAnswered = true;
   playSfx(sess.spellCorrect ? 'ok' : 'fail');
   setTimeout(playAnswerAudio, 100); render();
-} 
+}
 
 function checkSyntax() {
   const sess = studySession; if (!sess || sess.syntaxAnswered) return;
