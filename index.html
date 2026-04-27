@@ -772,17 +772,29 @@ function buildChoiceMode(card) {
     
     let t1 = pool.filter(w => w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass); // 1. Mesma classe gramatical
     let t2 = pool.filter(w => w.cardType === card.cardType); // 2. Mesmo tipo de carta
-    let t3 = pool.filter(w => isLong(w) === isLong(card)); // 3. Mesmo formato visual (Impede misturar palavra com textão)
+    let t3 = pool.filter(w => isLong(w) === isLong(card)); // 3. Mesmo formato visual
 
     let othersCards = t1.length >= 3 ? t1 : (t2.length >= 3 ? t2 : (t3.length >= 3 ? t3 : pool));
     
-    let others = othersCards.flatMap(w => getValidAnswers(w));
-    
-    // Segurança: se não tiver palavras suficientes do mesmo tipo cadastradas ainda, improvisa
-    if (isRel && others.length < totalOptions) {
-      others = [...others, ...W.filter(w => w.id !== card.id).map(w => w.word)];
-    } else if (!isRel && others.length < totalOptions) {
-      others = [...others, ...W.filter(w => w.id !== card.id).map(w => w.definition)];
+    let others = [];
+
+    // ✨ O MURO DE BERLIM: Separa estritamente palavras de frases!
+    if (isRel) {
+      // Universo 1: Sinônimos. Queremos SÓ palavras curtas. NUNCA a definição (frase) de uma carta normal!
+      others = othersCards.flatMap(w => (w.cardType === 'sinônimo' || w.cardType === 'antônimo') ? getValidAnswers(w) : [w.word]);
+      
+      // Se ainda faltar, pega palavras soltas de qualquer lugar do banco
+      if (others.length < totalOptions) {
+        others = [...others, ...pool.map(w => w.word)];
+      }
+    } else {
+      // Universo 2: Cartas Normais. Queremos SÓ frases/definições. NUNCA uma palavra curta perdida no meio.
+      others = othersCards.flatMap(w => (w.cardType === 'sinônimo' || w.cardType === 'antônimo') ? [] : getValidAnswers(w));
+      
+      // Se ainda faltar, pega definições de qualquer lugar (menos dos sinônimos)
+      if (others.length < totalOptions) {
+        others = [...others, ...pool.filter(w => w.cardType !== 'sinônimo' && w.cardType !== 'antônimo').map(w => w.definition)];
+      }
     }
     
     // Remove duplicatas e respostas que já sejam a correta
@@ -810,7 +822,7 @@ function buildChoiceMode(card) {
           else if (ch === sess.choiceSelected) cls += ' wrong reveal';
           else cls += ' reveal';
         }
-        return `<div class="${cls}" style="margin-bottom:0;font-size:14px;padding:10px" onclick="${answered ? '' : `choiceAnswer(${i})`}">${esc(ch)}</div>`;
+        return `<div class="${cls}" style="margin-bottom:8;font-size:14px;padding:10px" onclick="${answered ? '' : `choiceAnswer(${i})`}">${esc(ch)}</div>`;
       }).join('')}
     </div>
     ${answered ? `
@@ -821,8 +833,6 @@ function buildChoiceMode(card) {
       </div>
     </div>` : ''}`;
 }
-
-/* ── MODO: ESCOLHA VISUAL (DUOLINGO STYLE) ── */
 
 /* ── MODO: ESCOLHA VISUAL (DUOLINGO STYLE) ── */
 function buildImgChoiceMode(card) {
@@ -1115,11 +1125,16 @@ function buildTFMode(card) {
 
       let othersCards = t1.length >= 1 ? t1 : (t2.length >= 1 ? t2 : (t3.length >= 1 ? t3 : pool));
       
-      let others = othersCards.flatMap(w => getValidAnswers(w));
+      let others = [];
       
-      // Improvisa caso falte conteúdo no banco
-      if (isRel && others.length === 0) others = W.filter(w => w.id !== card.id).map(w => w.word);
-      else if (!isRel && others.length === 0) others = W.filter(w => w.id !== card.id).map(w => w.definition);
+      // ✨ O MURO DE BERLIM APLICADO NO V/F:
+      if (isRel) {
+        others = othersCards.flatMap(w => (w.cardType === 'sinônimo' || w.cardType === 'antônimo') ? getValidAnswers(w) : [w.word]);
+        if (others.length === 0) others = pool.map(w => w.word);
+      } else {
+        others = othersCards.flatMap(w => (w.cardType === 'sinônimo' || w.cardType === 'antônimo') ? [] : getValidAnswers(w));
+        if (others.length === 0) others = pool.filter(w => w.cardType !== 'sinônimo' && w.cardType !== 'antônimo').map(w => w.definition);
+      }
       
       def = others[Math.floor(Math.random() * others.length)] || correctDef;
       sess.tfIsCorrect = def === correctDef;
@@ -1254,7 +1269,7 @@ function buildSpellMode(card) {
         </div>
 
         ${!answered ? `
-        <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">
+        <div style="display:flex;flex-wrap:wrap;gap:20px;justify-content:center">
           ${availHtml}
         </div>` : ''}
       </div>
@@ -2135,11 +2150,14 @@ function buildWordForm(word) {
   const classes = ['','substantivo','verbo','adjetivo','advérbio','expressão','locução'];
   const langs = [['pt-BR','Português'],['en-US','Inglês'],['es-ES','Espanhol'],['fr-FR','Francês'],['de-DE','Alemão'],['it-IT','Italiano']];
   
+  // ✨ CORREÇÃO DA IMAGEM: Prepara o background se for uma foto Base64
+  const bgStyle = (w.image && w.image.startsWith('data:image')) ? `background-image:url('${w.image}');` : '';
+  
   return `
   <div class="form-group" style="text-align:center; background:var(--bg4); padding:16px; border-radius:var(--r2); border:1px dashed var(--border2)">
       <label class="lbl">Imagem da Câmera ou Emoji (Opcional)</label>
       
-      <div id="imgPreview" style="height:100px; width:100px; margin:10px auto; border-radius:var(--r2); display:flex; align-items:center; justify-content:center; font-size:50px; background-size:cover; background-position:center; cursor:pointer; background-color:rgba(0,0,0,0.2)" onclick="document.getElementById('fw_img_upload').click()">
+      <div id="imgPreview" style="height:100px; width:100px; margin:10px auto; border-radius:var(--r2); display:flex; align-items:center; justify-content:center; font-size:50px; background-size:cover; background-position:center; cursor:pointer; background-color:rgba(0,0,0,0.2); ${bgStyle}" onclick="document.getElementById('fw_img_upload').click()">
         ${w.image ? (w.image.startsWith('data:image') ? '' : w.image) : '📷'}
       </div>
       
@@ -2321,7 +2339,8 @@ function buildStatsTab() {
 /* ═══════════════════════════════════════
    ACTIONS
 ═══════════════════════════════════════ */
-function saveNewWord() {
+
+async function saveNewWord() { // ✨ Adicionado async
   const word = gv('fw_word');
   const def = gv('fw_def');
   if (!word || !def) { toast('Palavra e definição são obrigatórias', 'err'); return; }
@@ -2332,20 +2351,20 @@ function saveNewWord() {
     wordClass: gv('fw_class'), tags: gv('fw_tags'),
     langWord: gv('fw_lang_word'),  // ✨ CAPTURA IDIOMA DA PALAVRA
     langDef: gv('fw_lang_def'), // ✨ CAPTURA IDIOMA DA DEFINIÇÃO
-    image: gv('fw_image_data'),
+    image: gv('fw_image_data'), // ✨ CAPTURA IMAGEM/EMOJI
     cardType: gv('fw_type') // ✨ SALVA O TIPO
   });
   W.push(card);
-  save();
+  await save(); // ✨ Espera salvar fisicamente no banco de dados
   toast(`"${word}" adicionada ao léxico!`, 'gold');
   document.getElementById('addForm').innerHTML = buildWordForm();
   render();
 }
 
-function importWords() {
+async function importWords() { // ✨ Adicionado 'async' aqui para o salvamento seguro
   const raw = document.getElementById('importTA')?.value || '';
   const dropdownCat = document.getElementById('importCat')?.value || 'geral'; 
-  const dropdownType = document.getElementById('importType')?.value || 'normal'; // ✨ Lê o tipo selecionado
+  const dropdownType = document.getElementById('importType')?.value || 'normal';
   const langWord = document.getElementById('importLangWord')?.value || 'pt-BR'; 
   const langDef = document.getElementById('importLangDef')?.value || 'pt-BR'; 
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
@@ -2359,19 +2378,23 @@ function importWords() {
     let word = '';
     let def = '';
     let catFinal = dropdownCat;
+    let imgFinal = ''; // ✨ Nova variável para capturar a imagem/emoji
 
     const firstToken = parts[0].toLowerCase();
     
+    // Tratamento do seu formato legado (s ou a no início)
     if (firstToken === 's' || firstToken === 'a') {
       cType = firstToken === 's' ? 'sinônimo' : 'antônimo';
       word = parts[1];
-      def = parts[2]; // Pega só a segunda coluna como lista
-      catFinal = parts[5] || dropdownCat; // Ajuste para o legado
+      def = parts[2]; 
+      catFinal = parts[5] || dropdownCat; 
+      imgFinal = parts[6] || ''; // ✨ No formato legado, a imagem cai na 7ª coluna
     } else {
+      // Formato Padrão
       word = parts[0];
       def = parts[1];
-      // ✨ A MÁGICA AQUI: Agora TODOS os modos respeitam a coluna 4 para categoria!
       catFinal = parts[4] || dropdownCat;
+      imgFinal = parts[5] || ''; // ✨ No formato padrão, a imagem cai na 6ª coluna
     }
     
     if (!word || !def) { skipped++; return; }
@@ -2380,17 +2403,18 @@ function importWords() {
     W.push(mkCard({
       word: word, 
       definition: def,
-      example: parts[2] || '', // ✨ Puxa o Exemplo
-      synonyms: parts[3] || '', // ✨ Puxa os extras (se houver)
-      category: catFinal,  // ✨ Puxa a Categoria da linha (ou cai no padrão)
+      example: parts[2] || '', 
+      synonyms: parts[3] || '', 
+      category: catFinal, 
       langWord: langWord, 
       langDef: langDef,    
-      cardType: cType 
+      cardType: cType,
+      image: imgFinal // ✨ A imagem agora é salva perfeitamente!
     }));
     added++;
   });
   
-  save();
+  await save(); // ✨ Espera salvar com segurança no IndexedDB
   toast(`${added} palavras importadas! (${skipped} ignoradas)`, added > 0 ? 'gold' : 'err');
   document.getElementById('importPreview').innerHTML = '';
   document.getElementById('importTA').value = '';
@@ -2429,8 +2453,10 @@ function exportJSON() {
 }
 
 function exportCSV() {
-  const rows = [['tipo','palavra','definição','exemplo','sinônimos','categoria','classe','intervalo','repetições','próxima revisão']];
-  W.forEach(w => rows.push([w.cardType||'normal', w.word, w.definition, w.example||'', w.synonyms||'', w.category||'', w.wordClass||'', w.interval, w.repetitions, new Date(w.nextReview).toLocaleDateString('pt-BR')]));
+  // ✨ Adicionado 'imagem' na lista de cabeçalhos
+  const rows = [['tipo','palavra','definição','exemplo','sinônimos','categoria','classe','imagem','intervalo','repetições','próxima revisão']];
+  // ✨ Adicionado w.image||'' nos dados a serem exportados
+  W.forEach(w => rows.push([w.cardType||'normal', w.word, w.definition, w.example||'', w.synonyms||'', w.category||'', w.wordClass||'', w.image||'', w.interval, w.repetitions, new Date(w.nextReview).toLocaleDateString('pt-BR')]));
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   download('demostenes_lexico.csv', csv, 'text/csv');
   toast('CSV exportado!', 'ok');
@@ -2439,16 +2465,23 @@ function exportCSV() {
 function importJSON(e) {
   const file = e.target.files[0]; if (!file) return;
   const reader = new FileReader();
-  reader.onload = ev => {
+  reader.onload = async ev => { // ✨ Adicionado async aqui
     try {
       const d = JSON.parse(ev.target.result);
       if (d.words && Array.isArray(d.words)) {
         let added = 0;
         d.words.forEach(w => {
-          if (!W.find(x => x.word.toLowerCase() === w.word.toLowerCase() && x.cardType === w.cardType)) { W.push(w); added++; }
+          const existing = W.find(x => x.word.toLowerCase() === w.word.toLowerCase() && x.cardType === w.cardType);
+          if (!existing) { 
+            W.push(w); added++; 
+          } else if (!existing.image && w.image) {
+            // ✨ Se a palavra já existe mas estava sem imagem, ele "puxa" a imagem do backup!
+            existing.image = w.image; 
+          }
         });
         if (d.stats) STATS = {...STATS, ...d.stats};
-        save(); toast(`${added} palavras importadas!`, 'gold'); render();
+        await save(); // ✨ Salva com segurança
+        toast(`${added} palavras importadas/atualizadas!`, 'gold'); render();
       }
     } catch { toast('Arquivo inválido!', 'err'); }
   };
@@ -2587,8 +2620,7 @@ function saveModalWord() {
   save(); closeModal(); toast(`"${word}" adicionada!`, 'gold'); render();
 }
 
-
-function saveEditWord(id) {
+async function saveEditWord(id) { // ✨ Adicionado async
   const idx = W.findIndex(w => w.id === id);
   if (idx < 0) return;
   const word = gv('fw_word'), def = gv('fw_def');
@@ -2600,10 +2632,11 @@ function saveEditWord(id) {
     wordClass: gv('fw_class'), tags: gv('fw_tags'),
     langWord: gv('fw_lang_word'), // ✨ ATUALIZA IDIOMA DA PALAVRA 
     langDef: gv('fw_lang_def'), // ✨ ATUALIZA IDIOMA DA DEFINIÇÃO
-    image: gv('fw_image_data'),
+    image: gv('fw_image_data'), // ✨ ATUALIZA IMAGEM/EMOJI
     cardType: gv('fw_type') // ✨
   });
-  save(); closeModal(); toast('Palavra atualizada!', 'ok'); render();
+  await save(); // ✨ Espera salvar fisicamente no banco de dados
+  closeModal(); toast('Palavra atualizada!', 'ok'); render();
 }
 
 function openConfirmModal(msg, onConfirm) {
@@ -2845,11 +2878,10 @@ function handleImageUpload(e) {
 }
 function handleEmojiUpload(e) {
   const val = e.target.value;
-  if (val) {
-    document.getElementById('fw_image_data').value = val;
-    document.getElementById('imgPreview').style.backgroundImage = 'none';
-    document.getElementById('imgPreview').innerHTML = val;
-  }
+  // ✨ Removido o "if(val)". Assim, se você apagar o emoji da caixinha, ele apaga a imagem salva no banco.
+  document.getElementById('fw_image_data').value = val;
+  document.getElementById('imgPreview').style.backgroundImage = 'none';
+  document.getElementById('imgPreview').innerHTML = val || '📷'; // Se apagar, volta a mostrar o ícone da câmera
 }
 
 // ✨ DESENHA A IMAGEM EM QUALQUER MODO DE JOGO
@@ -2872,6 +2904,64 @@ function renderVisual(card) {
   document.getElementById('app').style.display = 'flex';
   render();
 })();
+/* ═══════════════════════════════════════
+   🧠 MOTOR DE MEMÓRIA DE INTERFACE (INTELIGENTE)
+═══════════════════════════════════════ */
+const ignoreList = ['fw_type', 'fw_lang_word', 'fw_lang_def', 'fw_class']; 
+
+// ✨ A MÁGICA ESTÁ AQUI: O "true" no final faz isso rodar ANTES de qualquer 
+// atualização visual da tela, evitando a Condição de Corrida!
+document.addEventListener('change', (e) => {
+  // Salva os Selects (Filtros, Categorias, Importações)
+  if (e.target.tagName === 'SELECT' && e.target.id && !ignoreList.includes(e.target.id)) {
+    localStorage.setItem('ui_pref_' + e.target.id, e.target.value);
+  }
+  // Salva os Checkboxes dos Modos de Jogo
+  if (e.target.classList.contains('custom-mode-cb')) {
+    localStorage.setItem('ui_pref_cb_' + e.target.value, e.target.checked);
+  }
+}, true); // <--- Este "true" mudou tudo!
+
+const uiObserver = new MutationObserver(() => {
+  let needsListUpdate = false;
+  let needsImportUpdate = false;
+
+  document.querySelectorAll('select[id]').forEach(sel => {
+    if (ignoreList.includes(sel.id)) return; // Fica longe do form de edição!
+    
+    const saved = localStorage.getItem('ui_pref_' + sel.id);
+    if (saved !== null && sel.value !== saved) {
+      // Garante que a opção salva na memória ainda existe no menu
+      const optionExists = Array.from(sel.options).some(opt => opt.value === saved);
+      if (optionExists) {
+        sel.value = saved;
+        
+        // Se o Motor forçou uma mudança visual ao abrir a tela, ele avisa para atualizar
+        if (sel.id === 'wordCat' || sel.id === 'wordSort') needsListUpdate = true;
+        if (sel.id === 'importType') needsImportUpdate = true;
+      }
+    }
+  });
+  
+  document.querySelectorAll('.custom-mode-cb').forEach(cb => {
+    const saved = localStorage.getItem('ui_pref_cb_' + cb.value);
+    if (saved !== null) {
+      const isChecked = (saved === 'true');
+      if (cb.checked !== isChecked) {
+        cb.checked = isChecked;
+        const label = cb.closest('label');
+        if (label) label.style.borderColor = isChecked ? 'var(--gold)' : 'var(--border2)';
+      }
+    }
+  });
+
+  // Dispara as atualizações visuais que os selects exigem logo ao abrir o app
+  if (needsListUpdate && typeof updateWordList === 'function') updateWordList();
+  if (needsImportUpdate && typeof handleImportTypeChange === 'function') handleImportTypeChange();
+});
+
+// Liga o observador no corpo do aplicativo
+uiObserver.observe(document.body, { childList: true, subtree: true });
 </script>
 </body>
 </html>
