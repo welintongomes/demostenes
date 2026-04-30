@@ -490,30 +490,24 @@ function getAdaptiveMode(card) {
   const ivl = card.interval;
   const rep = card.repetitions;
   
-  // ✨ MÁGICA: Se for um card de texto longo, a progressão é diferente!
   const isLongText = ['técnica', 'falácia', 'citação'].includes(card.cardType);
   if (isLongText) {
     if (rep === 0 || ivl <= 3) return ['flash', 'choice', 'tf'][Math.floor(Math.random() * 3)];
-    else if (ivl <= 7) return 'syntax'; // Fase 2: Força a ordenar a frase
-    else return ['syntax', 'cloze'][Math.floor(Math.random() * 2)]; // Fase avançada: Lacunas ou Ordenação
+    else if (ivl <= 7) return 'syntax'; 
+    else return ['syntax', 'cloze'][Math.floor(Math.random() * 2)]; 
   }
   
-  // Progressão Normal (Para palavras e conectivos)
   if (rep === 0 || ivl <= 3) {
-    const modes = ['flash', 'choice', 'tf'];
-    return modes[Math.floor(Math.random() * modes.length)];
+    return ['flash', 'choice', 'tf'][Math.floor(Math.random() * 3)];
   } else if (ivl <= 7) {
-    const modes = ['revchoice', 'spell'];
-    return modes[Math.floor(Math.random() * modes.length)];
-  } else if (ivl <= 14) {
-    const modes = ['scramble'];
-    return modes[Math.floor(Math.random() * modes.length)];
+    return ['revchoice', 'spell'][Math.floor(Math.random() * 2)];
+  } else if (ivl <= 20) {
+    return ['scramble', 'type', 'context'][Math.floor(Math.random() * 3)];
   } else {
-    const modes = ['type', 'context'];
-    return modes[Math.floor(Math.random() * modes.length)];
+    // ✨ CARTA DOMINADA (>20 dias)? PROVA FINAL!
+    return 'boss';
   }
 }
-
 //filtra o estudo inteligente por categoria ou todos
 // ✨ INTELIGÊNCIA DE TREINO LIVRE E TAGS
 function startSession(mode, filterVal = '', customArray = null, isFreeMode = false) {
@@ -573,12 +567,21 @@ function render() {
 
 function updateHeader() {
   const due = dueCards();
-  const todayDone = STATS.history?.filter(h => h.date === today()).length || 0;
   document.getElementById('hDue').textContent = due.length;
   document.getElementById('hTotal').textContent = W.length;
   document.getElementById('hStreak').textContent = (STATS.streak || 0) + '🔥';
   const pct = W.length ? Math.round((W.filter(w => w.repetitions > 0).length / W.length) * 100) : 0;
   document.getElementById('hProg').style.width = pct + '%';
+
+  // ✨ ATUALIZA A PATENTE NO TOPO DA TELA
+  const rank = getUserTitle();
+  const subtitleEl = document.querySelector('.app-subtitle');
+  if (subtitleEl) {
+     subtitleEl.innerHTML = `
+        <span style="color:${rank.color}; font-weight:bold; letter-spacing:1px">${rank.icon} ${rank.title}</span>
+        <button id="btnAudio" onclick="toggleAudio()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${autoPlayAudio ? '1' : '0.4'}; margin-left:8px}" title="Leitura Automática">${autoPlayAudio?'🔊':'🔈'}</button>
+     `;
+  }
 }
 
 /* ── STUDY TAB ── */
@@ -679,21 +682,15 @@ function buildStudyCard() {
   let activeMode = studyMode;
 
   if (studyMode === 'adaptive') {
-    if (!sess.currentAdaptiveMode) {
-      sess.currentAdaptiveMode = getAdaptiveMode(card);
-    }
+    if (!sess.currentAdaptiveMode) sess.currentAdaptiveMode = getAdaptiveMode(card);
     activeMode = sess.currentAdaptiveMode;
   } 
   else if (studyMode === 'custom') {
-    if (!sess.currentAdaptiveMode) {
-      sess.currentAdaptiveMode = sess.customModes[Math.floor(Math.random() * sess.customModes.length)];
-    }
+    if (!sess.currentAdaptiveMode) sess.currentAdaptiveMode = sess.customModes[Math.floor(Math.random() * sess.customModes.length)];
     activeMode = sess.currentAdaptiveMode;
   }
 
-  if (activeMode === 'imgchoice' && !card.image) {
-    activeMode = 'choice';
-  }
+  if (activeMode === 'imgchoice' && !card.image) activeMode = 'choice';
 
   if (activeMode === 'flash') inner = buildFlashMode(card, intervals);
   else if (activeMode === 'choice') inner = buildChoiceMode(card);
@@ -706,20 +703,48 @@ function buildStudyCard() {
   else if (activeMode === 'syntax') inner = buildSyntaxMode(card);
   else if (activeMode === 'cloze') inner = buildClozeMode(card);
   else if (activeMode === 'imgchoice') inner = buildImgChoiceMode(card);
+  else if (activeMode === 'boss') inner = buildBossMode(card); // ✨ Conexão da Prova Final!
+
+  // Descobre se o card já foi respondido
+  const isAns = sess.typeAnswered || sess.choiceAnswered || sess.tfAnswered || sess.revChoiceAnswered || sess.scrambleAnswered || sess.spellAnswered || sess.syntaxAnswered || sess.clozeAnswered || sess.contextAnswered || sess.imgChoiceAnswered || sess.bossAnswered || sess.flipped;
+
+  // ✨ LÓGICA DO TEMPO DE SOBREVIVÊNCIA
+  let timerHtml = '';
+  if (card.interval >= 3 && !sess.isFreeMode && activeMode !== 'flash') {
+     let timeLimit = card.interval >= 21 ? 12 : 25; // 12s p/ Mestres, 25s p/ Revisão
+     if (activeMode === 'boss') timeLimit = 15; // Prova Final dá 15 segundos
+     
+     if (!isAns) {
+        if (sess.currentCardId !== card.id) {
+           sess.currentCardId = card.id;
+           setTimeout(() => startSurvivalTimer(timeLimit), 100);
+        }
+        timerHtml = `
+        <div style="width:100%; height:4px; background:var(--bg4); margin-bottom:10px; border-radius:2px; overflow:hidden;">
+           <div id="survival-bar" style="height:100%; width:100%; background:var(--gold2);"></div>
+        </div>`;
+     } else {
+        clearTimeout(sess.timerId); // Desativa se já respondeu
+     }
+  } else {
+     clearTimeout(sess.timerId);
+  }
 
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--stone);letter-spacing:1px;text-transform:uppercase">${sess.current + 1} / ${tot}</span>
       <div style="display:flex;gap:8px;align-items:center">
         <span class="badge ${getStatus(card)}">${statusLabel(getStatus(card))}</span>
-        <button class="btn ghost sm" onclick="studySession=null;render()">✕ Sair</button>
+        <button class="btn ghost sm" onclick="clearTimeout(studySession?.timerId); studySession=null; render()">✕ Sair</button>
       </div>
     </div>
     
-    <!-- ✨ ALERTA DE SANGUESSUGA NA TELA -->
-    ${card.isLeech ? `<div style="background:rgba(231,76,60,0.1); border:1px solid var(--red); color:var(--red); padding:6px; border-radius:var(--r); font-size:12px; margin-bottom:10px; text-align:center;"><b>🩸 Sanguessuga:</b> Você tem errado muito esta palavra. Edite a definição ou apague!</div>` : ''}
+    ${card.isLeech ? `<div style="background:rgba(231,76,60,0.1); border:1px solid var(--red); color:var(--red); padding:6px; border-radius:var(--r); font-size:12px; margin-bottom:10px; text-align:center;"><b>🩸 Sanguessuga:</b> Você tem errado muito esta palavra. Cuidado!</div>` : ''}
 
     <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+    
+    ${timerHtml} <!-- ✨ A BARRA DO RELÓGIO APARECE AQUI! -->
+    
     ${inner}
     <div style="display:flex;gap:8px;justify-content:center;margin-top:6px">
       <span style="font-size:11px;color:var(--stone);font-style:italic">Acertos: ${sess.correct} | Modo: ${modeLabel(activeMode)} ${studyMode === 'adaptive' ? '🧠' : (studyMode === 'custom' ? '🎛️' : '')}</span>
@@ -966,7 +991,60 @@ function buildTFMode(card) {
       </button>
     </div>`}`;
 }
+// ✨ O MODO BOSS (TELA ESCURA E ÁUDIO)
+function buildBossMode(card) {
+  const sess = studySession;
+  const answered = sess.bossAnswered;
+  const micLang = card.langWord || 'pt-BR';
 
+  // Força o áudio da palavra a tocar quando o modo carrega, já que a tela esconde o texto!
+  if (!answered && !sess.bossAudioPlayed) {
+      setTimeout(() => ouvirPalavra(card.word, micLang), 300);
+      sess.bossAudioPlayed = true;
+  }
+
+  return `
+    <div class="card" style="margin-bottom:12px; background: #0a0a0a; border: 2px solid var(--red); box-shadow: 0 0 15px rgba(231,76,60,0.3)">
+      <div class="card-body" style="text-align:center">
+        <div class="fc-type" style="margin-bottom:8px; color:var(--red); font-weight:bold; letter-spacing:2px">🔥 PROVA FINAL</div>
+        <div style="font-size:45px; margin-bottom:10px; filter: drop-shadow(0 0 10px var(--red))">🎧</div>
+        <div class="fc-definition" style="font-size:15px;line-height:1.4;color:var(--stone3)">
+          ${answered ? `<span style="color:var(--gold2); font-size:24px">${esc(card.word)}</span>` : 'Ouçam a voz na escuridão. Digitem o que foi dito.'}
+        </div>
+      </div>
+    </div>
+    ${!answered ? `
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn ghost sm" onclick="ouvirPalavra('${esc(card.word)}', '${micLang}')" title="Repetir Áudio" style="padding:0 12px; font-size:18px; border-color:var(--red); color:var(--red)">🔊</button>
+      <button class="btn ghost sm" onclick="startDictation('bossInput', '${micLang}', this)" title="Falar Resposta" style="padding:0 12px; font-size:18px; border-color:var(--border2)">🎙️</button>
+      <input class="inp" id="bossInput" placeholder="A palavra é..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')checkBoss()">
+      <button class="btn danger" style="width:auto;padding:10px 16px; background:var(--red); border:none" onclick="checkBoss()">→</button>
+    </div>` : `
+    <div class="type-result ${sess.bossCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px; border-color:${sess.bossCorrect ? 'var(--gold2)' : 'var(--red)'}">
+      ${sess.bossCorrect ? '✓ Absoluto!' : '✗ A escuridão venceu.'} 
+      <div style="font-size:13px;margin-top:4px;color:var(--stone2)">
+        Significa: <b>${esc(clean(card.definition))}</b>
+      </div>
+    </div>
+    ${getRatingRowHtml(sess.bossCorrect, 'Dominado ✓')}`}
+  `;
+}
+
+function checkBoss() {
+  const sess = studySession; if (!sess || sess.bossAnswered) return;
+  const card = sess.queue[sess.current]; const inp = document.getElementById('bossInput'); if (!inp) return;
+  const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  
+  const ans = normalizeTxt(inp.value); 
+  const correctWord = normalizeTxt(card.word);
+  
+  sess.bossCorrect = ans === correctWord || levenshtein(ans, correctWord) <= 1;
+  sess.bossAnswered = true;
+  playSfx(sess.bossCorrect ? 'ok' : 'fail');
+  clearTimeout(sess.timerId); // Para o relógio
+  
+  render(); setTimeout(playAnswerAudio, 100);
+}
 function buildTypeMode(card) {
   const sess = studySession;
   const answered = sess.typeAnswered;
@@ -1011,8 +1089,24 @@ function buildContextMode(card) {
   let blanked = '', revealed = '';
   
   if (card.example) {
-    blanked = esc(clean(card.example)).replace(new RegExp('('+escReg(card.word)+')', 'gi'), '______');
-    revealed = esc(clean(card.example)).replace(new RegExp('('+escReg(card.word)+')', 'gi'), '<mark>$1</mark>');
+    let cleanEx = clean(card.example);
+    let bText = esc(cleanEx).replace(new RegExp('('+escReg(card.word)+')', 'gi'), '______');
+    let rText = esc(cleanEx).replace(new RegExp('('+escReg(card.word)+')', 'gi'), '<mark>$1</mark>');
+
+    // ✨ HARDCORE CONTEXT: Se a carta for mais velha que 7 dias, ele esconde um verbo extra!
+    if (card.interval >= 7) {
+        const words = cleanEx.split(/\s+/);
+        // Pega palavras grandes, ignorando a palavra principal
+        const eligible = words.filter(w => w.length > 5 && !w.toLowerCase().includes(card.word.toLowerCase()));
+        if (eligible.length > 0) {
+            const extraTarget = eligible[Math.floor(Math.random() * eligible.length)].replace(/[.,!?;:"'()]/g, '');
+            // Substitui o "verbo" por uma nuvem de neblina
+            bText = bText.replace(new RegExp('\\b'+escReg(extraTarget)+'\\b', 'gi'), '<span style="opacity:0.3">[oculto]</span>');
+        }
+    }
+    
+    blanked = bText;
+    revealed = rText;
   } else {
     if (isRel) {
       blanked = `<span style="font-size:14px;color:var(--stone)">Palavra base:</span><br><b style="color:var(--gold2);font-size:20px">${esc(card.word)}</b><br><br>Digite UM ${hl(card.cardType)}: ______`;
@@ -2691,6 +2785,35 @@ function loadStarter() {
    UTILS
 ═══════════════════════════════════════ */
 // funçao para falar e usar api de capturar audio para as respostas
+// ✨ SISTEMA DE NÍVEIS (GAMIFICAÇÃO)
+function getUserTitle() {
+  const revs = STATS.totalReviews || 0;
+  if (revs < 500) return { title: 'Plebeu', icon: '🥉', color: 'var(--stone)' };
+  if (revs < 2000) return { title: 'Estudioso', icon: '🥈', color: 'var(--blue2)' };
+  if (revs < 5000) return { title: 'Sofista', icon: '🥇', color: 'var(--gold)' };
+  return { title: 'Mestre da Retórica', icon: '👑', color: 'var(--gold2)' };
+}
+// ✨ RELÓGIO DA SOBREVIVÊNCIA
+function startSurvivalTimer(seconds) {
+  clearTimeout(studySession.timerId);
+  const bar = document.getElementById('survival-bar');
+  if(bar) {
+     bar.style.transition = 'none'; bar.style.width = '100%'; bar.style.backgroundColor = 'var(--gold2)';
+     setTimeout(() => {
+        bar.style.transition = `width ${seconds}s linear, background-color ${seconds}s linear`;
+        bar.style.width = '0%'; bar.style.backgroundColor = 'var(--red)';
+     }, 50);
+  }
+  
+  studySession.timerId = setTimeout(() => {
+      // Se a barra ainda estiver na tela quando o tempo acabar, significa que não respondeu!
+      if (document.getElementById('survival-bar')) {
+         toast('⏳ O tempo esgotou!', 'err');
+         playSfx('fail');
+         rateCard(0); // Reprova o card automaticamente!
+      }
+  }, seconds * 1000);
+}
 // ✨ MOTOR DE RECONHECIMENTO DE VOZ
 function startDictation(inputId, lang, btnElement) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -2827,7 +2950,7 @@ function modeLabel(m) {
   return {
     flash:'Flashcard', choice:'Múltipla escolha', type:'Digitação', context:'Contexto',
     tf:'V / F', revchoice:'Inversa', scramble:'Embaralhado', spell:'Letras',
-    syntax:'Sintaxe', cloze:'Lacunas', imgchoice:'Escolha Visual' // ✨ Novidades
+    syntax:'Sintaxe', cloze:'Lacunas', imgchoice:'Escolha Visual', boss:'Prova Final' // ✨ Novidade
   }[m]||m;
 }
 function levenshtein(a, b) {
