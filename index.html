@@ -651,15 +651,18 @@ function buildStudyTab() {
           <select class="inp" id="freeStudyFilter" style="border-color:rgba(52, 152, 219, 0.4)">
             <option value="">📚 Todo o Léxico (${W.length})</option>
             <optgroup label="Categorias">
-              ${allCats.map(c => `<option value="${esc(c)}">📁 ${esc(c)}</option>`).join('')}
+              <!-- ✨ AQUI ELE CONTA QUANTAS VEZES A CATEGORIA APARECE -->
+              ${allCats.map(c => `<option value="${esc(c)}">📁 ${esc(c)} (${W.filter(w => w.category === c).length})</option>`).join('')}
             </optgroup>
             ${allTags.length ? `<optgroup label="Tags">
-              ${allTags.map(t => `<option value="tag:${esc(t)}">🏷️ #${esc(t)}</option>`).join('')}
+              <!-- ✨ AQUI ELE CONTA QUANTAS VEZES A TAG APARECE -->
+              ${allTags.map(t => `<option value="tag:${esc(t)}">🏷️ #${esc(t)} (${W.filter(w => (w.tags || '').includes(t)).length})</option>`).join('')}
             </optgroup>` : ''}
           </select>
         </div>
         <div class="btn-row" style="flex-wrap:nowrap;gap:8px">
           <button class="btn" onclick="startSession('adaptive', document.getElementById('freeStudyFilter')?.value, null, true)" style="flex:1;border-color:var(--blue2);color:var(--blue2)">♾️ Iniciar Treino Livre</button>
+          <!-- ✨ O BOTÃO VOLTOU PARA ABRIR O SEU MODAL LIMPINHO -->
           <button class="btn" onclick="openCustomModal(true)" style="flex:1;border-color:var(--border2)">🎛️ Modos Específicos</button>
         </div>
       </div>
@@ -788,10 +791,9 @@ function buildFlashMode(card, intervals) {
   const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
   const typeLbl = isRel ? hl(card.cardType) : 'PALAVRA';
   
-  // Prepara as heranças de idioma
   const lw = card.langWord || 'pt-BR';
   const ld = card.langDef || 'pt-BR';
-  const lex = card.langEx || lw; // Se o exemplo não tiver idioma, herda o idioma da palavra!
+  const lex = card.langEx || lw; 
 
   return `
     <div id="flashcard-wrap" onclick="flipCard()">
@@ -799,24 +801,32 @@ function buildFlashMode(card, intervals) {
         <div class="fc-face front">
           <div class="fc-type">${typeLbl}</div>
           ${renderVisual(card)} 
-          <button class="mini-btn" style="border:none; padding:4px 12px; margin-bottom:8px" onclick="event.stopPropagation(); ouvirPalavra('${esc(card.word)}', '${lw}')">🔊 ${esc(card.word)}</button>
+          
+          <!-- ✨ SEGREDO DO SILÊNCIO: Se desligado, remove o botão 🔊 e exibe só o texto limpo -->
+          ${autoPlayAudio 
+             ? `<button class="mini-btn" style="border:none; padding:4px 12px; margin-bottom:8px" onclick="event.stopPropagation(); ouvirPalavra('${esc(card.word)}', '${lw}')">🔊 ${esc(card.word)}</button>` 
+             : `<div style="font-size:24px; font-weight:bold; color:var(--gold2); margin-bottom:8px">${esc(card.word)}</div>`}
+          
           ${card.phonetic ? `<div class="fc-phonetic">[${esc(card.phonetic)}]</div>` : ''}
           ${card.wordClass ? `<div class="fc-class">${esc(card.wordClass)}</div>` : ''}
           ${card.category !== 'geral' ? `<span class="badge learning" style="margin-top:8px">${esc(card.category)}</span>` : ''}
           <div class="fc-hint">Toque para revelar</div>
         </div>
         <div class="fc-face back">
-          <button class="mini-btn" style="border:none" onclick="event.stopPropagation(); ouvirPalavra('${esc(card.word)}', '${lw}')">🔊 ${esc(card.word)}</button>
+          
+          ${autoPlayAudio 
+             ? `<button class="mini-btn" style="border:none" onclick="event.stopPropagation(); ouvirPalavra('${esc(card.word)}', '${lw}')">🔊 ${esc(card.word)}</button>`
+             : `<div style="font-size:24px; font-weight:bold; color:var(--gold2)">${esc(card.word)}</div>`}
           
           <div class="fc-type" style="margin-top:12px">${isRel ? 'RESULTADOS' : 'DEFINIÇÃO'}</div>
           <div class="fc-definition" style="display:flex; align-items:center; justify-content:center; gap:8px">
-            <button class="btn ghost sm" style="border:none; padding:4px; font-size:18px" onclick="event.stopPropagation(); ouvirPalavra('${esc(clean(card.definition))}', '${ld}')" title="Ouvir Definição">🔊</button>
+            ${autoPlayAudio ? `<button class="btn ghost sm" style="border:none; padding:4px; font-size:18px" onclick="event.stopPropagation(); ouvirPalavra('${esc(clean(card.definition))}', '${ld}')" title="Ouvir Definição">🔊</button>` : ''}
             <span>${esc(clean(card.definition))}</span>
           </div>
           
           ${card.example ? `
           <div class="fc-example" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px">
-            <button class="btn ghost sm" style="border:none; padding:4px; font-size:16px" onclick="event.stopPropagation(); ouvirPalavra('${esc(clean(card.example))}', '${lex}')" title="Ouvir Exemplo">🔊</button>
+            ${autoPlayAudio ? `<button class="btn ghost sm" style="border:none; padding:4px; font-size:16px" onclick="event.stopPropagation(); ouvirPalavra('${esc(clean(card.example))}', '${lex}')" title="Ouvir Exemplo">🔊</button>` : ''}
             <span>"${esc(clean(card.example))}"</span>
           </div>` : ''}
           
@@ -832,7 +842,6 @@ function buildFlashMode(card, intervals) {
       </button>`).join('')}
     </div>` : `<button class="btn" style="margin-top:14px" onclick="flipCard()">↩ Revelar resposta</button>`}`;
 }
-
 function buildChoiceMode(card) {
   const sess = studySession;
   if (!sess.choices) {
@@ -3222,17 +3231,14 @@ function ouvirPalavra(texto, lang) {
 
 function toggleAudio() {
   autoPlayAudio = !autoPlayAudio;
-  const b = document.getElementById('btnAudio');
-  if (b) {
-    b.textContent = autoPlayAudio ? '🔊' : '🔈';
-    b.style.opacity = autoPlayAudio ? '1' : '0.4';
-  }
-  toast(autoPlayAudio ? 'Leitura Automática: ON' : 'Leitura Automática: OFF', autoPlayAudio ? 'gold' : 'err');
+  toast(autoPlayAudio ? '🔊 Áudio: ON' : '🔈 Áudio: OFF', autoPlayAudio ? 'gold' : 'err');
   
-  // Se ligou o áudio no meio da tela de estudo, já lê a pergunta atual
   if (autoPlayAudio && studySession && !studySession.flipped && !studySession.choiceAnswered && !studySession.tfAnswered && !studySession.typeAnswered && !studySession.revChoiceAnswered && !studySession.scrambleAnswered && !studySession.contextAnswered) {
     playQuestionAudio();
   }
+  
+  // ✨ MÁGICA AQUI: Força a tela a se reconstruir na mesma hora para sumir/aparecer os botões!
+  render();
 }
 
 function playQuestionAudio() {
