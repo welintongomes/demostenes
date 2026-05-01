@@ -296,62 +296,111 @@ function getQualityLabel(q) {
 /* ═══════════════════════════════════════
    STORAGE (INDEXEDDB)
 ═══════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   STORAGE (INDEXEDDB) - ALTA PERFORMANCE
+═══════════════════════════════════════ */
 const DB_NAME = 'DemostenesDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'appData';
+const DB_VERSION = 2; // Versão 2: Ativa a Arquitetura de Gavetas!
+const STORE_APP = 'appData';
+const STORE_WORDS = 'words';
 
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
+      if (!db.objectStoreNames.contains(STORE_APP)) db.createObjectStore(STORE_APP);
+      // Cria as gavetas individuais: cada carta é salva pelo seu 'id' único
+      if (!db.objectStoreNames.contains(STORE_WORDS)) db.createObjectStore(STORE_WORDS, { keyPath: 'id' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
+async function load() {
+  try {
+    const db = await openDB();
+    
+    // 1. Busca os dados nas gavetas separadas
+    const statsReq = new Promise(res => {
+        const tx = db.transaction(STORE_APP, 'readonly');
+        const req = tx.objectStore(STORE_APP).get('demo_stats');
+        req.onsuccess = () => res(req.result);
+        req.onerror = () => res(null);
+    });
+
+    const wordsReq = new Promise(res => {
+        if (!db.objectStoreNames.contains(STORE_WORDS)) return res([]);
+        const tx = db.transaction(STORE_WORDS, 'readonly');
+        const req = tx.objectStore(STORE_WORDS).getAll();
+        req.onsuccess = () => res(req.result);
+        req.onerror = () => res([]);
+    });
+
+    let [loadedStats, loadedWords] = await Promise.all([statsReq, wordsReq]);
+
+    // ✨ MIGRAÇÃO INTELIGENTE: Se não achar as gavetas, pega da caixa antiga e reorganiza!
+    if (!loadedStats && (!loadedWords || loadedWords.length === 0)) {
+        const oldReq = new Promise(res => {
+            const tx = db.transaction(STORE_APP, 'readonly');
+            const req = tx.objectStore(STORE_APP).get('demo_v3');
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => res(null);
+        });
+        const oldData = await oldReq;
+        
+        if (oldData) {
+            W = oldData.words || [];
+            STATS = oldData.stats || {streak: 0, lastStudy: 0, totalSessions: 0, totalReviews: 0, history: []};
+            await save(); // Salva no novo formato fragmentado
+            return;
+        }
+    }
+
+    W = loadedWords || [];
+    STATS = loadedStats || {streak: 0, lastStudy: 0, totalSessions: 0, totalReviews: 0, history: []};
+    
+  } catch (e) {
+    console.error("Erro ao carregar do IndexedDB", e);
+    W = []; STATS = {streak: 0, history: []};
+  }
+}
+
+// Salva TUDO de uma vez (Usado só quando você adiciona, deleta ou importa cartas novas)
 async function save() {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      // Salva os dados usando a mesma chave antiga para manter o padrão
-      store.put({ words: W, stats: STATS }, 'demo_v3');
+      const tx = db.transaction([STORE_APP, STORE_WORDS], 'readwrite');
+      tx.objectStore(STORE_APP).put(STATS, 'demo_stats');
+      
+      const storeW = tx.objectStore(STORE_WORDS);
+      storeW.clear().onsuccess = () => {
+          W.forEach(card => storeW.put(card));
+      };
+      
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
-  } catch (e) {
-    console.error("Erro ao salvar no IndexedDB", e);
-  }
+  } catch (e) { console.error(e); }
 }
 
-async function load() {
-  try {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.get('demo_v3');
-      req.onsuccess = () => {
-        const d = req.result || {};
-        W = d.words || [];
-        STATS = d.stats || {streak: 0, lastStudy: 0, totalSessions: 0, totalReviews: 0, history: []};
-        resolve();
-      };
-      req.onerror = () => {
-        W = []; STATS = {streak:0,lastStudy:0,totalSessions:0,totalReviews:0,history:[]};
-        resolve();
-      };
-    });
-  } catch (e) {
-    console.error("Erro ao carregar do IndexedDB", e);
-    W = []; STATS = {streak:0,lastStudy:0,totalSessions:0,totalReviews:0,history:[]};
-  }
+// ✨ O SEGREDO DA PERFORMANCE: Salva apenas a carta que você acabou de responder!
+async function saveCard(card) {
+   try {
+       const db = await openDB();
+       const tx = db.transaction(STORE_WORDS, 'readwrite');
+       tx.objectStore(STORE_WORDS).put(card);
+   } catch(e) {}
+}
+
+async function saveStats() {
+   try {
+       const db = await openDB();
+       const tx = db.transaction(STORE_APP, 'readwrite');
+       tx.objectStore(STORE_APP).put(STATS, 'demo_stats');
+   } catch(e) {}
 }
 
 /* ═══════════════════════════════════════
@@ -651,15 +700,18 @@ function buildStudyTab() {
           <select class="inp" id="freeStudyFilter" style="border-color:rgba(52, 152, 219, 0.4)">
             <option value="">📚 Todo o Léxico (${W.length})</option>
             <optgroup label="Categorias">
-              ${allCats.map(c => `<option value="${esc(c)}">📁 ${esc(c)}</option>`).join('')}
+              <!-- ✨ AQUI ELE CONTA QUANTAS VEZES A CATEGORIA APARECE -->
+              ${allCats.map(c => `<option value="${esc(c)}">📁 ${esc(c)} (${W.filter(w => w.category === c).length})</option>`).join('')}
             </optgroup>
             ${allTags.length ? `<optgroup label="Tags">
-              ${allTags.map(t => `<option value="tag:${esc(t)}">🏷️ #${esc(t)}</option>`).join('')}
+              <!-- ✨ AQUI ELE CONTA QUANTAS VEZES A TAG APARECE -->
+              ${allTags.map(t => `<option value="tag:${esc(t)}">🏷️ #${esc(t)} (${W.filter(w => (w.tags || '').includes(t)).length})</option>`).join('')}
             </optgroup>` : ''}
           </select>
         </div>
         <div class="btn-row" style="flex-wrap:nowrap;gap:8px">
           <button class="btn" onclick="startSession('adaptive', document.getElementById('freeStudyFilter')?.value, null, true)" style="flex:1;border-color:var(--blue2);color:var(--blue2)">♾️ Iniciar Treino Livre</button>
+          <!-- ✨ O BOTÃO VOLTOU PARA ABRIR O SEU MODAL LIMPINHO -->
           <button class="btn" onclick="openCustomModal(true)" style="flex:1;border-color:var(--border2)">🎛️ Modos Específicos</button>
         </div>
       </div>
@@ -788,10 +840,9 @@ function buildFlashMode(card, intervals) {
   const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
   const typeLbl = isRel ? hl(card.cardType) : 'PALAVRA';
   
-  // Prepara as heranças de idioma
   const lw = card.langWord || 'pt-BR';
   const ld = card.langDef || 'pt-BR';
-  const lex = card.langEx || lw; // Se o exemplo não tiver idioma, herda o idioma da palavra!
+  const lex = card.langEx || lw; 
 
   return `
     <div id="flashcard-wrap" onclick="flipCard()">
@@ -799,24 +850,32 @@ function buildFlashMode(card, intervals) {
         <div class="fc-face front">
           <div class="fc-type">${typeLbl}</div>
           ${renderVisual(card)} 
-          <button class="mini-btn" style="border:none; padding:4px 12px; margin-bottom:8px" onclick="event.stopPropagation(); ouvirPalavra('${esc(card.word)}', '${lw}')">🔊 ${esc(card.word)}</button>
+          
+          <!-- ✨ SEGREDO DO SILÊNCIO: Se desligado, remove o botão 🔊 e exibe só o texto limpo -->
+          ${autoPlayAudio 
+             ? `<button class="mini-btn" style="border:none; padding:4px 12px; margin-bottom:8px" onclick="event.stopPropagation(); ouvirPalavra('${esc(card.word)}', '${lw}')">🔊 ${esc(card.word)}</button>` 
+             : `<div style="font-size:24px; font-weight:bold; color:var(--gold2); margin-bottom:8px">${esc(card.word)}</div>`}
+          
           ${card.phonetic ? `<div class="fc-phonetic">[${esc(card.phonetic)}]</div>` : ''}
           ${card.wordClass ? `<div class="fc-class">${esc(card.wordClass)}</div>` : ''}
           ${card.category !== 'geral' ? `<span class="badge learning" style="margin-top:8px">${esc(card.category)}</span>` : ''}
           <div class="fc-hint">Toque para revelar</div>
         </div>
         <div class="fc-face back">
-          <button class="mini-btn" style="border:none" onclick="event.stopPropagation(); ouvirPalavra('${esc(card.word)}', '${lw}')">🔊 ${esc(card.word)}</button>
+          
+          ${autoPlayAudio 
+             ? `<button class="mini-btn" style="border:none" onclick="event.stopPropagation(); ouvirPalavra('${esc(card.word)}', '${lw}')">🔊 ${esc(card.word)}</button>`
+             : `<div style="font-size:24px; font-weight:bold; color:var(--gold2)">${esc(card.word)}</div>`}
           
           <div class="fc-type" style="margin-top:12px">${isRel ? 'RESULTADOS' : 'DEFINIÇÃO'}</div>
           <div class="fc-definition" style="display:flex; align-items:center; justify-content:center; gap:8px">
-            <button class="btn ghost sm" style="border:none; padding:4px; font-size:18px" onclick="event.stopPropagation(); ouvirPalavra('${esc(clean(card.definition))}', '${ld}')" title="Ouvir Definição">🔊</button>
+            ${autoPlayAudio ? `<button class="btn ghost sm" style="border:none; padding:4px; font-size:18px" onclick="event.stopPropagation(); ouvirPalavra('${esc(clean(card.definition))}', '${ld}')" title="Ouvir Definição">🔊</button>` : ''}
             <span>${esc(clean(card.definition))}</span>
           </div>
           
           ${card.example ? `
           <div class="fc-example" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px">
-            <button class="btn ghost sm" style="border:none; padding:4px; font-size:16px" onclick="event.stopPropagation(); ouvirPalavra('${esc(clean(card.example))}', '${lex}')" title="Ouvir Exemplo">🔊</button>
+            ${autoPlayAudio ? `<button class="btn ghost sm" style="border:none; padding:4px; font-size:16px" onclick="event.stopPropagation(); ouvirPalavra('${esc(clean(card.example))}', '${lex}')" title="Ouvir Exemplo">🔊</button>` : ''}
             <span>"${esc(clean(card.example))}"</span>
           </div>` : ''}
           
@@ -832,7 +891,6 @@ function buildFlashMode(card, intervals) {
       </button>`).join('')}
     </div>` : `<button class="btn" style="margin-top:14px" onclick="flipCard()">↩ Revelar resposta</button>`}`;
 }
-
 function buildChoiceMode(card) {
   const sess = studySession;
   if (!sess.choices) {
@@ -1804,7 +1862,12 @@ function rateCard(quality) {
   sess.bossAnswered = false; sess.bossAudioPlayed = false; // (Garante limpar o Boss)
   
   sess.currentAdaptiveMode = null;
-  if (!sess.isFreeMode) save(); 
+// BLOCO CORRIGIDO E BLINDADO:
+  if (!sess.isFreeMode) {
+      const cardToSave = W.find(w => w.id === card.id);
+      if (cardToSave) saveCard(cardToSave);
+      saveStats();
+  }
   render();
 }
 
@@ -2039,12 +2102,23 @@ function buildWordsTab() {
   `;
 }
 
+// ✨ VARIÁVEL DO DEBOUNCE (Guarda o cronômetro)
+let searchTimeout = null; 
+
 function handleSearchInput() {
-  wordDisplayLimit = 15;// Volta para os primeiros 50 ao pesquisar
   const inp = document.getElementById('wordSearch');
   const btn = document.getElementById('clearSearchBtn');
   if (btn && inp) btn.style.display = inp.value.length > 0 ? 'block' : 'none';
-  updateWordList();// Atualiza SÓ a lista, mantendo o foco no campo de busca!
+  
+  // ✨ A MÁGICA DO DEBOUNCE: 
+  // Se o usuário digitar outra letra rápido, ele cancela a busca anterior!
+  if (searchTimeout) clearTimeout(searchTimeout);
+  
+  // Só executa a busca pesada se o usuário parar de digitar por 300 milissegundos
+  searchTimeout = setTimeout(() => {
+    wordDisplayLimit = 15; // Volta para os primeiros 15 ao pesquisar
+    updateWordList();      // Atualiza a lista com segurança
+  }, 300);
 }
 
 function clearSearch() {
@@ -3194,9 +3268,34 @@ function updateStreak() {
   else STATS.streak = 1;
   STATS.lastStudy = Date.now();
 }
-function attachListeners() {
-  // nothing extra needed — all via inline handlers
+// ✨ CHAVE MESTRA DO ÁUDIO (Blindagem para iOS e Android)
+let isAudioUnlocked = false;
+
+function unlockAudio() {
+  if (isAudioUnlocked) return; // Se já destrancou, não faz mais nada
+  
+  // 1. Destranca a Voz do Robô (Speech Synthesis) com um áudio vazio
+  const u = new SpeechSynthesisUtterance('');
+  u.volume = 0; // Silencioso
+  window.speechSynthesis.speak(u);
+  
+  // 2. Destranca os Efeitos Sonoros (Beeps)
+  if (typeof audioCtx !== 'undefined' && audioCtx.state === 'suspended') {
+    audioCtx.resume();
   }
+  
+  isAudioUnlocked = true;
+  
+  // Remove os espiões para não gastar memória, já que o trabalho foi feito!
+  document.removeEventListener('touchstart', unlockAudio);
+  document.removeEventListener('click', unlockAudio);
+}
+
+function attachListeners() {
+  // Fica espionando o PRIMEIRO toque do usuário na tela do celular
+  document.addEventListener('touchstart', unlockAudio, { once: true });
+  document.addEventListener('click', unlockAudio, { once: true });
+}
 function renderStudy() {
   currentTab = 'study';
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('on', el.dataset.tab === 'study'));
@@ -3222,17 +3321,14 @@ function ouvirPalavra(texto, lang) {
 
 function toggleAudio() {
   autoPlayAudio = !autoPlayAudio;
-  const b = document.getElementById('btnAudio');
-  if (b) {
-    b.textContent = autoPlayAudio ? '🔊' : '🔈';
-    b.style.opacity = autoPlayAudio ? '1' : '0.4';
-  }
-  toast(autoPlayAudio ? 'Leitura Automática: ON' : 'Leitura Automática: OFF', autoPlayAudio ? 'gold' : 'err');
+  toast(autoPlayAudio ? '🔊 Áudio: ON' : '🔈 Áudio: OFF', autoPlayAudio ? 'gold' : 'err');
   
-  // Se ligou o áudio no meio da tela de estudo, já lê a pergunta atual
   if (autoPlayAudio && studySession && !studySession.flipped && !studySession.choiceAnswered && !studySession.tfAnswered && !studySession.typeAnswered && !studySession.revChoiceAnswered && !studySession.scrambleAnswered && !studySession.contextAnswered) {
     playQuestionAudio();
   }
+  
+  // ✨ MÁGICA AQUI: Força a tela a se reconstruir na mesma hora para sumir/aparecer os botões!
+  render();
 }
 
 function playQuestionAudio() {
@@ -3305,27 +3401,30 @@ function playAnswerAudio() {
   ouvirPalavra(clean(card.definition), card.langDef || 'pt-BR');
 }
 
-// ✨ COMPRESSOR AUTOMÁTICO DE CÂMERA
+// ✨ COMPRESSOR AUTOMÁTICO DE CÂMERA (Versão Ultra-Leve WEBP)
 function resizeImage(file, callback) {
   const reader = new FileReader();
   reader.onload = function(e) {
     const img = new Image();
     img.onload = function() {
       const canvas = document.createElement('canvas');
-      const MAX = 400; // Tamanho máximo perfeito para cards
+      
+      // ✨ Reduzimos de 400 para 250. Fica nítido na tela, mas pesa 80% menos!
+      const MAX = 250; 
       let w = img.width, h = img.height;
       if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } } 
       else { if (h > MAX) { w *= MAX / h; h = MAX; } }
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-      callback(canvas.toDataURL('image/jpeg', 0.7)); // Qualidade 70%
+      
+      // ✨ A GRANDE MÁGICA: Trocamos o 'image/jpeg' pesado por 'image/webp' levíssimo
+      callback(canvas.toDataURL('image/webp', 0.6)); 
     }
     img.src = e.target.result;
   }
   reader.readAsDataURL(file);
 }
-
 // ✨ PROCESSA O UPLOAD OU EMOJI NO FORMULÁRIO
 function handleImageUpload(e) {
   const file = e.target.files[0];
