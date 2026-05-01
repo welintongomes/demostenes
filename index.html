@@ -296,111 +296,62 @@ function getQualityLabel(q) {
 /* ═══════════════════════════════════════
    STORAGE (INDEXEDDB)
 ═══════════════════════════════════════ */
-/* ═══════════════════════════════════════
-   STORAGE (INDEXEDDB) - ALTA PERFORMANCE
-═══════════════════════════════════════ */
 const DB_NAME = 'DemostenesDB';
-const DB_VERSION = 2; // Versão 2: Ativa a Arquitetura de Gavetas!
-const STORE_APP = 'appData';
-const STORE_WORDS = 'words';
+const DB_VERSION = 1;
+const STORE_NAME = 'appData';
 
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_APP)) db.createObjectStore(STORE_APP);
-      // Cria as gavetas individuais: cada carta é salva pelo seu 'id' único
-      if (!db.objectStoreNames.contains(STORE_WORDS)) db.createObjectStore(STORE_WORDS, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
-async function load() {
-  try {
-    const db = await openDB();
-    
-    // 1. Busca os dados nas gavetas separadas
-    const statsReq = new Promise(res => {
-        const tx = db.transaction(STORE_APP, 'readonly');
-        const req = tx.objectStore(STORE_APP).get('demo_stats');
-        req.onsuccess = () => res(req.result);
-        req.onerror = () => res(null);
-    });
-
-    const wordsReq = new Promise(res => {
-        if (!db.objectStoreNames.contains(STORE_WORDS)) return res([]);
-        const tx = db.transaction(STORE_WORDS, 'readonly');
-        const req = tx.objectStore(STORE_WORDS).getAll();
-        req.onsuccess = () => res(req.result);
-        req.onerror = () => res([]);
-    });
-
-    let [loadedStats, loadedWords] = await Promise.all([statsReq, wordsReq]);
-
-    // ✨ MIGRAÇÃO INTELIGENTE: Se não achar as gavetas, pega da caixa antiga e reorganiza!
-    if (!loadedStats && (!loadedWords || loadedWords.length === 0)) {
-        const oldReq = new Promise(res => {
-            const tx = db.transaction(STORE_APP, 'readonly');
-            const req = tx.objectStore(STORE_APP).get('demo_v3');
-            req.onsuccess = () => res(req.result);
-            req.onerror = () => res(null);
-        });
-        const oldData = await oldReq;
-        
-        if (oldData) {
-            W = oldData.words || [];
-            STATS = oldData.stats || {streak: 0, lastStudy: 0, totalSessions: 0, totalReviews: 0, history: []};
-            await save(); // Salva no novo formato fragmentado
-            return;
-        }
-    }
-
-    W = loadedWords || [];
-    STATS = loadedStats || {streak: 0, lastStudy: 0, totalSessions: 0, totalReviews: 0, history: []};
-    
-  } catch (e) {
-    console.error("Erro ao carregar do IndexedDB", e);
-    W = []; STATS = {streak: 0, history: []};
-  }
-}
-
-// Salva TUDO de uma vez (Usado só quando você adiciona, deleta ou importa cartas novas)
 async function save() {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction([STORE_APP, STORE_WORDS], 'readwrite');
-      tx.objectStore(STORE_APP).put(STATS, 'demo_stats');
-      
-      const storeW = tx.objectStore(STORE_WORDS);
-      storeW.clear().onsuccess = () => {
-          W.forEach(card => storeW.put(card));
-      };
-      
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      // Salva os dados usando a mesma chave antiga para manter o padrão
+      store.put({ words: W, stats: STATS }, 'demo_v3');
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
-  } catch (e) { console.error(e); }
+  } catch (e) {
+    console.error("Erro ao salvar no IndexedDB", e);
+  }
 }
 
-// ✨ O SEGREDO DA PERFORMANCE: Salva apenas a carta que você acabou de responder!
-async function saveCard(card) {
-   try {
-       const db = await openDB();
-       const tx = db.transaction(STORE_WORDS, 'readwrite');
-       tx.objectStore(STORE_WORDS).put(card);
-   } catch(e) {}
-}
-
-async function saveStats() {
-   try {
-       const db = await openDB();
-       const tx = db.transaction(STORE_APP, 'readwrite');
-       tx.objectStore(STORE_APP).put(STATS, 'demo_stats');
-   } catch(e) {}
+async function load() {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get('demo_v3');
+      req.onsuccess = () => {
+        const d = req.result || {};
+        W = d.words || [];
+        STATS = d.stats || {streak: 0, lastStudy: 0, totalSessions: 0, totalReviews: 0, history: []};
+        resolve();
+      };
+      req.onerror = () => {
+        W = []; STATS = {streak:0,lastStudy:0,totalSessions:0,totalReviews:0,history:[]};
+        resolve();
+      };
+    });
+  } catch (e) {
+    console.error("Erro ao carregar do IndexedDB", e);
+    W = []; STATS = {streak:0,lastStudy:0,totalSessions:0,totalReviews:0,history:[]};
+  }
 }
 
 /* ═══════════════════════════════════════
@@ -1862,10 +1813,7 @@ function rateCard(quality) {
   sess.bossAnswered = false; sess.bossAudioPlayed = false; // (Garante limpar o Boss)
   
   sess.currentAdaptiveMode = null;
-  if (!sess.isFreeMode) {
-      saveCard(W[idx]); // Salva na gaveta só a carta que você jogou agora!
-      saveStats();      // Atualiza seus acertos e combos
-  } 
+  if (!sess.isFreeMode) save(); 
   render();
 }
 
@@ -2100,23 +2048,12 @@ function buildWordsTab() {
   `;
 }
 
-// ✨ VARIÁVEL DO DEBOUNCE (Guarda o cronômetro)
-let searchTimeout = null; 
-
 function handleSearchInput() {
+  wordDisplayLimit = 15;// Volta para os primeiros 50 ao pesquisar
   const inp = document.getElementById('wordSearch');
   const btn = document.getElementById('clearSearchBtn');
   if (btn && inp) btn.style.display = inp.value.length > 0 ? 'block' : 'none';
-  
-  // ✨ A MÁGICA DO DEBOUNCE: 
-  // Se o usuário digitar outra letra rápido, ele cancela a busca anterior!
-  if (searchTimeout) clearTimeout(searchTimeout);
-  
-  // Só executa a busca pesada se o usuário parar de digitar por 300 milissegundos
-  searchTimeout = setTimeout(() => {
-    wordDisplayLimit = 15; // Volta para os primeiros 15 ao pesquisar
-    updateWordList();      // Atualiza a lista com segurança
-  }, 300);
+  updateWordList();// Atualiza SÓ a lista, mantendo o foco no campo de busca!
 }
 
 function clearSearch() {
@@ -3266,34 +3203,9 @@ function updateStreak() {
   else STATS.streak = 1;
   STATS.lastStudy = Date.now();
 }
-// ✨ CHAVE MESTRA DO ÁUDIO (Blindagem para iOS e Android)
-let isAudioUnlocked = false;
-
-function unlockAudio() {
-  if (isAudioUnlocked) return; // Se já destrancou, não faz mais nada
-  
-  // 1. Destranca a Voz do Robô (Speech Synthesis) com um áudio vazio
-  const u = new SpeechSynthesisUtterance('');
-  u.volume = 0; // Silencioso
-  window.speechSynthesis.speak(u);
-  
-  // 2. Destranca os Efeitos Sonoros (Beeps)
-  if (typeof audioCtx !== 'undefined' && audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-  
-  isAudioUnlocked = true;
-  
-  // Remove os espiões para não gastar memória, já que o trabalho foi feito!
-  document.removeEventListener('touchstart', unlockAudio);
-  document.removeEventListener('click', unlockAudio);
-}
-
 function attachListeners() {
-  // Fica espionando o PRIMEIRO toque do usuário na tela do celular
-  document.addEventListener('touchstart', unlockAudio, { once: true });
-  document.addEventListener('click', unlockAudio, { once: true });
-}
+  // nothing extra needed — all via inline handlers
+  }
 function renderStudy() {
   currentTab = 'study';
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('on', el.dataset.tab === 'study'));
@@ -3399,30 +3311,27 @@ function playAnswerAudio() {
   ouvirPalavra(clean(card.definition), card.langDef || 'pt-BR');
 }
 
-// ✨ COMPRESSOR AUTOMÁTICO DE CÂMERA (Versão Ultra-Leve WEBP)
+// ✨ COMPRESSOR AUTOMÁTICO DE CÂMERA
 function resizeImage(file, callback) {
   const reader = new FileReader();
   reader.onload = function(e) {
     const img = new Image();
     img.onload = function() {
       const canvas = document.createElement('canvas');
-      
-      // ✨ Reduzimos de 400 para 250. Fica nítido na tela, mas pesa 80% menos!
-      const MAX = 250; 
+      const MAX = 400; // Tamanho máximo perfeito para cards
       let w = img.width, h = img.height;
       if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } } 
       else { if (h > MAX) { w *= MAX / h; h = MAX; } }
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-      
-      // ✨ A GRANDE MÁGICA: Trocamos o 'image/jpeg' pesado por 'image/webp' levíssimo
-      callback(canvas.toDataURL('image/webp', 0.6)); 
+      callback(canvas.toDataURL('image/jpeg', 0.7)); // Qualidade 70%
     }
     img.src = e.target.result;
   }
   reader.readAsDataURL(file);
 }
+
 // ✨ PROCESSA O UPLOAD OU EMOJI NO FORMULÁRIO
 function handleImageUpload(e) {
   const file = e.target.files[0];
