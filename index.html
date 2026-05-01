@@ -369,6 +369,7 @@ let modalStack = [];
 let wordDisplayLimit = 50;
 let confirmCallback = null;
 let autoPlayAudio = false;
+let enableTimer = false;
 
 // ✨ MOTOR DE ÁUDIO OFFLINE (Gerador de Frequência para Acerto/Erro)
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -501,11 +502,14 @@ function getAdaptiveMode(card) {
     return ['flash', 'choice', 'tf'][Math.floor(Math.random() * 3)];
   } else if (ivl <= 7) {
     return ['revchoice', 'spell'][Math.floor(Math.random() * 2)];
-  } else if (ivl <= 20) {
+  } else if (ivl <= 14) { 
     return ['scramble', 'type', 'context'][Math.floor(Math.random() * 3)];
+  } else if (ivl <= 20) {
+    // ✨ PENÚLTIMO MODO (15 a 20 dias de domínio)
+    return 'blind'; 
   } else {
-    // ✨ CARTA DOMINADA (>20 dias)? PROVA FINAL!
-    return 'boss';
+    // ✨ BOSS FINAL (>20 dias de domínio)
+    return 'boss'; 
   }
 }
 //filtra o estudo inteligente por categoria ou todos
@@ -573,13 +577,15 @@ function updateHeader() {
   const pct = W.length ? Math.round((W.filter(w => w.repetitions > 0).length / W.length) * 100) : 0;
   document.getElementById('hProg').style.width = pct + '%';
 
-  // ✨ ATUALIZA A PATENTE NO TOPO DA TELA
   const rank = getUserTitle();
   const subtitleEl = document.querySelector('.app-subtitle');
   if (subtitleEl) {
      subtitleEl.innerHTML = `
         <span style="color:${rank.color}; font-weight:bold; letter-spacing:1px">${rank.icon} ${rank.title}</span>
-        <button id="btnAudio" onclick="toggleAudio()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${autoPlayAudio ? '1' : '0.4'}; margin-left:8px}" title="Leitura Automática">${autoPlayAudio?'🔊':'🔈'}</button>
+        
+        <!-- ✨ BOTÕES DE CONTROLE AQUI -->
+        <button id="btnTimer" onclick="toggleTimer()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${enableTimer?'1':'0.4'}; margin-left:8px" title="Relógio de Sobrevivência">${enableTimer?'⏳':'⏸️'}</button>
+        <button id="btnAudio" onclick="toggleAudio()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${autoPlayAudio?'1':'0.4'}; margin-left:4px" title="Leitura Automática">${autoPlayAudio?'🔊':'🔈'}</button>
      `;
   }
 }
@@ -692,6 +698,33 @@ function buildStudyCard() {
 
   if (activeMode === 'imgchoice' && !card.image) activeMode = 'choice';
 
+  // ✨ O GUARDIÃO DO SILÊNCIO: Intercepta o jogo se o áudio estiver desligado!
+  if ((activeMode === 'blind' || activeMode === 'boss') && !autoPlayAudio) {
+     clearTimeout(sess.timerId); // Impede o relógio da morte de rodar aqui
+     let isBoss = activeMode === 'boss';
+     let color = isBoss ? 'var(--red)' : 'var(--gold2)';
+     
+     return `
+       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+         <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--stone);letter-spacing:1px;text-transform:uppercase">${sess.current + 1} / ${tot}</span>
+         <button class="btn ghost sm" onclick="studySession=null;render()">✕ Sair</button>
+       </div>
+       <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+       
+       <div class="card" style="border: 2px dashed ${color}; text-align:center; padding:30px 15px; margin-top:15px; background:rgba(0,0,0,0.4)">
+          <div style="font-size:40px; margin-bottom:15px">🔇</div>
+          <h3 style="color:${color}; margin-bottom:10px">${isBoss ? 'A Prova Final' : 'O Ditado Cego'} requer o seu Áudio!</h3>
+          <p style="color:var(--stone2); font-size:14px; line-height:1.5; margin-bottom:20px">
+            Esta palavra atingiu um nível intelectual avançado. Para provar o seu domínio, você precisa ouvir a definição e <b>pronunciar</b> a resposta.<br><br>Como o seu aplicativo está silenciado, o que deseja fazer?
+          </p>
+          <div style="display:flex; gap:10px; flex-direction:column">
+             <button class="btn" style="background:${color}; color:#fff; font-weight:bold; border:none; padding:12px" onclick="toggleAudio(); render()">🔊 Ligar Áudio e Enfrentar</button>
+             <button class="btn ghost" onclick="skipCardWithoutPenalty()" style="padding:12px">⏭️ Pular sem punição (Revisar depois)</button>
+          </div>
+       </div>`;
+  }
+
+  // Se o áudio estiver ligado, o código continua normalmente
   if (activeMode === 'flash') inner = buildFlashMode(card, intervals);
   else if (activeMode === 'choice') inner = buildChoiceMode(card);
   else if (activeMode === 'type') inner = buildTypeMode(card);
@@ -703,16 +736,15 @@ function buildStudyCard() {
   else if (activeMode === 'syntax') inner = buildSyntaxMode(card);
   else if (activeMode === 'cloze') inner = buildClozeMode(card);
   else if (activeMode === 'imgchoice') inner = buildImgChoiceMode(card);
-  else if (activeMode === 'boss') inner = buildBossMode(card); // ✨ Conexão da Prova Final!
+  else if (activeMode === 'blind') inner = buildBlindMode(card);
+  else if (activeMode === 'boss') inner = buildBossMode(card); 
 
-  // Descobre se o card já foi respondido
-  const isAns = sess.typeAnswered || sess.choiceAnswered || sess.tfAnswered || sess.revChoiceAnswered || sess.scrambleAnswered || sess.spellAnswered || sess.syntaxAnswered || sess.clozeAnswered || sess.contextAnswered || sess.imgChoiceAnswered || sess.bossAnswered || sess.flipped;
+  const isAns = sess.typeAnswered || sess.choiceAnswered || sess.tfAnswered || sess.revChoiceAnswered || sess.scrambleAnswered || sess.spellAnswered || sess.syntaxAnswered || sess.clozeAnswered || sess.contextAnswered || sess.imgChoiceAnswered || sess.bossAnswered || sess.blindAnswered || sess.flipped;
 
-  // ✨ LÓGICA DO TEMPO DE SOBREVIVÊNCIA
   let timerHtml = '';
-  if (card.interval >= 3 && !sess.isFreeMode && activeMode !== 'flash') {
-     let timeLimit = card.interval >= 21 ? 12 : 25; // 12s p/ Mestres, 25s p/ Revisão
-     if (activeMode === 'boss') timeLimit = 15; // Prova Final dá 15 segundos
+  if (enableTimer && card.interval >= 3 && !sess.isFreeMode && activeMode !== 'flash') {
+     let timeLimit = card.interval >= 21 ? 12 : 25; 
+     if (activeMode === 'boss') timeLimit = 15; 
      
      if (!isAns) {
         if (sess.currentCardId !== card.id) {
@@ -724,7 +756,7 @@ function buildStudyCard() {
            <div id="survival-bar" style="height:100%; width:100%; background:var(--gold2);"></div>
         </div>`;
      } else {
-        clearTimeout(sess.timerId); // Desativa se já respondeu
+        clearTimeout(sess.timerId); 
      }
   } else {
      clearTimeout(sess.timerId);
@@ -743,7 +775,7 @@ function buildStudyCard() {
 
     <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
     
-    ${timerHtml} <!-- ✨ A BARRA DO RELÓGIO APARECE AQUI! -->
+    ${timerHtml}
     
     ${inner}
     <div style="display:flex;gap:8px;justify-content:center;margin-top:6px">
@@ -991,59 +1023,203 @@ function buildTFMode(card) {
       </button>
     </div>`}`;
 }
-// ✨ O MODO BOSS (TELA ESCURA E ÁUDIO)
+// ✨ O MODO BOSS - FALA OBRIGATÓRIA DA PALAVRA BASE
 function buildBossMode(card) {
   const sess = studySession;
   const answered = sess.bossAnswered;
-  const micLang = card.langWord || 'pt-BR';
+  const ansLang = card.langWord || 'pt-BR'; 
+  const defLang = card.langDef || 'pt-BR';  
 
-  // Força o áudio da palavra a tocar quando o modo carrega, já que a tela esconde o texto!
   if (!answered && !sess.bossAudioPlayed) {
-      setTimeout(() => ouvirPalavra(card.word, micLang), 300);
+      setTimeout(() => ouvirPalavra(clean(card.definition), defLang), 300);
       sess.bossAudioPlayed = true;
   }
 
-  return `
+  let exigencias = ['a <b>palavra</b>'];
+  if (card.synonyms) exigencias.push('um <b>sinônimo</b>');
+  if (card.antonyms) exigencias.push('um <b>antônimo</b>');
+  let textoExigencia = exigencias.join(', ').replace(/,([^,]*)$/, ' e$1'); 
+
+  let html = `
     <div class="card" style="margin-bottom:12px; background: #0a0a0a; border: 2px solid var(--red); box-shadow: 0 0 15px rgba(231,76,60,0.3)">
       <div class="card-body" style="text-align:center">
         <div class="fc-type" style="margin-bottom:8px; color:var(--red); font-weight:bold; letter-spacing:2px">🔥 PROVA FINAL</div>
         <div style="font-size:45px; margin-bottom:10px; filter: drop-shadow(0 0 10px var(--red))">🎧</div>
         <div class="fc-definition" style="font-size:15px;line-height:1.4;color:var(--stone3)">
-          ${answered ? `<span style="color:var(--gold2); font-size:24px">${esc(card.word)}</span>` : 'Ouçam a voz na escuridão. Digitem o que foi dito.'}
+          ${answered ? `<span style="color:var(--gold2); font-size:24px">${esc(card.word)}</span>` : `A escuridão exige o seu conhecimento. Ouça o significado, <b>fale</b> ${textoExigencia}.`}
+        </div>
+      </div>
+    </div>`;
+
+  if (!answered) {
+    html += `
+    <div style="display:flex; justify-content:center; margin-bottom:12px">
+       <button class="btn ghost sm" onclick="ouvirPalavra(clean(studySession.queue[studySession.current].definition), studySession.queue[studySession.current].langDef || 'pt-BR')" style="border-color:var(--red); color:var(--red)"><span style="font-size:18px">🔊</span> Repetir Definição</button>
+    </div>
+    
+    <!-- ✨ CAMPO 1: PALAVRA BASE (EXCLUSIVAMENTE POR VOZ) -->
+    <div style="margin-bottom:12px; padding:12px; background:rgba(231,76,60,0.1); border-radius:var(--r); border:1px dashed var(--red)">
+       <div style="font-size:12px; color:var(--red); margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; font-weight:bold; text-align:center;">1. Pronuncie a Palavra (Obrigatório)</div>
+       <div style="display:flex; gap:8px; flex-direction:column;">
+         <button class="btn danger" onclick="startDictation('bossWord', '${ansLang}', this)" style="padding:12px; font-size:16px; background:var(--red); border:none; color:#fff; cursor:pointer">
+            🎙️ Tocar para Falar
+         </button>
+         <!-- Input bloqueado (readonly), só recebe o texto do microfone -->
+         <input class="inp" id="bossWord" readonly placeholder="A sua voz aparecerá aqui..." style="background:rgba(0,0,0,0.5); border-color:var(--red); color:var(--gold2); text-align:center; font-style:italic; font-size:16px; pointer-events:none">
+       </div>
+    </div>`;
+
+    // CAMPO 2: SINÔNIMO (Se existir - Híbrido)
+    if (card.synonyms) {
+       html += `
+       <div style="margin-bottom:10px">
+          <div style="font-size:12px; color:var(--gold2); margin-bottom:4px; text-transform:uppercase; letter-spacing:1px">2. Um Sinônimo Válido</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn ghost sm" onclick="startDictation('bossSyn', '${card.langSyn || defLang}', this)" style="border-color:var(--border2)">🎙️</button>
+            <input class="inp" id="bossSyn" placeholder="Digite ou fale..." autocomplete="off" onkeydown="if(event.key==='Enter') { const nxt = document.getElementById('bossAnt'); nxt ? nxt.focus() : checkBoss(); }">
+          </div>
+       </div>`;
+    }
+
+    // CAMPO 3: ANTÔNIMO (Se existir - Híbrido)
+    if (card.antonyms) {
+       html += `
+       <div style="margin-bottom:10px">
+          <div style="font-size:12px; color:var(--blue2); margin-bottom:4px; text-transform:uppercase; letter-spacing:1px">3. Um Antônimo Válido</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn ghost sm" onclick="startDictation('bossAnt', '${card.langAnt || defLang}', this)" style="border-color:var(--border2)">🎙️</button>
+            <input class="inp" id="bossAnt" placeholder="Digite ou fale..." autocomplete="off" onkeydown="if(event.key==='Enter') checkBoss()">
+          </div>
+       </div>`;
+    }
+
+    html += `
+    <button class="btn danger" style="width:100%;padding:12px; background:var(--red); border:none; margin-top:8px; font-weight:bold" onclick="checkBoss()">JULGAR RESPOSTAS →</button>
+    `;
+  } else {
+    // TELA DE RESULTADO
+    html += `
+    <div class="type-result ${sess.bossCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px; border-color:${sess.bossCorrect ? 'var(--gold2)' : 'var(--red)'}">
+      ${sess.bossCorrect ? '✓ Absoluto! Você domina esta palavra.' : '✗ O seu conhecimento foi insuficiente.'} 
+      <div style="font-size:13px;margin-top:8px;color:var(--stone2); text-align:left; line-height:1.6">
+        <div><b>Significado:</b> ${esc(clean(card.definition))}</div>
+        <div style="color:var(--red)"><b>Palavra:</b> ${esc(card.word)}</div>
+        ${card.synonyms ? `<div style="color:var(--gold2)"><b>Sinônimos aceitos:</b> ${esc(card.synonyms)}</div>` : ''}
+        ${card.antonyms ? `<div style="color:var(--blue2)"><b>Antônimos aceitos:</b> ${esc(card.antonyms)}</div>` : ''}
+      </div>
+    </div>
+    ${getRatingRowHtml(sess.bossCorrect, 'Domínio Retórico ✓')}`;
+  }
+  
+  return html;
+}
+
+// ✨ O MODO DITADO CEGO - 100% VOZ (Corrigido)
+function buildBlindMode(card) {
+  const sess = studySession;
+  const answered = sess.blindAnswered;
+  const ansLang = card.langWord || 'pt-BR'; 
+  const defLang = card.langDef || 'pt-BR';  
+
+  if (!answered && !sess.blindAudioPlayed) {
+      setTimeout(() => ouvirPalavra(clean(card.definition), defLang), 300);
+      sess.blindAudioPlayed = true;
+  }
+
+  return `
+    <div class="card" style="margin-bottom:12px; background: #1a1a1a; border: 1px solid var(--gold2);">
+      <div class="card-body" style="text-align:center">
+        <div class="fc-type" style="margin-bottom:8px; color:var(--gold2); font-weight:bold; letter-spacing:1px">🎧 DITADO CEGO</div>
+        <div style="font-size:35px; margin-bottom:10px; opacity:0.8">👤</div>
+        <div class="fc-definition" style="font-size:15px;line-height:1.4;color:var(--stone3)">
+          ${answered ? `<span style="color:var(--gold2); font-size:24px">${esc(card.word)}</span>` : 'Escute o significado e <b>fale</b> a palavra correspondente.'}
         </div>
       </div>
     </div>
     ${!answered ? `
-    <div style="display:flex;gap:8px;margin-bottom:10px">
-      <button class="btn ghost sm" onclick="ouvirPalavra('${esc(card.word)}', '${micLang}')" title="Repetir Áudio" style="padding:0 12px; font-size:18px; border-color:var(--red); color:var(--red)">🔊</button>
-      <button class="btn ghost sm" onclick="startDictation('bossInput', '${micLang}', this)" title="Falar Resposta" style="padding:0 12px; font-size:18px; border-color:var(--border2)">🎙️</button>
-      <input class="inp" id="bossInput" placeholder="A palavra é..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')checkBoss()">
-      <button class="btn danger" style="width:auto;padding:10px 16px; background:var(--red); border:none" onclick="checkBoss()">→</button>
-    </div>` : `
-    <div class="type-result ${sess.bossCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px; border-color:${sess.bossCorrect ? 'var(--gold2)' : 'var(--red)'}">
-      ${sess.bossCorrect ? '✓ Absoluto!' : '✗ A escuridão venceu.'} 
+    <div style="display:flex; justify-content:center; margin-bottom:12px">
+       <button class="btn ghost sm" onclick="ouvirPalavra(clean(studySession.queue[studySession.current].definition), studySession.queue[studySession.current].langDef || 'pt-BR')" style="border-color:var(--gold2); color:var(--gold2)"><span style="font-size:18px">🔊</span> Repetir Definição</button>
+    </div>
+    
+    <!-- ✨ CAMPO ÚNICO: EXCLUSIVAMENTE POR VOZ -->
+    <div style="margin-bottom:12px; padding:12px; background:rgba(212,175,55,0.1); border-radius:var(--r); border:1px dashed var(--gold2)">
+       <div style="font-size:12px; color:var(--gold2); margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; font-weight:bold; text-align:center;">Pronuncie a Resposta (Obrigatório)</div>
+       <div style="display:flex; gap:8px; flex-direction:column;">
+         <button class="btn" onclick="startDictation('blindInput', '${ansLang}', this)" style="padding:12px; font-size:16px; background:var(--gold2); border:none; color:var(--bg); cursor:pointer; font-weight:bold">
+            🎙️ Tocar para Falar
+         </button>
+         <input class="inp" id="blindInput" readonly placeholder="A sua voz aparecerá aqui..." style="background:rgba(0,0,0,0.5); border-color:var(--gold2); color:var(--gold2); text-align:center; font-style:italic; font-size:16px; pointer-events:none">
+       </div>
+    </div>
+    <button class="btn gold" style="width:100%;padding:12px; font-weight:bold" onclick="checkBlind()">CONFIRMAR RESPOSTA →</button>
+    ` : `
+    <div class="type-result ${sess.blindCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px">
+      ${sess.blindCorrect ? '✓ Excelente!' : `✗ A palavra era: ${esc(card.word)}`} 
       <div style="font-size:13px;margin-top:4px;color:var(--stone2)">
         Significa: <b>${esc(clean(card.definition))}</b>
       </div>
     </div>
-    ${getRatingRowHtml(sess.bossCorrect, 'Dominado ✓')}`}
+    ${getRatingRowHtml(sess.blindCorrect, 'Correto ✓')}`}
   `;
 }
 
-function checkBoss() {
-  const sess = studySession; if (!sess || sess.bossAnswered) return;
-  const card = sess.queue[sess.current]; const inp = document.getElementById('bossInput'); if (!inp) return;
+function checkBlind() {
+  const sess = studySession; if (!sess || sess.blindAnswered) return;
+  const card = sess.queue[sess.current]; const inp = document.getElementById('blindInput'); if (!inp) return;
   const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   
   const ans = normalizeTxt(inp.value); 
   const correctWord = normalizeTxt(card.word);
   
-  sess.bossCorrect = ans === correctWord || levenshtein(ans, correctWord) <= 1;
+  sess.blindCorrect = ans === correctWord || levenshtein(ans, correctWord) <= 1;
+  sess.blindAnswered = true;
+  playSfx(sess.blindCorrect ? 'ok' : 'fail');
+  clearTimeout(sess.timerId); 
+  
+  render(); setTimeout(playAnswerAudio, 100);
+}
+
+function checkBoss() {
+  const sess = studySession; if (!sess || sess.bossAnswered) return;
+  const card = sess.queue[sess.current]; 
+  
+  const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  
+  // Função para checar se o que a pessoa digitou está dentro da lista (separada por vírgula)
+  const checkMatchInList = (ans, targetListString) => {
+      if (!ans || !targetListString) return false;
+      const validOptions = targetListString.split(',').map(s => normalizeTxt(s));
+      return validOptions.some(opt => opt === ans || levenshtein(ans, opt) <= 1);
+  };
+
+  // 1. Checa a Palavra Base
+  const ansWord = normalizeTxt(document.getElementById('bossWord')?.value);
+  const correctWord = normalizeTxt(card.word);
+  let isWordCorrect = (ansWord === correctWord || levenshtein(ansWord, correctWord) <= 1);
+
+  // 2. Checa o Sinônimo (se exigido)
+  let isSynCorrect = true; 
+  if (card.synonyms) {
+      const ansSyn = normalizeTxt(document.getElementById('bossSyn')?.value);
+      isSynCorrect = checkMatchInList(ansSyn, card.synonyms);
+  }
+
+  // 3. Checa o Antônimo (se exigido)
+  let isAntCorrect = true;
+  if (card.antonyms) {
+      const ansAnt = normalizeTxt(document.getElementById('bossAnt')?.value);
+      isAntCorrect = checkMatchInList(ansAnt, card.antonyms);
+  }
+
+  // A pessoa SÓ passa se acertar TUDO que foi exigido!
+  sess.bossCorrect = isWordCorrect && isSynCorrect && isAntCorrect;
   sess.bossAnswered = true;
+  
   playSfx(sess.bossCorrect ? 'ok' : 'fail');
   clearTimeout(sess.timerId); // Para o relógio
   
-  render(); setTimeout(playAnswerAudio, 100);
+  render(); 
+  setTimeout(playAnswerAudio, 100);
 }
 function buildTypeMode(card) {
   const sess = studySession;
@@ -1623,7 +1799,9 @@ function rateCard(quality) {
   sess.spellSetup = false; sess.spellAnswered = false;
   sess.syntaxSetup = false; sess.syntaxAnswered = false;
   sess.clozeSetup = false; sess.clozeAnswered = false;
-  sess.imgChoices = null; sess.imgChoiceAnswered = false; 
+  sess.imgChoices = null; sess.imgChoiceAnswered = false;
+  sess.blindAnswered = false; sess.blindAudioPlayed = false; // ✨ Limpa o Cego
+  sess.bossAnswered = false; sess.bossAudioPlayed = false; // (Garante limpar o Boss)
   
   sess.currentAdaptiveMode = null;
   if (!sess.isFreeMode) save(); 
@@ -2617,19 +2795,24 @@ function openCustomModal(isFreeMode = false) {
     {id:'spell', lbl:'🅰️ Letras'}, {id:'scramble', lbl:'🔀 Embaralhado'},
     {id:'type', lbl:'⌨ Digitação'}, {id:'context', lbl:'📜 Contexto'},
     {id:'syntax', lbl:'🧩 Sintaxe da Frase'}, {id:'cloze', lbl:'🕳️ Lacunas'},
-    {id:'imgchoice', lbl:'🖼️ Escolha Visual'}
+    {id:'imgchoice', lbl:'🖼️ Escolha Visual'}, 
+    {id:'blind', lbl:'🎧 Ditado Cego'}, // ✨ ADICIONADO
+    {id:'boss', lbl:'🔥 Prova Final'}   // ✨ ADICIONADO
   ];
   
-  openModal(`
+openModal(`
     <h3>🎛️ Modos Aleatórios</h3>
     <div style="font-size:13px;color:var(--stone2);margin-bottom:12px;line-height:1.5">Selecione os modos que deseja incluir na rotação:</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-      ${modes.map(m => `
-        <label style="display:flex;align-items:center;gap:8px;background:var(--bg3);padding:10px;border:1px solid var(--border2);border-radius:var(--r);cursor:pointer;transition:all 0.2s" onclick="this.style.borderColor = this.querySelector('input').checked ? 'var(--gold)' : 'var(--border2)'">
+      ${modes.map(m => {
+        // ✨ Pequeno truque para deixar as bordas vermelha/dourada nos novos modos
+        let baseColor = m.id === 'boss' ? 'var(--red)' : (m.id === 'blind' ? 'var(--gold2)' : 'var(--border2)');
+        return `
+        <label style="display:flex;align-items:center;gap:8px;background:var(--bg3);padding:10px;border:1px solid ${baseColor};border-radius:var(--r);cursor:pointer;transition:all 0.2s" onclick="this.style.borderColor = this.querySelector('input').checked ? 'var(--gold)' : '${baseColor}'">
           <input type="checkbox" class="custom-mode-cb" value="${m.id}" style="accent-color:var(--gold);width:16px;height:16px" >
           <span style="font-size:12px;font-family:'Cinzel',serif;font-weight:600">${m.lbl}</span>
         </label>
-      `).join('')}
+      `}).join('')}
     </div>
     <div class="btn-row">
       <button class="btn gold" onclick="startCustomSession('${esc(cat)}', ${isFreeMode})">Iniciar Sessão</button>
@@ -2793,6 +2976,35 @@ function getUserTitle() {
   if (revs < 5000) return { title: 'Sofista', icon: '🥇', color: 'var(--gold)' };
   return { title: 'Mestre da Retórica', icon: '👑', color: 'var(--gold2)' };
 }
+// ✨ CONTROLE DO RELÓGIO DE SOBREVIVÊNCIA
+function toggleTimer() {
+  enableTimer = !enableTimer;
+  toast(enableTimer ? '⏳ Relógio ativado' : '⏸️ Relógio pausado', 'ok');
+  updateHeader();
+  
+  // Se você desativar no meio de um card, ele para a barra na hora!
+  if (!enableTimer && studySession && studySession.timerId) {
+      clearTimeout(studySession.timerId);
+      const bar = document.getElementById('survival-bar');
+      if (bar) bar.style.display = 'none';
+  }
+}
+
+// ✨ PULAR CARTA SEM PUNIR O ALGORITMO
+function skipCardWithoutPenalty() {
+   const sess = studySession;
+   if (!sess) return;
+   
+   // Remove a carta atual da fila sem alterar seu status no banco de dados
+   sess.queue.splice(sess.current, 1);
+   
+   // Limpa os status para a próxima carta
+   sess.currentAdaptiveMode = null; 
+   clearTimeout(sess.timerId);
+   
+   render(); // O render vai recarregar a tela automaticamente na próxima carta
+}
+
 // ✨ RELÓGIO DA SOBREVIVÊNCIA
 function startSurvivalTimer(seconds) {
   clearTimeout(studySession.timerId);
@@ -2950,7 +3162,7 @@ function modeLabel(m) {
   return {
     flash:'Flashcard', choice:'Múltipla escolha', type:'Digitação', context:'Contexto',
     tf:'V / F', revchoice:'Inversa', scramble:'Embaralhado', spell:'Letras',
-    syntax:'Sintaxe', cloze:'Lacunas', imgchoice:'Escolha Visual', boss:'Prova Final' // ✨ Novidade
+    syntax:'Sintaxe', cloze:'Lacunas', imgchoice:'Escolha Visual', blind:'Ditado Cego', boss:'Prova Final' // ✨ Novidade
   }[m]||m;
 }
 function levenshtein(a, b) {
