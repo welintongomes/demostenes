@@ -47,7 +47,7 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Crimson
 .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 .app-title{font-family:'Cinzel',serif;font-size:18px;font-weight:700;color:var(--gold2);letter-spacing:3px;text-transform:uppercase;}
 .app-subtitle{font-size:11px;color:var(--stone);letter-spacing:2px;text-transform:uppercase;font-style:italic;}
-.header-stats{display:flex;gap:12px;}
+.header-stats{display:flex;gap:2px;}
 .hstat{text-align:center;}
 .hstat-val{font-family:'Cinzel',serif;font-size:16px;font-weight:600;color:var(--gold2);line-height:1;}
 .hstat-lbl{font-size:9px;color:var(--stone);text-transform:uppercase;letter-spacing:1px;margin-top:1px;}
@@ -524,42 +524,121 @@ function playSfx(type) {
   
   let duration = 0.2; 
   
-  if(type === 'ok') {
-    // 1. Lógica do Combo e Proteção da Carteira
-    sess.combo = (sess.combo || 0) + 1;
-    if (STATS.moedas === undefined) STATS.moedas = 0;
+  // ✨ BLINDAGEM: Garante que as variáveis existem antes de fazer qualquer conta!
+  if (sess.combo === undefined || isNaN(sess.combo)) sess.combo = 0;
+  if (STATS.moedas === undefined || isNaN(STATS.moedas)) STATS.moedas = 0;
+
+  if (type === 'ok' || type === 'crit') {
+    // 1. Aumenta o combo de acertos
+    sess.combo++;
     
-    // 2. Sorteio de Crítico (A cada 5 acertos ou 10% sorte)
+    // 2. Sorteio de Crítico (A cada 5 acertos ou 10% sorte ou acionamento forçado)
     const isMilestone = (sess.combo % 5 === 0);
-    const isCrit = isMilestone || Math.random() < 0.10; 
+    const isCrit = isMilestone || Math.random() < 0.10 || type === 'crit'; 
 
-    // 3. ✨ SISTEMA DE PAGAMENTO DE MOEDAS E NÉCTAR
-    let ganho = sess.isFreeMode ? 1 : 3; 
-    if (isCrit) ganho += sess.isFreeMode ? 2 : 5; 
 
-    // O Néctar dobra as moedas e consome 1 carga!
-    let nectarActive = false;
-    if (STATS.inventory && STATS.inventory.doubleCoins > 0) {
-        ganho *= 2;
-        STATS.inventory.doubleCoins--;
-        nectarActive = true;
+    // 3. ✨ SISTEMA DE PAGAMENTO DE MOEDAS E XP (Com Eventos, Loja e TODOS OS PETS!)
+  // 3. ✨ SISTEMA DE PAGAMENTO DE MOEDAS E XP (Com Punição do Relógio!)
+    
+    // Matemática Base Risco vs Recompensa
+    let baseMoedas = sess.isFreeMode ? 1 : 3; 
+    let baseXP = sess.isFreeMode ? 5 : 15; 
+    let critMoedas = sess.isFreeMode ? 2 : 5;
+    let critXP = 25;
+
+    // 🛑 A PUNIÇÃO: Corta os lucros violentamente se o Relógio estiver pausado!
+    if (!enableTimer) {
+        baseMoedas = sess.isFreeMode ? 0 : 1; // Modo livre não dá ouro sem relógio!
+        baseXP = sess.isFreeMode ? 2 : 5;     // XP cai para 1/3 do valor original
+        critMoedas = sess.isFreeMode ? 0 : 2; 
+        critXP = 10;
     }
 
-    STATS.moedas += ganho; 
+    let ganhoMoedas = baseMoedas; 
+    let ganhoXP = baseXP; 
+
+    if (isCrit) {
+        ganhoMoedas += critMoedas; 
+        ganhoXP += critXP; 
+    }
+
+    // 🔥 LIVE-OPS: Multiplicador do Evento Ativo
+    if (STATS.activeEvent && STATS.activeEvent.id === 'coins_double') ganhoMoedas *= 2;
+    if (STATS.activeEvent && STATS.activeEvent.id === 'coins_triple') ganhoMoedas *= 3;
+    if (STATS.activeEvent && STATS.activeEvent.id === 'xp_double') ganhoXP *= 2;
+    if (STATS.activeEvent && STATS.activeEvent.id === 'xp_triple') ganhoXP *= 3;
+
+    // 🍷 ITEM: Néctar dos Deuses
+    let nectarActive = false;
+    if (STATS.inventory && STATS.inventory.doubleCoins > 0) {
+        ganhoMoedas *= 2; STATS.inventory.doubleCoins--; nectarActive = true;
+    }
+
+    // 💧 ITEM: Água de Mnemósine
+    let aguaActive = false;
+    if (STATS.inventory && STATS.inventory.doubleXp > 0) {
+        ganhoXP *= 2; STATS.inventory.doubleXp--; aguaActive = true;
+    }
+
+    // 🐾 COMPANHEIROS MÍTICOS (Afinidade e Bônus)
+    let petVisualCoins = ''; let petVisualXP = ''; let petActiveFlag = false;
+
+    if (STATS.pets && STATS.pets.active) {
+        petActiveFlag = true;
+        const activePet = STATS.pets.active;
+        const isFed = STATS.pets.fedCharges > 0;
+        
+        if (!STATS.pets.affinity) STATS.pets.affinity = {};
+        if (STATS.pets.affinity[activePet] === undefined) STATS.pets.affinity[activePet] = 0;
+        
+        STATS.pets.affinity[activePet]++;
+        const petLevel = Math.floor(STATS.pets.affinity[activePet] / 50) + 1;
+        
+        if (activePet === 'coruja') {
+            ganhoXP += isFed ? (10 + ((petLevel - 1) * 2)) : (2 + Math.floor((petLevel - 1) * 0.5));     
+            petVisualXP = isFed ? '🦉🍎' : '🦉'; 
+        } 
+        else if (activePet === 'fenix') {
+            ganhoMoedas += isFed ? (4 + (petLevel - 1)) : (1 + Math.floor((petLevel - 1) * 0.2));  
+            petVisualCoins = isFed ? '🔥🍎' : '🔥';
+        }
+        else if (activePet === 'tartaruga') { 
+            ganhoXP += isFed ? (4 + (petLevel - 1)) : (1 + Math.floor((petLevel - 1) * 0.2));     
+            petVisualXP = isFed ? '🐢🍎' : '🐢'; 
+        }
+        else if (activePet === 'formiga') { 
+            ganhoMoedas += isFed ? (2 + Math.floor((petLevel - 1) * 0.5)) : 0; 
+            petVisualCoins = isFed ? '🐜🍎' : '🐜';
+        }
+        else if (activePet === 'dragao') { 
+            ganhoMoedas += isFed ? (10 + ((petLevel - 1) * 2)) : (3 + Math.floor((petLevel - 1) * 0.5));
+            ganhoXP += isFed ? (30 + ((petLevel - 1) * 5)) : (5 + (petLevel - 1));
+            petVisualCoins = isFed ? '🐉🍎' : '🐉'; petVisualXP = isFed ? '🐉🍎' : '🐉';
+        }
+        
+        if (isFed) STATS.pets.fedCharges--;
+    }
+
+    STATS.moedas += ganhoMoedas; 
+    if (STATS.earnedXP === undefined) STATS.earnedXP = 0;
+    STATS.earnedXP += ganhoXP; 
+    
     if (typeof saveStats === 'function') saveStats(); 
     
     const moedasEl = document.getElementById('hMoedas');
     if (moedasEl) moedasEl.textContent = STATS.moedas + '🪙';
     
-    // 4. Feedback Visual
+    // 4. Feedback Visual de Dopamina Expandido
     if (isCrit) {
-      showFloatingText(`CRÍTICO! +${ganho} 🪙`, '#e024ff'); 
+      showFloatingText(`CRÍTICO! +${ganhoMoedas} 🪙${petVisualCoins} | +${ganhoXP} ✨${petVisualXP}`, '#e024ff'); 
       if (typeof shootConfetti === 'function') shootConfetti();
     } else {
-      showFloatingText(`+${ganho} 🪙 ${nectarActive ? '🍷' : ''}`, nectarActive ? '#e024ff' : 'var(--gold)'); 
+      const iconCoins = nectarActive ? '🍷' : '';
+      const iconXP = aguaActive ? '💧' : '';
+      const textColor = (nectarActive || aguaActive || petActiveFlag) ? '#00e5ff' : 'var(--gold)';
+      showFloatingText(`+${ganhoMoedas} 🪙${iconCoins}${petVisualCoins} | +${ganhoXP} ✨${iconXP}${petVisualXP}`, textColor); 
     }
-
-    // 5. Pitch Shifting (Escalada Sonora)
+    // 5. Pitch Shifting (O som vai ficando mais agudo conforme o combo sobe!)
     const pitchShift = Math.min(sess.combo, 10) * 30; 
     duration = isCrit ? 0.4 : 0.3;
     
@@ -571,8 +650,8 @@ function playSfx(type) {
     gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
     osc.start(); osc.stop(audioCtx.currentTime + duration);
     
-  } else {
-    // Errou: Quebra o combo (mas não perde moedas)
+  } else if (type === 'fail') {
+    // ✖ ERROU: Quebra o combo e toca som grave (mas não perde moedas)
     sess.combo = 0; 
     duration = 0.2;
     showFloatingText('✖ Errou', 'var(--red)');
@@ -903,18 +982,25 @@ function updateHeader() {
   const subtitleEl = document.querySelector('.app-subtitle');
   if (subtitleEl) {
      subtitleEl.innerHTML = `
-        <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.05); padding:3px 10px; border-radius:12px; border: 1px solid ${rank.color}">
-            <span style="background:${rank.color}; color:#000; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold">${rank.prestige}</span>
-            <span style="color:${rank.color}; font-weight:bold; letter-spacing:1px; font-size:13px; text-shadow: 0 0 5px ${rank.color}40">${rank.icon} ${rank.title}</span>
+        <div style="display:inline-flex; flex-direction:column; align-items:center; gap:2px;">
+            <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.05); padding:1px 2px; border-radius:12px; border: 1px solid ${rank.color}">
+                <span style="background:${rank.color}; color:#000; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold">${rank.prestige}</span>
+                <span style="color:${rank.color}; font-weight:bold; letter-spacing:1px; font-size:10px;margin-right: 3px; text-shadow: 0 0 5px ${rank.color}40">${rank.icon} ${rank.title}</span>
+            </div>
+            <div style="font-size:10px; font-weight:bold; color:var(--stone2); letter-spacing:1px">XP: ${rank.currentXP} / ${rank.nextXP} ✨</div>
         </div>
         
-        <button id="btnTimer" onclick="toggleTimer()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${enableTimer?'1':'0.4'}; margin-left:8px" title="Relógio">${enableTimer?'⏳':'⏸️'}</button>
-        <button id="btnAudio" onclick="toggleAudio()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${autoPlayAudio?'1':'0.4'}; margin-left:4px" title="Áudio">${autoPlayAudio?'🔊':'🔈'}</button>
+        <div style="display:inline-flex; align-items:center; margin-left:0px; margin-top:16px">
+            <button id="btnTimer" onclick="toggleTimer()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${enableTimer?'1':'0.4'}" title="Relógio">${enableTimer?'⏳':'⏸️'}</button>
+            <button id="btnAudio" onclick="toggleAudio()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${autoPlayAudio?'1':'0.4'}; margin-left:4px" title="Áudio">${autoPlayAudio?'🔊':'🔈'}</button>
+        </div>
      `;
   }
   
   // Executa o Fiscal do Level Up
   checkLevelUp(rank);
+  // ✨ Ativa o Relógio Mestre dos Eventos Especiais
+  runEventManager();
 }
 
 // ✨ O FISCAL DE LEVEL UP (Imune a fraudes!)
@@ -1041,6 +1127,29 @@ function buildStudyTab() {
           <div style="color:var(--gold2); font-weight:bold; font-size:18px">${STATS.moedas || 0} 🪙</div>
        </div>
     </div>`;
+  }
+  // ✨ BANNER LIVE-OPS (Aviso de Evento Ativo)
+  if (STATS.activeEvent) {
+      const timeLeftMinutes = Math.max(0, Math.ceil((STATS.activeEvent.endTime - Date.now()) / 60000));
+      html += `
+      <div class="card" style="border: 2px dashed ${STATS.activeEvent.color}; background:rgba(0,0,0,0.3); margin-top: 15px; position:relative; overflow:hidden">
+         
+         <!-- Efeito de luz passando no fundo -->
+         <div style="position:absolute; top:0; left:-100%; width:50%; height:100%; background:linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); animation: shine 3s infinite"></div>
+         
+         <div class="card-body" style="text-align:center; padding: 16px">
+            <div style="font-size:10px; font-weight:bold; letter-spacing:2px; color:var(--stone2); text-transform:uppercase; margin-bottom:4px">🔥 Evento Ativo 🔥</div>
+            <div style="font-size:22px; font-weight:bold; color:${STATS.activeEvent.color}; text-shadow: 0 0 10px ${STATS.activeEvent.color}40">${STATS.activeEvent.name}</div>
+            <div style="font-size:13px; color:white; margin-top:6px">${STATS.activeEvent.desc}</div>
+            
+            <div style="display:inline-block; background:var(--bg); border:1px solid ${STATS.activeEvent.color}; padding:4px 12px; border-radius:12px; font-size:12px; font-weight:bold; color:${STATS.activeEvent.color}; margin-top:12px">
+               ⏳ Termina em: ${timeLeftMinutes} min
+            </div>
+         </div>
+      </div>
+      <style>
+         @keyframes shine { 100% { left: 200%; } }
+      </style>`;
   }
 // ✨ BANNER DE BACKUP E SINCRONIZAÇÃO
   if (W.length > 0) {
@@ -2245,18 +2354,33 @@ function rateCard(quality) {
 
 if (!sess.isFreeMode) {
     
-    // ✨ SISTEMA DE PROTEÇÃO: 1º Verifica Mini Escudo, 2º Verifica Vidas
-    if (quality === 0 && sess.miniShieldActive) {
-        sess.miniShieldActive = false; // Consome o poder do escudo
+    // ✨ SISTEMA DE PROTEÇÃO TOTAL: Verifica Eventos, depois Escudos, depois Vidas!
+    const hasInfLives = STATS.activeEvent && STATS.activeEvent.id === 'lives_inf';
+    const hasInfShield = STATS.activeEvent && STATS.activeEvent.id === 'shields_inf';
+
+    if (quality === 0 && hasInfShield) {
+        // Evento da Égide Divina: O erro é perdoado de graça!
+        toast('🛡️ Égide Divina Ativa! Nenhuma penalidade no SM-2.', 'blue');
+        sess.queue.push(card);
+    } 
+    else if (quality === 0 && sess.miniShieldActive) {
+        sess.miniShieldActive = false; // Consome o escudo da loja
         toast('🛡️ Égide Menor ativada! O card foi protegido.', 'gold');
         sess.queue.push(card);
-    } else if (quality === 0 && STATS.vidas > 0) {
+    } 
+    else if (quality === 0 && hasInfLives) {
+        // Evento de Imortalidade: Protege a carta sem gastar os ❤️ Corações
+        toast('❤️‍🔥 Imortalidade Ativa! Sua vida não foi consumida.', 'red');
+        sess.queue.push(card);
+    } 
+    else if (quality === 0 && STATS.vidas > 0) {
         STATS.vidas--; // Consome a vida normal
         toast('❤️ Vida consumida! O card foi protegido.', 'gold');
         sess.queue.push(card);
         if (typeof saveStats === 'function') saveStats();
-    } else {
-        // --- LÓGICA NORMAL (Acertou, ou errou sem ter vidas e sem escudo) ---
+    } 
+    else {
+        // --- LÓGICA NORMAL (Acertou, ou errou sem ter nenhuma defesa) ---
         if (quality === 0) {
             toast('💔 Sem defesas! Penalidade aplicada.', 'err');
             sess.queue.push(card); 
@@ -3276,8 +3400,20 @@ function confirmClearAll() {
 }
 // ✨ LOJA: MERCADO DE ATENAS E ITENS (AGORA COM VIDAS E MINI ESCUDOS)
 function openStoreModal() {
-  if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0 };
-  
+if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, doubleXp: 0 };
+if (!STATS.pets) STATS.pets = { owned: [], active: null, fedCharges: 0 }; // INICIA O BANCO DE PETS 
+if (!STATS.pets.affinity) STATS.pets.affinity = {};
+
+  // ✨ Cálculos de Status de TODOS os Pets
+  const getLvl = (id) => Math.floor((STATS.pets.affinity[id] || 0) / 50) + 1;
+  const getNext = (id) => 50 - ((STATS.pets.affinity[id] || 0) % 50);
+
+  const lvlCoruja = getLvl('coruja'), nextCoruja = getNext('coruja'), powCoruja = 10 + ((lvlCoruja - 1) * 2);
+  const lvlFenix = getLvl('fenix'), nextFenix = getNext('fenix'), powFenix = 4 + (lvlFenix - 1);
+  const lvlTartaruga = getLvl('tartaruga'), nextTartaruga = getNext('tartaruga'), powTartaruga = 4 + (lvlTartaruga - 1);
+  const lvlFormiga = getLvl('formiga'), nextFormiga = getNext('formiga'), powFormiga = 2 + Math.floor((lvlFormiga - 1) * 0.5);
+  const lvlDragao = getLvl('dragao'), nextDragao = getNext('dragao');
+  const powDragaoGold = 10 + ((lvlDragao - 1) * 2), powDragaoXP = 30 + ((lvlDragao - 1) * 5); 
   openModal(`
     <h3 style="margin-bottom:8px">🛒 Mercado de Atenas</h3>
     <div style="text-align:center; margin-bottom:15px;">
@@ -3295,7 +3431,7 @@ function openStoreModal() {
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Revela a 1ª sílaba sem punição no SM-2.</div>
                 <div style="font-size:11px; margin-top:4px; color:var(--gold2);">Estoque: ${STATS.inventory.magicHints || 0}</div>
              </div>
-             <button class="btn gold sm" style="padding:8px" onclick="buyItem('magicHints', 15)">15 🪙</button>
+             <button class="btn gold sm" style="padding:8px" onclick="buyItem('magicHints', 100)">100 🪙</button>
           </div>
         </div>
 
@@ -3307,7 +3443,7 @@ function openStoreModal() {
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Pule uma carta difícil sem ser penalizado.</div>
                 <div style="font-size:11px; margin-top:4px; color:var(--green);">Estoque: ${STATS.inventory.skips || 0}</div>
              </div>
-             <button class="btn success sm" style="padding:8px" onclick="buyItem('skips', 30)">30 🪙</button>
+             <button class="btn success sm" style="padding:8px" onclick="buyItem('skips', 100)">100 🪙</button>
           </div>
         </div>
 
@@ -3319,7 +3455,7 @@ function openStoreModal() {
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Protege você de UM erro durante o jogo. Bloqueia a perda de Vida e a punição.</div>
                 <div style="font-size:11px; margin-top:4px; color:var(--stone);">Estoque: ${STATS.inventory.miniShields || 0}</div>
              </div>
-             <button class="btn ghost sm" style="padding:8px; border-color:var(--stone); color:var(--stone)" onclick="buyItem('miniShields', 10)">10 🪙</button>
+             <button class="btn ghost sm" style="padding:8px; border-color:var(--stone); color:var(--stone)" onclick="buyItem('miniShields', 100)">100 🪙</button>
           </div>
         </div>
 
@@ -3331,7 +3467,7 @@ function openStoreModal() {
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Recupera 1 Vida no seu contador.</div>
                 <div style="font-size:11px; margin-top:4px; color:var(--red);">Vidas atuais: ${STATS.vidas}</div>
              </div>
-             <button class="btn danger sm" style="padding:8px" onclick="buyLife()">25 🪙</button>
+             <button class="btn danger sm" style="padding:8px" onclick="buyLife()">100 🪙</button>
           </div>
         </div>
 
@@ -3343,7 +3479,19 @@ function openStoreModal() {
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Se você faltar 1 dia, salva sua ofensiva 🔥.</div>
                 <div style="font-size:11px; margin-top:4px; color:var(--blue2);">Equipados: ${STATS.inventory.shields || 0}/2</div>
              </div>
-             <button class="btn sm" style="padding:8px; border-color:var(--blue2); color:var(--blue2)" onclick="buyShield()" ${STATS.inventory.shields >= 2 ? 'disabled' : ''}>50 🪙</button>
+             <button class="btn sm" style="padding:8px; border-color:var(--blue2); color:var(--blue2)" onclick="buyShield()" ${STATS.inventory.shields >= 2 ? 'disabled' : ''}>250 🪙</button>
+          </div>
+        </div>
+
+        <!-- Item: XP em Dobro -->
+        <div class="card" style="border-color:#00e5ff; margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">💧 Água de Mnemósine</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A deusa da memória aguça sua mente. As próximas 20 respostas dão o DOBRO de XP.</div>
+                <div style="font-size:11px; margin-top:4px; color:#00e5ff;">Cargas ativas: ${STATS.inventory.doubleXp || 0}</div>
+             </div>
+             <button class="btn sm" style="padding:8px; border-color:#00e5ff; color:#00e5ff" onclick="buyItem('doubleXp', 250, 20)">250 🪙</button>
           </div>
         </div>
 
@@ -3355,10 +3503,10 @@ function openStoreModal() {
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">As próximas 20 respostas dão o DOBRO de moedas.</div>
                 <div style="font-size:11px; margin-top:4px; color:#e024ff;">Cargas ativas: ${STATS.inventory.doubleCoins || 0}</div>
              </div>
-             <button class="btn sm" style="padding:8px; border-color:#e024ff; color:#e024ff" onclick="buyItem('doubleCoins', 40, 20)">40 🪙</button>
+             <button class="btn sm" style="padding:8px; border-color:#e024ff; color:#e024ff" onclick="buyItem('doubleCoins', 250, 20)">250 🪙</button>
           </div>
         </div>
-
+        
         <!-- Item: Cura Sanguessuga -->
         <div class="card" style="border-color:var(--red); margin-bottom:0">
           <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
@@ -3367,7 +3515,123 @@ function openStoreModal() {
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Purifica todo o léxico. Remove o status de 🩸 Sanguessuga.</div>
                 <div style="font-size:11px; margin-top:4px; color:var(--red);">Consumo Imediato</div>
              </div>
-             <button class="btn danger sm" style="padding:8px" onclick="buyMist()">100 🪙</button>
+             <button class="btn danger sm" style="padding:8px" onclick="buyMist()">1000 🪙</button>
+          </div>
+        </div>
+        <!-- ✨ SEÇÃO: COMPANHEIROS MÍTICOS -->
+        <div style="margin-top:16px; margin-bottom:4px; font-weight:bold; color:var(--gold); border-bottom:1px solid var(--gold2); padding-bottom:4px; font-size:14px; text-transform:uppercase; letter-spacing:1px">
+           🐾 Companheiros Míticos
+        </div>
+
+        <!-- 1. Pet Básico: Tartaruga -->
+        <div class="card" style="border-color:#27ae60; margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">🐢 Tartaruga de Esopo <span style="font-size:10px; background:#27ae60; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlTartaruga}</span></div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#27ae60; font-weight:bold">+${powTartaruga} ✨</span> extras.</div>
+                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextTartaruga} acertos para Nv. ${lvlTartaruga + 1}</div>
+             </div>
+             ${STATS.pets.owned.includes('tartaruga')
+                ? (STATS.pets.active === 'tartaruga' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#27ae60; color:#27ae60">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#27ae60; color:#27ae60" onclick="equipPet('tartaruga')">Equipar</button>`)
+                : `<button class="btn sm ghost" style="padding:8px; border-color:#27ae60; color:#27ae60" onclick="buyPet('tartaruga', 500)">500 🪙</button>`}
+          </div>
+        </div>
+
+        <!-- 2. Pet Básico: Formiga -->
+        <div class="card" style="border-color:#d35400; margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">🐜 Formiga Mirmidão <span style="font-size:10px; background:#d35400; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlFormiga}</span></div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#d35400; font-weight:bold">+${powFormiga} 🪙</span> extras.</div>
+                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextFormiga} acertos para Nv. ${lvlFormiga + 1}</div>
+             </div>
+             ${STATS.pets.owned.includes('formiga')
+                ? (STATS.pets.active === 'formiga' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#d35400; color:#d35400">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#d35400; color:#d35400" onclick="equipPet('formiga')">Equipar</button>`)
+                : `<button class="btn sm ghost" style="padding:8px; border-color:#d35400; color:#d35400" onclick="buyPet('formiga', 750)">750 🪙</button>`}
+          </div>
+        </div>
+
+        <!-- 3. Pet Intermediário: Coruja -->
+        <div class="card" style="border-color:#b4a7d6; margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">🦉 Coruja de Atena <span style="font-size:10px; background:#b4a7d6; color:#000; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlCoruja}</span></div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#b4a7d6; font-weight:bold">+${powCoruja} ✨</span> extras.</div>
+                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextCoruja} acertos para Nv. ${lvlCoruja + 1}</div>
+             </div>
+             ${STATS.pets.owned.includes('coruja')
+                ? (STATS.pets.active === 'coruja' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#b4a7d6; color:#b4a7d6">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#b4a7d6; color:#b4a7d6" onclick="equipPet('coruja')">Equipar</button>`)
+                : `<button class="btn sm ghost" style="padding:8px; border-color:#b4a7d6; color:#b4a7d6" onclick="buyPet('coruja', 1500)">1500 🪙</button>`}
+          </div>
+        </div>
+
+        <!-- 4. Pet Intermediário: Fênix -->
+        <div class="card" style="border-color:#ff5e00; margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">🔥 Fênix de Apolo <span style="font-size:10px; background:#ff5e00; color:#000; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlFenix}</span></div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#ff5e00; font-weight:bold">+${powFenix} 🪙</span> extras.</div>
+                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextFenix} acertos para Nv. ${lvlFenix + 1}</div>
+             </div>
+             ${STATS.pets.owned.includes('fenix')
+                ? (STATS.pets.active === 'fenix' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#ff5e00; color:#ff5e00">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#ff5e00; color:#ff5e00" onclick="equipPet('fenix')">Equipar</button>`)
+                : `<button class="btn sm ghost" style="padding:8px; border-color:#ff5e00; color:#ff5e00" onclick="buyPet('fenix', 2500)">2500 🪙</button>`}
+          </div>
+        </div>
+
+        <!-- 5. O META SUPREMO: Dragão de Ladão -->
+        <div class="card" style="border: 2px solid #e024ff; box-shadow: 0 0 15px rgba(224, 36, 255, 0.2); margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px; color:#e024ff; text-transform:uppercase; text-shadow: 0 0 5px rgba(224,36,255,0.5)">🐉 Dragão de Ladão <span style="font-size:10px; background:#e024ff; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px; text-shadow:none">Nv. ${lvlDragao}</span></div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A Besta Mítica. Alimentada dá Absurdos: <span style="color:#e024ff; font-weight:bold">+${powDragaoGold} 🪙</span> e <span style="color:#00e5ff; font-weight:bold">+${powDragaoXP} ✨</span> extras.</div>
+                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextDragao} acertos para Nv. ${lvlDragao + 1}</div>
+             </div>
+             ${STATS.pets.owned.includes('dragao')
+                ? (STATS.pets.active === 'dragao' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#e024ff; color:#e024ff">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#e024ff; color:#e024ff" onclick="equipPet('dragao')">Equipar</button>`)
+                : `<button class="btn sm ghost" style="padding:8px; border-color:#e024ff; color:#e024ff; font-weight:bold" onclick="buyPet('dragao', 10000)">10000 🪙</button>`}
+          </div>
+        </div>
+
+        <!-- ✨ SEÇÃO DE ALIMENTAÇÃO MÍTICA -->
+        <div style="margin-top:16px; margin-bottom:4px; font-weight:bold; color:#ffcc00; border-bottom:1px solid #ffcc00; padding-bottom:4px; font-size:14px; text-transform:uppercase; letter-spacing:1px; display:flex; justify-content:space-between; align-items:flex-end">
+           <span>🍽️ Rações Míticas</span>
+           <span style="font-size:10px; color:var(--stone2); text-transform:none; font-weight:normal">Cargas na Barriga: <span style="color:#ffcc00; font-weight:bold; font-size:12px">${STATS.pets.fedCharges || 0}</span></span>
+        </div>
+
+        <!-- Comida 1: Sementes (Pobreza) -->
+        <div class="card" style="border-color:#8e44ad; margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">🌱 Sementes de Romã</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Petisco do Submundo. Sacia seu mascote por apenas <span style="color:#8e44ad; font-weight:bold">5 cartas</span>.</div>
+             </div>
+             <!-- Preço base: 25 (Mas você pode alterar depois pra deixar mais caro kkk) -->
+             <button class="btn sm" style="padding:8px; border-color:#8e44ad; color:#8e44ad" onclick="feedPet(40, 5)">40 🪙</button>
+          </div>
+        </div>
+
+        <!-- Comida 2: Uvas (Intermediário) -->
+        <div class="card" style="border-color:#9b59b6; margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">🍇 Uvas de Dionísio</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Lanche suculento. Sacia seu mascote por <span style="color:#9b59b6; font-weight:bold">10 cartas</span>.</div>
+             </div>
+             <!-- Preço base: 45 -->
+             <button class="btn sm" style="padding:8px; border-color:#9b59b6; color:#9b59b6" onclick="feedPet(80, 10)">80 🪙</button>
+          </div>
+        </div>
+
+        <!-- Comida 3: Maçã de Ouro (Luxo) -->
+        <div class="card" style="border-color:#ffcc00; margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">🍎 Maçã das Hespérides</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimento Mítico completo. Sacia seu mascote por <span style="color:#ffcc00; font-weight:bold">20 cartas</span>.</div>
+             </div>
+             <!-- Preço base: 80 -->
+             <button class="btn sm" style="padding:8px; border-color:#ffcc00; color:#ffcc00" onclick="feedPet(150, 20)">150 🪙</button>
           </div>
         </div>
     </div>
@@ -3381,7 +3645,7 @@ function openStoreModal() {
 // nova função que processa a compra de Vidas:
 function buyLife() {
    if ((STATS.moedas || 0) < 25) { toast('Moedas insuficientes!', 'err'); triggerScreenShake(); return; }
-   STATS.moedas -= 25;
+   STATS.moedas -= 100;
    if (STATS.vidas === undefined) STATS.vidas = 3;
    STATS.vidas++; // Adiciona +1 Vida
    if (typeof saveStats === 'function') saveStats(); 
@@ -3389,7 +3653,51 @@ function buyLife() {
    openStoreModal(); 
    updateHeader();
 }
+// ✨ SISTEMA DE PETS MÍTICOS (Compra, Equipamento e Comida)
+function buyPet(petId, price) {
+   if ((STATS.moedas || 0) < price) { 
+       toast('Moedas insuficientes!', 'err'); 
+       if(typeof triggerScreenShake === 'function') triggerScreenShake(); 
+       return; 
+   }
+   STATS.moedas -= price;
+   STATS.pets.owned.push(petId);
+   STATS.pets.active = petId; // Equipa automaticamente ao comprar
+   
+   if (typeof saveStats === 'function') saveStats(); 
+   toast('🐾 Companheiro Mítico Adotado!', 'gold'); 
+   if (typeof shootConfetti === 'function') shootConfetti();
+   openStoreModal(); 
+   updateHeader();
+}
 
+function equipPet(petId) {
+   STATS.pets.active = petId;
+   if (typeof saveStats === 'function') saveStats(); 
+   toast('🐾 Mascote Equipado!', 'ok'); 
+   openStoreModal();
+}
+
+function feedPet(price, charges) {
+   if (!STATS.pets.active) {
+       toast('Equipe um Pet primeiro!', 'err');
+       if(typeof triggerScreenShake === 'function') triggerScreenShake(); 
+       return;
+   }
+   if ((STATS.moedas || 0) < price) { 
+       toast('Moedas insuficientes!', 'err'); 
+       if(typeof triggerScreenShake === 'function') triggerScreenShake(); 
+       return; 
+   }
+   
+   STATS.moedas -= price;
+   STATS.pets.fedCharges = (STATS.pets.fedCharges || 0) + charges;
+   
+   if (typeof saveStats === 'function') saveStats(); 
+   toast('🍎 Mascote Alimentado! Bônus Máximo Ativado.', 'gold'); 
+   openStoreModal(); 
+   updateHeader();
+}
 function buyItem(itemType, cost, amount = 1) {
    if ((STATS.moedas || 0) < cost) { toast('Moedas insuficientes!', 'err'); triggerScreenShake(); return; }
    STATS.moedas -= cost;
@@ -3412,12 +3720,12 @@ function buyItem(itemType, cost, amount = 1) {
 function buyShield() {
    if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0 };
    if (STATS.inventory.shields >= 2) return; // Limite de 2 escudos
-   buyItem('shields', 50, 1);
+   buyItem('shields', 250, 1);
 }
 
 function buyMist() {
    if ((STATS.moedas || 0) < 100) { toast('Moedas insuficientes!', 'err'); triggerScreenShake(); return; }
-   STATS.moedas -= 100;
+   STATS.moedas -= 1000;
    let curadas = 0;
    W.forEach(w => {
        if(w.isLeech || w.consecutiveFails >= 4) {
@@ -3834,18 +4142,20 @@ function loadStarter() {
 /* ═══════════════════════════════════════
    UTILS
 ═══════════════════════════════════════ */
-// funçao para falar e usar api de capturar audio para as respostas
-// ✨ SISTEMA DE NÍVEIS (GAMIFICAÇÃO)
-// ✨ SISTEMA DE PRESTÍGIO E TÍTULOS INFINITOS
+// ✨ SISTEMA HÍBRIDO DE PRESTÍGIO E XP INFINITO
 function getUserTitle() {
-  const totalCards = W.length; // Usa o total de cartas do seu Léxico
-  const cardsPerLevel = 10;    // A CADA 10 CARTAS, VOCÊ SOBE UM NÍVEL!
+  if (!STATS.earnedXP) STATS.earnedXP = 0;
   
-  const level = Math.floor(totalCards / cardsPerLevel);
+  // 1 Carta = 50 XP Base. Somado ao XP que você ganha jogando!
+  const baseXP = W.length * 50; 
+  const totalXP = baseXP + STATS.earnedXP;
   
-  // Array de títulos que se repete infinitamente
+  const xpPerLevel = 500; // A cada 500 XP, você sobe de nível e ganha vida!
+  const level = Math.floor(totalXP / xpPerLevel);
+  const currentLevelXP = totalXP % xpPerLevel; // O XP que sobra para mostrar na barrinha
+  
   const titles = [
-  { t: 'Plebeu', icon: '⛺' },
+      { t: 'Plebeu', icon: '⛺' },
   { t: 'Noviço', icon: '🪶' },
   { t: 'Iniciado', icon: '📘' },
   { t: 'Aprendiz', icon: '📖' },
@@ -3895,13 +4205,12 @@ function getUserTitle() {
   { t: 'Apogeu', icon: '🌅' },
   { t: 'Ápice', icon: '🚀' },
   { t: 'Demóstenes', icon: '👑🔥' }
-];
+  ];
   
-  const prestige = Math.floor(level / titles.length) + 1; // Qual a sua "Geração" (1, 2, 3...)
-  const titleIndex = level % titles.length; // Em qual título desta geração você está
+  const prestige = Math.floor(level / titles.length) + 1;
+  const titleIndex = level % titles.length; 
   
-  // Cores que vão evoluindo a cada Prestígio (Se passar do último, ele recomeça o ciclo de cores!)
-const prestigeColors = [
+  const prestigeColors = [
   '#5a5a5a', // 1 ferro bruto
   '#616161',
   '#696969',
@@ -3961,7 +4270,7 @@ const prestigeColors = [
   '#00ffff',
   '#66ffff',
   '#ccffff'  // 50 ápice (Demóstenes 👑)
-];
+   ];
   const color = prestigeColors[(prestige - 1) % prestigeColors.length];
   
   return {
@@ -3969,7 +4278,9 @@ const prestigeColors = [
       icon: titles[titleIndex].icon,
       color: color,
       prestige: prestige,
-      level: level
+      level: level,
+      currentXP: currentLevelXP,
+      nextXP: xpPerLevel
   };
 }
 // ✨ CONTROLE DO RELÓGIO DE SOBREVIVÊNCIA
@@ -4346,24 +4657,30 @@ function renderVisual(card) {
     return `<div style="font-size:70px; line-height:1; margin-bottom:14px; text-align:center; filter:drop-shadow(0 4px 8px rgba(0,0,0,0.4))">${esc(card.image)}</div>`;
   }
 }
-// ✨ SISTEMA DE NUVEM E SINCRONIZAÇÃO (Backup e Restauração)
+// ✨ SISTEMA DE NUVEM E SINCRONIZAÇÃO (Backup e Restauração Total)
 function openBackupModal() {
   openModal(`
     <h3 style="margin-bottom:8px">💾 Sincronização do Demóstenes</h3>
-    <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Transfira todo o seu progresso, moedas, itens e léxico para outro dispositivo sem perder nada!</p>
+    <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Transfira todo o seu progresso para outro dispositivo sem perder nada!</p>
     
     <div class="card" style="border-color:var(--blue); margin-bottom:10px">
       <div class="card-body">
          <div style="font-weight:bold; color:var(--blue)">📤 Salvar Progresso (Exportar)</div>
-         <div style="font-size:11px; margin-bottom:12px; color:var(--stone2)">Baixa um arquivo blindado com todo o seu jogo atual.</div>
-         <button class="btn info" style="width:100%" onclick="exportBackup()">Baixar Arquivo</button>
+         <div style="font-size:11px; margin-bottom:12px; color:var(--stone2)">
+             Baixa um arquivo blindado contendo:<br>
+             <span style="color:var(--gold)">✔ Léxico e Memória SM-2</span><br>
+             <span style="color:var(--gold)">✔ Nível de Conta e XP</span><br>
+             <span style="color:var(--gold)">✔ Moedas e Inventário da Loja</span><br>
+             <span style="color:var(--gold)">✔ Pets Míticos e Nível de Afinidade</span>
+         </div>
+         <button class="btn info" style="width:100%" onclick="exportBackup()">Baixar Arquivo Completo</button>
       </div>
     </div>
 
     <div class="card" style="border-color:var(--green); margin-bottom:0">
       <div class="card-body">
          <div style="font-weight:bold; color:var(--green)">📥 Continuar Progresso (Importar)</div>
-         <div style="font-size:11px; margin-bottom:12px; color:var(--stone2)">Carrega um arquivo anterior para continuar de onde parou.</div>
+         <div style="font-size:11px; margin-bottom:12px; color:var(--stone2)">Carrega um arquivo anterior para continuar sua jornada de onde parou.</div>
          <input type="file" id="backupInput" style="display:none" accept=".json" onchange="importBackup(event)">
          <button class="btn success" style="width:100%; background:var(--green); color:white" onclick="document.getElementById('backupInput').click()">Carregar Arquivo</button>
       </div>
@@ -4424,6 +4741,88 @@ function importBackup(event) {
         }
     };
     reader.readAsText(file);
+}
+// ✨ SISTEMA LIVE-OPS: EVENTOS E MARATONAS DE FIM DE SEMANA
+function runEventManager() {
+    if (!STATS) return;
+    const now = Date.now();
+    
+    // O calendário: descobre se é dia de semana ou fim de semana
+    const dateObj = new Date();
+    const dayOfWeek = dateObj.getDay(); // 0 = Domingo, 6 = Sábado
+    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+
+    // 1. O Lixeiro: Limpa o evento se o tempo (1 hora) já esgotou
+    if (STATS.activeEvent && now > STATS.activeEvent.endTime) {
+        toast(`⏳ O evento ${STATS.activeEvent.name} terminou!`, 'stone');
+        STATS.activeEvent = null;
+        if (typeof saveStats === 'function') saveStats();
+    }
+
+    // Se já tem um evento rodando agora, não faz novos sorteios
+    if (STATS.activeEvent) return;
+
+    // 2. Controle de Sorteios (A Magia do Fim de Semana!)
+    const todayStr = dateObj.toISOString().slice(0, 10);
+    
+    if (!isWeekend) {
+        // TRAVA RIGOROSA (Segunda a Sexta): Só sorteia 1x por dia!
+        if (STATS.lastEventRoll === todayStr) return;
+        STATS.lastEventRoll = todayStr;
+    } else {
+        // FIM DE SEMANA: Ele marca o dia, mas NÃO TE BLOQUEIA de sortear de novo quando o evento acabar!
+        STATS.lastEventRoll = todayStr;
+    }
+
+    // 3. A Roleta de Eventos (RNG)
+    const roll = Math.random(); 
+    let eventTriggered = null;
+
+    const epics = [
+        { id: 'coins_triple', name: 'Chuva de Ouro 💰', desc: 'Todas as recompensas de moedas são TRIPLAS!', color: 'var(--gold)' },
+        { id: 'xp_triple', name: 'Sabedoria de Atena 🦉', desc: 'Todo o XP ganho nas respostas é TRIPLO!', color: '#e024ff' }
+    ];
+    
+    const rares = [
+        { id: 'coins_double', name: 'Benção de Hermes 🪙', desc: 'Todas as recompensas de moedas são DUPLAS!', color: 'var(--green)' },
+        { id: 'xp_double', name: 'Foco de Apolo ☀️', desc: 'Todo o XP ganho nas respostas é DUPLO!', color: '#ff245e' },
+        { id: 'lives_inf', name: 'Imortalidade ❤️‍🔥', desc: 'Vidas NÃO são consumidas ao errar!', color: 'var(--red)' },
+        { id: 'shields_inf', name: 'Égide Divina 🛡️', desc: 'Nenhuma falha pune o seu SM-2!', color: 'var(--blue)' }
+    ];
+
+    if (isWeekend) {
+        // ✨ MARATONA (Sáb/Dom): 100% DE CHANCE DE EVENTO! 
+        // Acaba um, começa outro na mesma hora. (15% Épico, 85% Raro)
+        if (roll < 0.15) {
+            eventTriggered = epics[Math.floor(Math.random() * epics.length)];
+        } else {
+            eventTriggered = rares[Math.floor(Math.random() * rares.length)];
+        }
+    } else {
+        // 💼 DIAS NORMAIS (Seg a Sex): 5% Épico, 35% Raro, 60% chance de NADA acontecer.
+        if (roll < 0.05) {
+            eventTriggered = epics[Math.floor(Math.random() * epics.length)];
+        } else if (roll < 0.40) {
+            eventTriggered = rares[Math.floor(Math.random() * rares.length)];
+        }
+    }
+
+    // 4. Se ativou algo na roleta, o evento dura exatamente 1 Hora (3.600.000 ms)
+    if (eventTriggered) {
+        STATS.activeEvent = {
+            ...eventTriggered,
+            endTime: now + 3600000 
+        };
+        
+        // Notificação especial se for sábado ou domingo!
+        if (isWeekend) {
+            toast(`🎉 MARATONA DE FIM DE SEMANA: ${eventTriggered.name}!`, 'gold');
+        } else {
+            toast(`🎉 EVENTO INICIADO: ${eventTriggered.name}!`, 'gold');
+        }
+        
+        if (typeof saveStats === 'function') saveStats();
+    }
 }
 /* ═══════════════════════════════════════
    INIT
