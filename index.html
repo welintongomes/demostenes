@@ -55,7 +55,7 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Crimson
 /* ── TABS ── */
 #tabs{display:flex;background:var(--bg3);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
 #tabs::-webkit-scrollbar{display:none;}
-.tab{flex:1;min-width:60px;padding:10px 6px;font-family:'Cinzel',serif;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--stone);cursor:pointer;text-align:center;border-bottom:2px solid transparent;transition:all .2s;user-select:none;white-space:nowrap;}
+.tab{flex:1;min-width:60px;padding:3px 2px;font-family:'Cinzel',serif;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--stone);cursor:pointer;text-align:center;border-bottom:2px solid transparent;transition:all .2s;user-select:none;white-space:nowrap;}
 .tab.on{color:var(--gold2);border-color:var(--gold);}
 .tab:active{opacity:.7;}
 
@@ -63,7 +63,7 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Crimson
 #body{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px;}
 
 /* ── CARDS ── */
-.card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;margin-bottom:12px;position:relative;}
+.card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);overflow:clip;margin-bottom:12px;position:relative;}
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.4),transparent);}
 .card-head{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2);}
 .card-title{font-family:'Cinzel',serif;font-size:13px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--stone3);}
@@ -111,7 +111,7 @@ select.inp{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.
 .fc-class{font-size:12px;color:var(--stone);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
 .fc-hint{font-size:11px;color:var(--stone);margin-top:16px;letter-spacing:1px;}
 .fc-synonym{font-size:13px;color:var(--stone2);margin-top:8px;}
-.rating-row{display:flex;gap:6px;margin-top:12px;}
+.rating-row{flex-direction: row-reverse;display:flex;gap:6px;margin-top:12px;}
 .rating-btn{flex:1;padding:12px 4px;border-radius:var(--r);border:1px solid;font-family:'Cinzel',serif;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;transition:all .15s;text-align:center;}
 .rating-btn:active{transform:scale(.94);}
 .rating-btn.r1{background:rgba(192,57,43,.12);border-color:rgba(192,57,43,.3);color:var(--red2);}
@@ -157,10 +157,10 @@ select.inp{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.
 .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px 14px 0 0;border-top:2px solid var(--gold);padding:16px 16px 32px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;animation:slideUp .3s cubic-bezier(.4,0,.2,1);}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .modal-handle{width:32px;height:3px;background:rgba(255,255,255,.1);border-radius:2px;margin:0 auto 4px;}
-.modal h3{font-family:'Cinzel',serif;font-size:16px;font-weight:700;color:var(--gold2);letter-spacing:2px;text-transform:uppercase;}
+.modal h3{text-align: center;font-family:'Cinzel',serif;font-size:16px;font-weight:700;color:var(--gold2);letter-spacing:2px;text-transform:uppercase;}
 
 /* ── TOAST ── */
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);color:var(--ink2);padding:10px 20px;border-radius:20px;font-family:'Cinzel',serif;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:999;animation:toastIn .3s ease;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);color:var(--ink2);padding:10px 20px;border-radius:20px;font-family:'Cinzel',serif;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:999;animation:toastIn .3s ease;pointer-events:none;white-space:normal;word-break: break-word;max-width:90vw;text-align:center;}
 .toast.ok{border-color:rgba(39,174,96,.4);}
 .toast.err{border-color:rgba(192,57,43,.4);}
 .toast.gold{border-color:rgba(201,168,76,.5);color:var(--gold2);}
@@ -217,6 +217,88 @@ svg.ring{transform:rotate(-90deg);}
 .load-bar{width:140px;height:2px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;}
 .load-fill{height:100%;width:0;background:var(--gold);animation:lf 1.2s ease forwards;}
 @keyframes lf{to{width:100%}}
+
+/* ✨ GAMIFICAÇÃO: Juiciness e Efeitos Físicos */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px) rotate(-1deg); }
+  50% { transform: translateX(6px) rotate(1deg); }
+  75% { transform: translateX(-6px) rotate(-1deg); }
+}
+.shake-effect {
+  animation: shake 0.3s ease-in-out;
+}
+
+.floating-text {
+  position: fixed;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  font-family: 'Cinzel', serif;
+  font-weight: 800;
+  font-size: 28px;
+  pointer-events: none;
+  z-index: 9999;
+  text-shadow: 0px 4px 15px rgba(0,0,0,0.6);
+  animation: floatUp 1.2s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+@keyframes floatUp {
+  0% { opacity: 1; transform: translate(-50%, 0) scale(0.8); }
+  50% { transform: translate(-50%, -40px) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -80px) scale(1); }
+}
+/* ✨ SISTEMA DE RARIDADE: EFEITO DE CARTA FÍSICA (Camadas) */
+
+/* O Container Global (A Carta na sua mão) */
+.physical-card {
+  padding: 16px 14px;
+  border-radius: 16px;
+  margin-top: 15px;
+  margin-bottom: 5px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+/* 🪨 Ferro (Básico) */
+.physical-card.rarity-ferro { border: 3px solid var(--border); background-color: rgba(255, 255, 255, 0.02); }
+.rarity-ferro .card, .rarity-ferro .fc-face, .rarity-ferro .context-card { border: 1px solid var(--border) !important; background-color: rgba(255, 255, 255, 0.03) !important; }
+
+/* 🥉 Bronze */
+.physical-card.rarity-bronze { border: 3px solid #cd7f32; background-color: rgba(205, 127, 50, 0.03); box-shadow: 0 8px 20px rgba(205, 127, 50, 0.1); }
+.rarity-bronze .card, .rarity-bronze .fc-face, .rarity-bronze .context-card { border: 1px solid #cd7f32 !important; background-color: rgba(205, 127, 50, 0.15) !important; }
+.text-bronze { color: #cd7f32 !important; }
+
+/* 🥈 Prata */
+.physical-card.rarity-prata { border: 3px solid #c0c0c0; background-color: rgba(192, 192, 192, 0.03); box-shadow: 0 8px 20px rgba(192, 192, 192, 0.1); }
+.rarity-prata .card, .rarity-prata .fc-face, .rarity-prata .context-card { border: 1px solid #c0c0c0 !important; background-color: rgba(192, 192, 192, 0.15) !important; }
+.text-prata { color: #c0c0c0 !important; }
+
+/* 🥇 Ouro */
+.physical-card.rarity-ouro { border: 3px solid var(--gold); background-color: rgba(212, 175, 55, 0.04); box-shadow: 0 0 25px rgba(212, 175, 55, 0.2); }
+.rarity-ouro .card, .rarity-ouro .fc-face, .rarity-ouro .context-card { border: 1px solid var(--gold) !important; background-color: rgba(212, 175, 55, 0.15) !important; }
+.text-ouro { color: var(--gold) !important; text-shadow: 0 0 5px rgba(212, 175, 55, 0.4); }
+
+/* 🌌 MÍTICO (Soberano) */
+.physical-card.rarity-mitico { 
+  border: 3px solid #e024ff; 
+  background: linear-gradient(145deg, rgba(26,11,46,0.6), rgba(5,5,5,0.95)); 
+  box-shadow: 0 0 30px rgba(224, 36, 255, 0.3), inset 0 0 20px rgba(224, 36, 255, 0.1); 
+}
+.rarity-mitico .card, .rarity-mitico .fc-face, .rarity-mitico .context-card { 
+  border: 1px solid #e024ff !important; 
+  background: rgba(224, 36, 255, 0.15) !important;
+  box-shadow: inset 0 0 15px rgba(212, 175, 55, 0.1) !important; 
+}
+.rarity-mitico .fc-word, .rarity-mitico .fc-type, .rarity-mitico .context-q { color: #e024ff !important; text-shadow: 0 0 8px rgba(224, 36, 255, 0.5) !important; }
+.text-mitico { color: #e024ff !important; font-weight: bold; text-shadow: 0 0 8px rgba(224,36,255,0.6); }
+
+/* Adaptação para colorir a aba do Léxico */
+.word-row.rarity-bronze { border-left: 4px solid #cd7f32; background: linear-gradient(90deg, rgba(205, 127, 50, 0.1), transparent); }
+.word-row.rarity-prata { border-left: 4px solid #c0c0c0; background: linear-gradient(90deg, rgba(192, 192, 192, 0.1), transparent); }
+.word-row.rarity-ouro { border-left: 4px solid var(--gold); background: linear-gradient(90deg, rgba(212, 175, 55, 0.1), transparent); }
+.word-row.rarity-mitico { border-left: 4px solid #e024ff; background: linear-gradient(90deg, rgba(224, 36, 255, 0.2), transparent); }
+/* ✨ DESLIGA AS CAIXAS DE DICA ANTIGAS QUE CAUSAVAM BUGS */
+#hint-display { display: none !important; }
 </style>
 </head>
 <body>
@@ -237,10 +319,12 @@ svg.ring{transform:rotate(-90deg);}
           <button id="btnAudio" onclick="toggleAudio()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:0.4" title="Leitura Automática">🔈</button>
         </div>
       </div>
-      <div class="header-stats">
+      <div class="header-stats" style="flex-wrap: wrap; justify-content: flex-end;">
         <div class="hstat"><div class="hstat-val" id="hDue">0</div><div class="hstat-lbl">Hoje</div></div>
         <div class="hstat"><div class="hstat-val" id="hTotal">0</div><div class="hstat-lbl">Total</div></div>
         <div class="hstat"><div class="hstat-val" id="hStreak">0🔥</div><div class="hstat-lbl">Série</div></div>
+        <div class="hstat" style="color:var(--gold)"><div class="hstat-val" id="hMoedas">0🪙</div><div class="hstat-lbl">Moedas</div></div>
+        <div class="hstat" style="color:var(--red)"><div class="hstat-val" id="hVidas">0❤️</div><div class="hstat-lbl">Vidas</div></div>
       </div>
     </div>
     <div class="prog-bar"><div class="prog-fill" id="hProg" style="width:0%"></div></div>
@@ -404,9 +488,6 @@ async function saveStats() {
 }
 
 /* ═══════════════════════════════════════
-   STATE
-═══════════════════════════════════════ */
-/* ═══════════════════════════════════════
    STATE & EFEITOS ESPECIAIS
 ═══════════════════════════════════════ */
 let W = [];
@@ -419,51 +500,232 @@ let wordDisplayLimit = 50;
 let confirmCallback = null;
 let autoPlayAudio = false;
 let enableTimer = false;
-
+// ✨ DETECTOR DE RARIDADE DAS CARTAS (Risco Zero)
+function getCardRarity(card) {
+  if (card.isLeech) return { cls: 'rarity-ferro', txtCls: '', label: 'Sanguessuga' };
+  if (card.interval >= 30) return { cls: 'rarity-mitico', txtCls: 'text-mitico', label: 'Mítico 🌌' };
+  if (card.interval >= 22) return { cls: 'rarity-ouro', txtCls: 'text-ouro', label: 'Ouro 🥇' };
+  if (card.interval >= 15) return { cls: 'rarity-prata', txtCls: 'text-prata', label: 'Prata 🥈' };
+  if (card.interval >= 7)  return { cls: 'rarity-bronze', txtCls: 'text-bronze', label: 'Bronze 🥉' };
+  return { cls: 'rarity-ferro', txtCls: '', label: 'Ferro 🪨' };
+}
 // ✨ MOTOR DE ÁUDIO OFFLINE (Gerador de Frequência para Acerto/Erro)
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+// ✨ MOTOR GAMIFICADO: Áudio, Combos, Críticos e MOEDAS 🪙
 function playSfx(type) {
   if (!studySession) return;
+  const sess = studySession;
+
   if(audioCtx.state === 'suspended') audioCtx.resume();
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   osc.connect(gain); gain.connect(audioCtx.destination);
   
+  let duration = 0.2; 
+  
   if(type === 'ok') {
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+    // 1. Lógica do Combo e Proteção da Carteira
+    sess.combo = (sess.combo || 0) + 1;
+    if (STATS.moedas === undefined) STATS.moedas = 0;
+    
+    // 2. Sorteio de Crítico (A cada 5 acertos ou 10% sorte)
+    const isMilestone = (sess.combo % 5 === 0);
+    const isCrit = isMilestone || Math.random() < 0.10; 
+
+    // 3. ✨ SISTEMA DE PAGAMENTO DE MOEDAS E NÉCTAR
+    let ganho = sess.isFreeMode ? 1 : 3; 
+    if (isCrit) ganho += sess.isFreeMode ? 2 : 5; 
+
+    // O Néctar dobra as moedas e consome 1 carga!
+    let nectarActive = false;
+    if (STATS.inventory && STATS.inventory.doubleCoins > 0) {
+        ganho *= 2;
+        STATS.inventory.doubleCoins--;
+        nectarActive = true;
+    }
+
+    STATS.moedas += ganho; 
+    if (typeof saveStats === 'function') saveStats(); 
+    
+    const moedasEl = document.getElementById('hMoedas');
+    if (moedasEl) moedasEl.textContent = STATS.moedas + '🪙';
+    
+    // 4. Feedback Visual
+    if (isCrit) {
+      showFloatingText(`CRÍTICO! +${ganho} 🪙`, '#e024ff'); 
+      if (typeof shootConfetti === 'function') shootConfetti();
+    } else {
+      showFloatingText(`+${ganho} 🪙 ${nectarActive ? '🍷' : ''}`, nectarActive ? '#e024ff' : 'var(--gold)'); 
+    }
+
+    // 5. Pitch Shifting (Escalada Sonora)
+    const pitchShift = Math.min(sess.combo, 10) * 30; 
+    duration = isCrit ? 0.4 : 0.3;
+    
+    osc.type = isCrit ? 'triangle' : 'sine';
+    osc.frequency.setValueAtTime(isCrit ? 800 : (600 + pitchShift), audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(isCrit ? 1600 : (1200 + pitchShift), audioCtx.currentTime + 0.1);
+    
+    gain.gain.setValueAtTime(isCrit ? 0.3 : 0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    osc.start(); osc.stop(audioCtx.currentTime + duration);
+    
   } else {
+    // Errou: Quebra o combo (mas não perde moedas)
+    sess.combo = 0; 
+    duration = 0.2;
+    showFloatingText('✖ Errou', 'var(--red)');
+    if (typeof triggerScreenShake === 'function') triggerScreenShake();
+    
+    // Som grave de erro
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(300, audioCtx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.2);
     gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    osc.start(); osc.stop(audioCtx.currentTime + duration);
   }
+  
+  // 6. Lixeiro da Memória (Evita travar o áudio no celular)
+  setTimeout(() => {
+      osc.disconnect();
+      gain.disconnect();
+  }, (duration * 1000) + 50);
 }
 
-// ✨ GERADOR DE CONFETES
+// ✨ ÁUDIO DE LEVEL UP (Toque de Vitória + Salva de Palmas)
+function playLevelUpSfx() {
+  if (!audioCtx) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  
+  // 1. O Toque de Vitória (Acordes de Trompete)
+  const freqs = [329.63, 440.00, 554.37, 659.25]; // Acorde Maior
+  freqs.forEach((freq, i) => {
+    setTimeout(() => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+      osc.start(); osc.stop(audioCtx.currentTime + 1.5);
+    }, i * 150); // Toca uma nota depois da outra rapidinho
+  });
+
+  // 2. A Salva de Palmas (Sintetizador de Ruído Branco Simulando Multidão)
+  setTimeout(() => {
+    const bufferSize = audioCtx.sampleRate * 1.5; // 1.5 segundos de som
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    // Criação do caos (ruído branco) que simula milhares de mãos batendo
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1; 
+    
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    
+    // Filtro para o ruído soar abafado como palmas, e não como TV fora do ar
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 800;
+    
+    const gain = audioCtx.createGain();
+    noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    
+    // Volume das palmas subindo e descendo suavemente
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.6, audioCtx.currentTime + 0.2);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+    
+    noise.start();
+  }, 200); // As palmas entram quase junto com o fim do acorde de vitória!
+}
+
+// ✨ GERADOR DE CONFETES (Física Realista)
 function shootConfetti() {
   const colors = ['#c9a84c', '#e8c96a', '#27ae60', '#3498db', '#e74c3c'];
   for (let i = 0; i < 60; i++) {
     const conf = document.createElement('div');
-    conf.style.position = 'fixed'; conf.style.left = Math.random() * 100 + 'vw'; conf.style.top = '-10px';
-    conf.style.width = Math.random() * 8 + 4 + 'px'; conf.style.height = Math.random() * 8 + 4 + 'px';
+    const startLeft = Math.random() * 100; // Posição inicial na tela
+    
+    conf.style.position = 'fixed'; 
+    conf.style.left = startLeft + 'vw'; 
+    conf.style.top = '-20px';
+    // Fazemos alguns retangulares e alguns quadrados para dar variedade
+    conf.style.width = Math.random() * 8 + 6 + 'px'; 
+    conf.style.height = Math.random() * 12 + 6 + 'px'; 
     conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-    conf.style.zIndex = '9999'; conf.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+    conf.style.zIndex = '9999'; 
+    conf.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
     conf.style.pointerEvents = 'none';
-    conf.style.transition = 'top 2s ease-in, transform 2s ease-in, opacity 2s ease-in';
+    
+    // ✨ A MÁGICA: Cada confete tem um tempo de queda entre 2 e 4.5 segundos
+    // E um pequeno "atraso" para não começarem todos no mesmo milissegundo
+    const fallDuration = Math.random() * 2.5 + 2; 
+    const delay = Math.random() * 0.5; 
+    
+    conf.style.transition = `top ${fallDuration}s linear ${delay}s, transform ${fallDuration}s ease-in-out ${delay}s, opacity ${fallDuration}s ease-in ${delay}s, left ${fallDuration}s ease-in-out ${delay}s`;
     conf.style.transform = `rotate(${Math.random() * 360}deg)`;
+    
     document.body.appendChild(conf);
-    setTimeout(() => { conf.style.top = '100vh'; conf.style.transform = `rotate(${Math.random() * 720}deg)`; conf.style.opacity = '0'; }, 10);
-    setTimeout(() => conf.remove(), 2000);
+    
+    // Calcula um "vento" para o confete flutuar um pouco para os lados
+    const drift = (Math.random() - 0.5) * 15; 
+    
+    setTimeout(() => { 
+        conf.style.top = '100vh'; 
+        conf.style.left = (startLeft + drift) + 'vw'; // O vento empurra lateralmente
+        conf.style.transform = `rotate(${Math.random() * 720}deg)`; 
+        conf.style.opacity = '0'; 
+    }, 10);
+    
+    // Só remove da tela quando o confete mais lento terminar de cair
+    setTimeout(() => conf.remove(), (fallDuration + delay) * 1000 + 100);
   }
 }
 
+// ✨ GERADOR DE TEXTO FLUTUANTE (Dopamina Visual Lenta e Premium)
+function showFloatingText(text, color) {
+  const el = document.createElement('div');
+  
+  // Criamos o estilo todo aqui no Javascript para garantir que seja lento e suave
+  el.style.position = 'fixed';
+  el.style.left = '50%';
+  el.style.top = '40%';
+  el.style.transform = 'translate(-50%, -50%)';
+  el.style.color = color || 'var(--gold)';
+  el.style.fontSize = '24px';
+  el.style.fontWeight = 'bold';
+  el.style.textShadow = '0 2px 10px rgba(0,0,0,0.6)';
+  el.style.zIndex = '9999';
+  el.style.pointerEvents = 'none';
+  el.style.opacity = '1';
+  
+  // ✨ MÁGICA DO TEXTO: 2.5 segundos de duração, subindo suavemente
+  el.style.transition = 'top 2.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 2.5s ease-in';
+  
+  el.innerHTML = text;
+  document.body.appendChild(el);
+  
+  // Um instante depois, manda ele flutuar para cima e ir sumindo
+  setTimeout(() => {
+      el.style.top = '25%'; // Ele viaja de 40% até 25% da tela
+      el.style.opacity = '0';
+  }, 50);
+  
+  // Remove o texto só depois de quase 3 segundos!
+  setTimeout(() => el.remove(), 2600);
+}
+
+// ✨ TREMOR DE TELA PARA ERROS (Aversão à Perda)
+function triggerScreenShake() {
+  const app = document.getElementById('app');
+  app.classList.remove('shake-effect'); 
+  void app.offsetWidth; // Força o navegador a reiniciar a animação
+  app.classList.add('shake-effect');
+}
 /* ═══════════════════════════════════════
    WORD FACTORY E SINÔNIMOS
 ═══════════════════════════════════════ */
@@ -623,20 +885,67 @@ function updateHeader() {
   document.getElementById('hDue').textContent = due.length;
   document.getElementById('hTotal').textContent = W.length;
   document.getElementById('hStreak').textContent = (STATS.streak || 0) + '🔥';
-  const pct = W.length ? Math.round((W.filter(w => w.repetitions > 0).length / W.length) * 100) : 0;
-  document.getElementById('hProg').style.width = pct + '%';
+  
+  if (STATS.moedas === undefined) STATS.moedas = 0;
+  const moedasEl = document.getElementById('hMoedas');
+  if (moedasEl) moedasEl.textContent = STATS.moedas + '🪙';
 
+  if (STATS.vidas === undefined) STATS.vidas = 3;
+  const vidasEl = document.getElementById('hVidas');
+  if (vidasEl) vidasEl.textContent = STATS.vidas + '❤️';
+
+  const pct = W.length ? Math.round((W.filter(w => w.repetitions > 0).length / W.length) * 100) : 0;
+  const progEl = document.getElementById('hProg');
+  if(progEl) progEl.style.width = pct + '%';
+
+  // ✨ A BOLINHA DE PRESTÍGIO NA TELA
   const rank = getUserTitle();
   const subtitleEl = document.querySelector('.app-subtitle');
   if (subtitleEl) {
      subtitleEl.innerHTML = `
-        <span style="color:${rank.color}; font-weight:bold; letter-spacing:1px">${rank.icon} ${rank.title}</span>
+        <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.05); padding:3px 10px; border-radius:12px; border: 1px solid ${rank.color}">
+            <span style="background:${rank.color}; color:#000; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold">${rank.prestige}</span>
+            <span style="color:${rank.color}; font-weight:bold; letter-spacing:1px; font-size:13px; text-shadow: 0 0 5px ${rank.color}40">${rank.icon} ${rank.title}</span>
+        </div>
         
-        <!-- ✨ BOTÕES DE CONTROLE AQUI -->
-        <button id="btnTimer" onclick="toggleTimer()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${enableTimer?'1':'0.4'}; margin-left:8px" title="Relógio de Sobrevivência">${enableTimer?'⏳':'⏸️'}</button>
-        <button id="btnAudio" onclick="toggleAudio()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${autoPlayAudio?'1':'0.4'}; margin-left:4px" title="Leitura Automática">${autoPlayAudio?'🔊':'🔈'}</button>
+        <button id="btnTimer" onclick="toggleTimer()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${enableTimer?'1':'0.4'}; margin-left:8px" title="Relógio">${enableTimer?'⏳':'⏸️'}</button>
+        <button id="btnAudio" onclick="toggleAudio()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${autoPlayAudio?'1':'0.4'}; margin-left:4px" title="Áudio">${autoPlayAudio?'🔊':'🔈'}</button>
      `;
   }
+  
+  // Executa o Fiscal do Level Up
+  checkLevelUp(rank);
+}
+
+// ✨ O FISCAL DE LEVEL UP (Imune a fraudes!)
+function checkLevelUp(rank) {
+   // Registra o nível máximo que o jogador já chegou (Impede de ganhar vida apagando e recriando cartas)
+   if (STATS.highestLevelEver === undefined) {
+       STATS.highestLevelEver = rank.level;
+       return; // Sai silenciosamente na primeira vez que o app abre
+   }
+   
+   if (rank.level > STATS.highestLevelEver) {
+       STATS.highestLevelEver = rank.level; // Atualiza o recorde
+       
+       // PRÊMIO: +1 Vida ❤️
+       if (STATS.vidas === undefined) STATS.vidas = 3;
+       STATS.vidas++; 
+       if (typeof saveStats === 'function') saveStats();
+       
+       // CELEBRAÇÃO 1: Confetes explodem Imediatamente!
+       if (typeof shootConfetti === 'function') shootConfetti();
+       
+       // CELEBRAÇÃO 2: Espera 1 segundo para as Palmas, a Notificação de Vida e a atualização do menu!
+       setTimeout(() => {
+           playLevelUpSfx();
+           showFloatingText(`👑 LEVEL UP! +1 ❤️`, rank.color);
+           
+           // Atualiza o contador de vida na tela agora que você já ouviu o som
+           const vidasEl = document.getElementById('hVidas');
+           if (vidasEl) vidasEl.textContent = STATS.vidas + '❤️';
+       }, 1000); 
+   }
 }
 
 /* ── STUDY TAB ── */
@@ -717,7 +1026,38 @@ function buildStudyTab() {
       </div>
     </div>`;
   }
-
+// ✨ BANNER DA LOJA (Mercado de Atenas)
+  if (W.length > 0) {
+    html += `
+    <div class="card" style="border-color:var(--gold); cursor:pointer; background:rgba(212,175,55,0.05)" onclick="openStoreModal()">
+       <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding: 12px 16px">
+          <div style="display:flex; align-items:center; gap:12px">
+             <div style="font-size:28px">🛒</div>
+             <div>
+                <div style="font-weight:bold; color:var(--gold); font-size:14px; text-transform:uppercase; letter-spacing:1px">Mercado de Atenas</div>
+                <div style="font-size:12px; color:var(--stone2); margin-top:2px">Compre vantagens com suas moedas</div>
+             </div>
+          </div>
+          <div style="color:var(--gold2); font-weight:bold; font-size:18px">${STATS.moedas || 0} 🪙</div>
+       </div>
+    </div>`;
+  }
+// ✨ BANNER DE BACKUP E SINCRONIZAÇÃO
+  if (W.length > 0) {
+    html += `
+    <div class="card" style="border-color:var(--blue); cursor:pointer; background:rgba(41, 128, 185, 0.05); margin-top: 10px" onclick="openBackupModal()">
+       <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding: 12px 16px">
+          <div style="display:flex; align-items:center; gap:12px">
+             <div style="font-size:28px">💾</div>
+             <div>
+                <div style="font-weight:bold; color:var(--blue); font-size:14px; text-transform:uppercase; letter-spacing:1px">Sincronização</div>
+                <div style="font-size:12px; color:var(--stone2); margin-top:2px">Salve ou restaure seu progresso</div>
+             </div>
+          </div>
+          <div style="color:var(--blue); font-weight:bold; font-size:18px">⇄</div>
+       </div>
+    </div>`;
+  }
   const quotes = [
     '"Nada é mais fácil do que enganar a si mesmo." — Demóstenes',
     '"A palavra é a única arma que nunca enferruja." — Proverbio',
@@ -814,10 +1154,39 @@ function buildStudyCard() {
      clearTimeout(sess.timerId);
   }
 
+
+  // ✨ BARRA DE ITENS MÁGICOS (AGORA INTELIGENTE)
+  let toolsHtml = '';
+  // Modos que não exigem digitação/montagem não devem mostrar dicas!
+  const noHintModes = ['flash', 'choice', 'tf', 'revchoice', 'imgchoice', 'blind', 'boss'];
+  const canHint = !noHintModes.includes(activeMode);
+
+  if (!isAns) {
+      if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0 };
+      const inv = STATS.inventory;
+      toolsHtml = `
+      <div style="display:flex; gap:6px; justify-content:center; margin-bottom:12px; margin-top:4px; flex-wrap:wrap">
+         ${canHint ? `
+         <button id="btnMagicHint" class="btn ghost sm" onclick="useMagicHint()" ${inv.magicHints > 0 ? '' : 'disabled style="opacity:0.3"'} style="border-color:var(--gold2); color:var(--gold2); flex:1; padding:6px 2px; font-size:11px">
+             ✨ Dica (${inv.magicHints || 0})
+         </button>` : ''}
+         <button id="btnMiniShield" class="btn ghost sm" onclick="useMiniShield()" ${inv.miniShields > 0 && !sess.miniShieldActive ? '' : 'disabled style="opacity:0.3"'} style="border-color:var(--stone); color:var(--stone); flex:1; padding:6px 2px; font-size:11px">
+             🛡️ Bloqueio (${inv.miniShields || 0})
+         </button>
+         <button class="btn ghost sm" onclick="useSkipItem()" ${inv.skips > 0 ? '' : 'disabled style="opacity:0.3"'} style="border-color:var(--green); color:var(--green); flex:1; padding:6px 2px; font-size:11px">
+             ⏭️ Pular (${inv.skips || 0})
+         </button>
+      </div>`;
+  }
+
+  const rarity = getCardRarity(card); // Calcula o brilho da carta atual
+
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--stone);letter-spacing:1px;text-transform:uppercase">${sess.current + 1} / ${tot}</span>
       <div style="display:flex;gap:8px;align-items:center">
+        <!-- ✨ A ETIQUETA COM O NOME DA RARIDADE -->
+        <span class="badge ${rarity.txtCls}" style="background:transparent; border:1px solid currentColor; font-family:'Cinzel',serif">${rarity.label}</span>
         <span class="badge ${getStatus(card)}">${statusLabel(getStatus(card))}</span>
         <button class="btn ghost sm" onclick="clearTimeout(studySession?.timerId); studySession=null; render()">✕ Sair</button>
       </div>
@@ -828,8 +1197,19 @@ function buildStudyCard() {
     <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
     
     ${timerHtml}
+    ${toolsHtml} 
     
-    ${inner}
+<!-- ✨ O ENVELOPE MÁGICO QUE ABRAÇA A CARTA INTEIRA -->
+    <div class="physical-card ${rarity.cls}">
+       ${inner}
+       
+       <!-- ✨ CAIXA GLOBAL DE DICAS (Imune a bugs e sempre no lugar certo!) -->
+       ${(sess.hintUsed || sess.magicHintVisible) && !isAns ? `
+       <div style="padding:12px; background:rgba(212,175,55,0.08); border:1px dashed var(--gold); color:var(--gold2); border-radius:var(--r); text-align:center; margin-top:14px; font-size:14px; font-weight:bold;">
+          ${sess.magicHintVisible ? '✨ Dica de Atena:' : '💡 Dica Padrão:'} <span style="color:var(--gold)">${esc(sess.hintText)}</span>
+       </div>` : ''}
+    </div>
+
     <div style="display:flex;gap:8px;justify-content:center;margin-top:6px">
       <span style="font-size:11px;color:var(--stone);font-style:italic">Acertos: ${sess.correct} | Modo: ${modeLabel(activeMode)} ${studyMode === 'adaptive' ? '🧠' : (studyMode === 'custom' ? '🎛️' : '')}</span>
     </div>`;
@@ -1323,25 +1703,73 @@ function buildContextMode(card) {
   let blanked = '', revealed = '';
   
   if (card.example) {
-    let cleanEx = clean(card.example);
-    let bText = esc(cleanEx).replace(new RegExp('('+escReg(card.word)+')', 'gi'), '______');
-    let rText = esc(cleanEx).replace(new RegExp('('+escReg(card.word)+')', 'gi'), '<mark>$1</mark>');
-
-    // ✨ HARDCORE CONTEXT: Se a carta for mais velha que 7 dias, ele esconde um verbo extra!
-    if (card.interval >= 7) {
-        const words = cleanEx.split(/\s+/);
-        // Pega palavras grandes, ignorando a palavra principal
-        const eligible = words.filter(w => w.length > 5 && !w.toLowerCase().includes(card.word.toLowerCase()));
-        if (eligible.length > 0) {
-            const extraTarget = eligible[Math.floor(Math.random() * eligible.length)].replace(/[.,!?;:"'()]/g, '');
-            // Substitui o "verbo" por uma nuvem de neblina
-            bText = bText.replace(new RegExp('\\b'+escReg(extraTarget)+'\\b', 'gi'), '<span style="opacity:0.3">[oculto]</span>');
+        let cleanEx = clean(card.example); 
+        let targetWord = clean(card.word).trim(); 
+        
+        // ✨ O CÃO DE GUARDA DEFINITIVO (Blindagem contra Acentos e Maiúsculas)
+        // Removemos TODOS os acentos da frase e da palavra só para fazer a busca
+        const normEx = cleanEx.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        const normWord = targetWord.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        
+        // Pega a raiz da palavra limpa (sem acento)
+        let rootLen = Math.max(4, Math.floor(normWord.length * 0.8));
+        let rootWord = normWord.substring(0, rootLen);
+        
+        // Como a frase agora não tem acentos na busca, o limite de palavra (\b) funciona com perfeição
+        let regex = new RegExp('\\b' + escReg(rootWord) + '[a-z]*\\b', 'g');
+        
+        let matches = [];
+        let m;
+        while ((m = regex.exec(normEx)) !== null) {
+            matches.push({ start: m.index, end: m.index + m[0].length });
         }
-    }
-    
-    blanked = bText;
-    revealed = rText;
-  } else {
+        
+        let bArr = [], rArr = [], lastIdx = 0;
+        
+        // Monta a frase recortando as palavras originais (preservando os acentos reais na tela)
+        for (let i = 0; i < matches.length; i++) {
+            const match = matches[i];
+            const before = cleanEx.substring(lastIdx, match.start);
+            const originalWord = cleanEx.substring(match.start, match.end);
+            
+            bArr.push(esc(before));
+            rArr.push(esc(before));
+            
+            if (isRel) {
+                // Sinônimo / Antônimo: Destaca a palavra
+                bArr.push('<b style="color:var(--gold2); border-bottom: 2px dashed var(--gold2)">' + esc(originalWord) + '</b>');
+                rArr.push('<mark>' + esc(originalWord) + '</mark>');
+            } else {
+                // Carta Normal: Esconde com o número exato de tracinhos!
+                bArr.push('_ '.repeat(originalWord.length)); 
+                rArr.push('<mark>' + esc(originalWord) + '</mark>');
+            }
+            lastIdx = match.end;
+        }
+        
+        bArr.push(esc(cleanEx.substring(lastIdx)));
+        rArr.push(esc(cleanEx.substring(lastIdx)));
+        
+        let bText = bArr.join('');
+        let rText = rArr.join('');
+
+        // ✨ HARDCORE CONTEXT (Esconde uma palavra extra se a carta for velha)
+        if (!isRel && card.interval >= 7) {
+            const words = cleanEx.split(/\s+/);
+            const eligible = words.filter(w => {
+                 let cleanW = w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[.,!?;:"'()]/g, '');
+                 return cleanW.length > 5 && !cleanW.includes(rootWord);
+            });
+            if (eligible.length > 0) {
+                const extraTarget = eligible[Math.floor(Math.random() * eligible.length)].replace(/[.,!?;:"'()]/g, '');
+                const safeExtra = esc(extraTarget);
+                bText = bText.replace(new RegExp('(' + escReg(safeExtra) + ')', 'g'), (match) => '<span style="opacity:0.3">' + '_'.repeat(match.length) + '</span>');
+            }
+        }
+        
+        blanked = bText;
+        revealed = rText;
+      } else {
     if (isRel) {
       blanked = `<span style="font-size:14px;color:var(--stone)">Palavra base:</span><br><b style="color:var(--gold2);font-size:20px">${esc(card.word)}</b><br><br>Digite UM ${hl(card.cardType)}: ______`;
       revealed = `<span style="font-size:14px;color:var(--stone)">Palavra base:</span><br><b style="color:var(--gold2);font-size:20px">${esc(card.word)}</b>`;
@@ -1783,21 +2211,18 @@ function buildImgChoiceMode(card) {
 }
 
 
-// Funções de clique do Modo Letras
-function spellAdd(id) { if(!studySession)return; studySession.spellAnswer.push(id); render(); }
-function spellRemove(id) { if(!studySession)return; studySession.spellAnswer = studySession.spellAnswer.filter(i => i !== id); render(); }
-function spellClear() { if(!studySession)return; studySession.spellAnswer = []; render(); }
+// ✨ INTERAÇÕES DINÂMICAS: Escondem a dica mágica assim que usada!
+function spellAdd(id) { if(!studySession)return; studySession.spellAnswer.push(id); hideMagicHint(); render(); }
+function spellRemove(id) { if(!studySession)return; studySession.spellAnswer = studySession.spellAnswer.filter(i => i !== id); hideMagicHint(); render(); }
+function spellClear() { if(!studySession)return; studySession.spellAnswer = []; hideMagicHint(); render(); }
 
-function syntaxAdd(id) { if(!studySession)return; studySession.syntaxAnswer.push(id); render(); }
-function syntaxRemove(id) { if(!studySession)return; studySession.syntaxAnswer = studySession.syntaxAnswer.filter(i => i !== id); render(); }
-function syntaxClear() { if(!studySession)return; studySession.syntaxAnswer = []; render(); }
+function syntaxAdd(id) { if(!studySession)return; studySession.syntaxAnswer.push(id); hideMagicHint(); render(); }
+function syntaxRemove(id) { if(!studySession)return; studySession.syntaxAnswer = studySession.syntaxAnswer.filter(i => i !== id); hideMagicHint(); render(); }
+function syntaxClear() { if(!studySession)return; studySession.syntaxAnswer = []; hideMagicHint(); render(); }
 
-
-function clozeAdd(id) { if(!studySession)return; studySession.clozeUserAnswers.push(id); render(); }
-function clozeRemove(id) { if(!studySession)return; studySession.clozeUserAnswers = studySession.clozeUserAnswers.filter(i => i !== id); render(); }
-function clozeClear() { if(!studySession)return; studySession.clozeUserAnswers = []; render(); }
-
-/* ═══════════════════════════════════════
+function clozeAdd(id) { if(!studySession)return; studySession.clozeUserAnswers.push(id); hideMagicHint(); render(); }
+function clozeRemove(id) { if(!studySession)return; studySession.clozeUserAnswers = studySession.clozeUserAnswers.filter(i => i !== id); hideMagicHint(); render(); }
+function clozeClear() { if(!studySession)return; studySession.clozeUserAnswers = []; hideMagicHint(); render(); }/* ═══════════════════════════════════════
    CHECKERS DE RESPOSTA
 ═══════════════════════════════════════ */
 function flipCard() {
@@ -1815,39 +2240,69 @@ function rateCard(quality) {
   const card = sess.queue[sess.current];
   if (!card) return;
 
-  if (!sess.isFreeMode) {
-    const result = sm2(card, quality);
-    const idx = W.findIndex(w => w.id === card.id);
-    if (idx >= 0) {
-      Object.assign(W[idx], result);
-      W[idx].lastReview = Date.now();
-      W[idx].totalReviews = (W[idx].totalReviews || 0) + 1;
-      
-      // ✨ CAÇADOR DE SANGUESSUGAS:
-      if (quality >= 2) {
-         W[idx].correctStreak = (W[idx].correctStreak || 0) + 1;
-         W[idx].consecutiveFails = 0; // Se acertou, zera as falhas!
-         W[idx].isLeech = false;
-      } else {
-         W[idx].correctStreak = 0;
-         W[idx].consecutiveFails = (W[idx].consecutiveFails || 0) + 1;
-         if (W[idx].consecutiveFails >= 4) {
-             W[idx].isLeech = true; // Caiu na malha fina!
-         }
-      }
+  // ✨ BLINDAGEM: Garante que as vidas existem no momento exato do clique!
+  if (STATS.vidas === undefined || isNaN(STATS.vidas)) STATS.vidas = 3;
+
+if (!sess.isFreeMode) {
+    
+    // ✨ SISTEMA DE PROTEÇÃO: 1º Verifica Mini Escudo, 2º Verifica Vidas
+    if (quality === 0 && sess.miniShieldActive) {
+        sess.miniShieldActive = false; // Consome o poder do escudo
+        toast('🛡️ Égide Menor ativada! O card foi protegido.', 'gold');
+        sess.queue.push(card);
+    } else if (quality === 0 && STATS.vidas > 0) {
+        STATS.vidas--; // Consome a vida normal
+        toast('❤️ Vida consumida! O card foi protegido.', 'gold');
+        sess.queue.push(card);
+        if (typeof saveStats === 'function') saveStats();
+    } else {
+        // --- LÓGICA NORMAL (Acertou, ou errou sem ter vidas e sem escudo) ---
+        if (quality === 0) {
+            toast('💔 Sem defesas! Penalidade aplicada.', 'err');
+            sess.queue.push(card); 
+        }
+
+        const result = sm2(card, quality);
+        const idx = W.findIndex(w => w.id === card.id);
+        if (idx >= 0) {
+          Object.assign(W[idx], result);
+          W[idx].lastReview = Date.now();
+          W[idx].totalReviews = (W[idx].totalReviews || 0) + 1;
+          
+          if (quality >= 2) {
+             W[idx].correctStreak = (W[idx].correctStreak || 0) + 1;
+             W[idx].consecutiveFails = 0; 
+             W[idx].isLeech = false;
+          } else {
+             W[idx].correctStreak = 0;
+             W[idx].consecutiveFails = (W[idx].consecutiveFails || 0) + 1;
+             if (W[idx].consecutiveFails >= 4) {
+                 W[idx].isLeech = true; 
+             }
+          }
+          
+          const cardToSave = W.find(w => w.id === card.id);
+          if (cardToSave) saveCard(cardToSave);
+        }
+        if (typeof saveStats === 'function') saveStats();
     }
+  } else {
+    // Modo Treino Livre
+    if (quality === 0) sess.queue.push(card);
   }
 
   setTimeout(playQuestionAudio, 200);
 
-  if (quality === 0) sess.queue.push(card); 
-  
   sess.answered++;
   if (quality >= 2) sess.correct++;
   sess.current++;
   sess.flipped = false;
 
   sess.hintUsed = false; sess.hintText = '';
+  sess.magicHintUsed = false;
+  sess.magicHintVisible = false; // ✨ Garante que a caixa suma na próxima carta
+  sess.magicHintsActive = 0;     // ✨ Zera o contador de letras reveladas
+  sess.miniShieldActive = false;
   
   sess.choices = null; sess.choiceAnswered = false;
   sess.typeAnswered = false; sess.contextAnswered = false;
@@ -1858,17 +2313,11 @@ function rateCard(quality) {
   sess.syntaxSetup = false; sess.syntaxAnswered = false;
   sess.clozeSetup = false; sess.clozeAnswered = false;
   sess.imgChoices = null; sess.imgChoiceAnswered = false;
-  sess.blindAnswered = false; sess.blindAudioPlayed = false; // ✨ Limpa o Cego
-  sess.bossAnswered = false; sess.bossAudioPlayed = false; // (Garante limpar o Boss)
+  sess.blindAnswered = false; sess.blindAudioPlayed = false; 
+  sess.bossAnswered = false; sess.bossAudioPlayed = false; 
   
   sess.currentAdaptiveMode = null;
-// BLOCO CORRIGIDO E BLINDADO:
-  if (!sess.isFreeMode) {
-      const cardToSave = W.find(w => w.id === card.id);
-      if (cardToSave) saveCard(cardToSave);
-      saveStats();
-  }
-  render();
+  render(); // Isso vai forçar o cabeçalho a mostrar o ❤️ sumindo na mesma hora!
 }
 
 function choiceAnswer(idx) {
@@ -1896,19 +2345,54 @@ function checkType() {
   playSfx(sess.typeCorrect ? 'ok' : 'fail');
   render(); setTimeout(playAnswerAudio, 100);
 }
+// ✨ BOTÃO DE DESISTÊNCIA (Para quando der "Branco" na memória)
+function skipContext() {
+  const sess = studySession; 
+  if (!sess || sess.contextAnswered) return;
+  
+  sess.contextCorrect = false; // Computa como erro!
+  sess.contextAnswered = true;
+  playSfx('fail');
+  if (typeof triggerScreenShake === 'function') triggerScreenShake();
+  setTimeout(playAnswerAudio, 100); 
+  render();
+}
 
+function skipType() {
+  const sess = studySession; 
+  if (!sess || sess.typeAnswered) return;
+  
+  sess.typeCorrect = false; // Computa como erro!
+  sess.typeAnswered = true;
+  playSfx('fail');
+  if (typeof triggerScreenShake === 'function') triggerScreenShake();
+  setTimeout(playAnswerAudio, 100); 
+  render();
+}
 function checkContext() {
   const sess = studySession; if (!sess || sess.contextAnswered) return;
   const card = sess.queue[sess.current]; const inp = document.getElementById('ctxInput'); if (!inp) return;
+  
   const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  const ans = normalizeTxt(inp.value); const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+  const ans = normalizeTxt(inp.value); 
+  const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+  
   if (isRel) {
-    const valids = getValidAnswers(card).map(v => normalizeTxt(v)); valids.push(normalizeTxt(card.word));
-    sess.contextCorrect = valids.some(v => ans === v || levenshtein(ans, v) <= 1);
+    const baseWord = normalizeTxt(card.word);
+    
+    // ✨ BLOQUEIO DE TRAPAÇA: Se tentar usar a mesma palavra, ele avisa!
+    if (ans === baseWord || levenshtein(ans, baseWord) <= 1) {
+        sess.contextCorrect = false;
+        toast(`Use um ${card.cardType}, não a palavra original!`, 'err');
+    } else {
+        const valids = getValidAnswers(card).map(v => normalizeTxt(v)); 
+        sess.contextCorrect = valids.some(v => ans === v || levenshtein(ans, v) <= 1);
+    }
   } else {
     const correctWord = normalizeTxt(card.word);
     sess.contextCorrect = ans === correctWord || levenshtein(ans, correctWord) <= 1;
   }
+  
   sess.contextAnswered = true;
   playSfx(sess.contextCorrect ? 'ok' : 'fail');
   setTimeout(playAnswerAudio, 100); render();
@@ -2180,7 +2664,7 @@ function updateWordList() {
   const visibleList = list.slice(0, wordDisplayLimit);
 
   let html = `<div class="card" style="margin-bottom:0">`;
-  html += visibleList.map(w => `<div class="word-row" onclick="openWordDetail('${w.id}')">
+  html += visibleList.map(w => `<div class="word-row ${getCardRarity(w).cls}" onclick="openWordDetail('${w.id}')">
     <div class="word-row-main">
       <div class="word-row-word">${w.cardType === 'sinônimo' ? '🔗 ' : (w.cardType === 'antônimo' ? '⚖️ ' : '')}${esc(w.word)}</div>
       <div class="word-row-def">${esc(clean(w.word))}: ${esc(clean(w.definition))}</div>
@@ -2790,7 +3274,316 @@ function confirmClearAll() {
     W = []; save(); toast('Léxico limpo.'); render();
   });
 }
+// ✨ LOJA: MERCADO DE ATENAS E ITENS (AGORA COM VIDAS E MINI ESCUDOS)
+function openStoreModal() {
+  if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0 };
+  
+  openModal(`
+    <h3 style="margin-bottom:8px">🛒 Mercado de Atenas</h3>
+    <div style="text-align:center; margin-bottom:15px;">
+       <span style="font-size:26px; color:var(--gold); font-weight:bold">${STATS.moedas || 0} 🪙</span>
+       <div style="font-size:12px; color:var(--stone2)">Seu saldo atual</div>
+    </div>
+    
+    <div style="max-height: 50vh; overflow-y: auto; padding-right:4px; display:flex; flex-direction:column; gap:8px">
+        
+        <!-- Item 1: Dica -->
+        <div class="card" style="border-color:var(--gold2); margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">✨ Dica de Atena</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Revela a 1ª sílaba sem punição no SM-2.</div>
+                <div style="font-size:11px; margin-top:4px; color:var(--gold2);">Estoque: ${STATS.inventory.magicHints || 0}</div>
+             </div>
+             <button class="btn gold sm" style="padding:8px" onclick="buyItem('magicHints', 15)">15 🪙</button>
+          </div>
+        </div>
 
+        <!-- Item 2: Pular -->
+        <div class="card" style="border-color:var(--green); margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">⏭️ Salto de Cronos</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Pule uma carta difícil sem ser penalizado.</div>
+                <div style="font-size:11px; margin-top:4px; color:var(--green);">Estoque: ${STATS.inventory.skips || 0}</div>
+             </div>
+             <button class="btn success sm" style="padding:8px" onclick="buyItem('skips', 30)">30 🪙</button>
+          </div>
+        </div>
+
+        <!-- NOVO ITEM: Mini Escudo -->
+        <div class="card" style="border-color:var(--stone); margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">🛡️ Égide Menor</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Protege você de UM erro durante o jogo. Bloqueia a perda de Vida e a punição.</div>
+                <div style="font-size:11px; margin-top:4px; color:var(--stone);">Estoque: ${STATS.inventory.miniShields || 0}</div>
+             </div>
+             <button class="btn ghost sm" style="padding:8px; border-color:var(--stone); color:var(--stone)" onclick="buyItem('miniShields', 10)">10 🪙</button>
+          </div>
+        </div>
+
+        <!-- NOVO ITEM: Vida Extra -->
+        <div class="card" style="border-color:var(--red); margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">❤️ Poção de Vida</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Recupera 1 Vida no seu contador.</div>
+                <div style="font-size:11px; margin-top:4px; color:var(--red);">Vidas atuais: ${STATS.vidas}</div>
+             </div>
+             <button class="btn danger sm" style="padding:8px" onclick="buyLife()">25 🪙</button>
+          </div>
+        </div>
+
+        <!-- Item: Escudo de Esparta -->
+        <div class="card" style="border-color:var(--blue2); margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">🏺 Escudo de Esparta</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Se você faltar 1 dia, salva sua ofensiva 🔥.</div>
+                <div style="font-size:11px; margin-top:4px; color:var(--blue2);">Equipados: ${STATS.inventory.shields || 0}/2</div>
+             </div>
+             <button class="btn sm" style="padding:8px; border-color:var(--blue2); color:var(--blue2)" onclick="buyShield()" ${STATS.inventory.shields >= 2 ? 'disabled' : ''}>50 🪙</button>
+          </div>
+        </div>
+
+        <!-- Item: Néctar -->
+        <div class="card" style="border-color:#e024ff; margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">🍷 Néctar dos Deuses</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">As próximas 20 respostas dão o DOBRO de moedas.</div>
+                <div style="font-size:11px; margin-top:4px; color:#e024ff;">Cargas ativas: ${STATS.inventory.doubleCoins || 0}</div>
+             </div>
+             <button class="btn sm" style="padding:8px; border-color:#e024ff; color:#e024ff" onclick="buyItem('doubleCoins', 40, 20)">40 🪙</button>
+          </div>
+        </div>
+
+        <!-- Item: Cura Sanguessuga -->
+        <div class="card" style="border-color:var(--red); margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">🌫️ Névoa de Lete</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Purifica todo o léxico. Remove o status de 🩸 Sanguessuga.</div>
+                <div style="font-size:11px; margin-top:4px; color:var(--red);">Consumo Imediato</div>
+             </div>
+             <button class="btn danger sm" style="padding:8px" onclick="buyMist()">100 🪙</button>
+          </div>
+        </div>
+    </div>
+    
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn ghost" onclick="closeModal()">Sair do Mercado</button>
+    </div>
+  `);
+}
+
+// nova função que processa a compra de Vidas:
+function buyLife() {
+   if ((STATS.moedas || 0) < 25) { toast('Moedas insuficientes!', 'err'); triggerScreenShake(); return; }
+   STATS.moedas -= 25;
+   if (STATS.vidas === undefined) STATS.vidas = 3;
+   STATS.vidas++; // Adiciona +1 Vida
+   if (typeof saveStats === 'function') saveStats(); 
+   toast('❤️ Vida recuperada!', 'ok'); 
+   openStoreModal(); 
+   updateHeader();
+}
+
+function buyItem(itemType, cost, amount = 1) {
+   if ((STATS.moedas || 0) < cost) { toast('Moedas insuficientes!', 'err'); triggerScreenShake(); return; }
+   STATS.moedas -= cost;
+   
+   if (!STATS.inventory) STATS.inventory = {};
+   
+   // ✨ CURA O BUG DO NÉCTAR: Se o item for novo ou estiver corrompido com NaN, ele zera a variável primeiro!
+   if (STATS.inventory[itemType] === undefined || isNaN(STATS.inventory[itemType])) {
+       STATS.inventory[itemType] = 0;
+   }
+   
+   STATS.inventory[itemType] += amount;
+   
+   if (typeof saveStats === 'function') saveStats(); 
+   toast('Compra realizada!', 'ok'); 
+   openStoreModal(); 
+   updateHeader();
+}
+
+function buyShield() {
+   if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0 };
+   if (STATS.inventory.shields >= 2) return; // Limite de 2 escudos
+   buyItem('shields', 50, 1);
+}
+
+function buyMist() {
+   if ((STATS.moedas || 0) < 100) { toast('Moedas insuficientes!', 'err'); triggerScreenShake(); return; }
+   STATS.moedas -= 100;
+   let curadas = 0;
+   W.forEach(w => {
+       if(w.isLeech || w.consecutiveFails >= 4) {
+           w.isLeech = false; w.consecutiveFails = 0; curadas++;
+           saveCard(w); // Salva a cura no banco na mesma hora
+       }
+   });
+   if (typeof saveStats === 'function') saveStats();
+   toast(`✨ ${curadas} cartas purificadas!`, 'gold');
+   openStoreModal(); updateHeader();
+}
+
+// ✨ O CÉREBRO DAS DICAS (Consumo por Letra/Palavra)
+function getSmartHint(mode, sess, card) {
+    let target = card.word;
+    
+    if (mode === 'syntax') {
+        if (sess.isSynonymMatch) {
+            const missing = sess.syntaxTargetWords.filter(w => !sess.syntaxAnswer.map(id => sess.syntaxPool.find(p=>p.id===id).word).includes(w));
+            if (missing.length > 0) return `Falta: "${missing[0]}"`;
+            return "Todos os itens selecionados!";
+        } else {
+            const wordsArr = sess.syntaxTarget.split(/\s+/);
+            const nextIndex = sess.syntaxAnswer.length;
+            if (nextIndex < wordsArr.length) return `A próxima palavra é: "${wordsArr[nextIndex]}"`;
+            return "Frase completa!";
+        }
+    } 
+    else if (mode === 'cloze') {
+        const nextIndex = sess.clozeUserAnswers.length;
+        if (nextIndex < sess.clozeAnswers.length) return `A próxima lacuna é: "${sess.clozeAnswers[nextIndex]}"`;
+        return "Todas as lacunas preenchidas!";
+    } 
+    else if (mode === 'spell') {
+        const cleanTarget = (sess.spellTarget || target).replace(/[\s\u200B-\u200D\uFEFF]/g, '').toUpperCase();
+        const nextIndex = sess.spellAnswer.length;
+        if (nextIndex < cleanTarget.length) return `A próxima letra é: "${cleanTarget[nextIndex]}"`;
+        return "Palavra completa!";
+    }
+    else {
+        // Modos de Digitação e Contexto
+        if (mode === 'scramble' && sess.scrambleTarget) target = sess.scrambleTarget;
+        else if ((mode === 'type' || mode === 'context') && (card.cardType === 'sinônimo' || card.cardType === 'antônimo')) {
+            const valids = getValidAnswers(card);
+            target = valids[0]; 
+        }
+        const cleanTarget = target.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+        
+        if (sess.hintUsed) {
+            // Dica Normal (Punição de SM-2): Mostra metade da palavra grátis
+            const showLen = Math.max(2, Math.floor(cleanTarget.length / 2));
+            return `Começa com: "${cleanTarget.substring(0, showLen).toUpperCase()}..."`;
+        } else {
+            // Dica Mágica: Mostra exatamente 1 letra a mais para CADA ITEM GASTO!
+            const showLen = Math.min(sess.magicHintsActive || 1, cleanTarget.length);
+            return `Revelado: "${cleanTarget.substring(0, showLen).toUpperCase()}${(showLen < cleanTarget.length) ? '...' : ''}"`;
+        }
+    }
+}
+
+function updateDynamicHint() {
+    const sess = studySession;
+    if (!sess || (!sess.hintUsed && !sess.magicHintVisible)) return;
+    const card = sess.queue[sess.current];
+    const mode = sess.currentAdaptiveMode || studyMode;
+    sess.hintText = getSmartHint(mode, sess, card);
+}
+
+function useMagicHint() {
+  const sess = studySession;
+  if (!sess || sess.hintUsed) return; // Se já usou a normal, não precisa da mágica
+  
+  const card = sess.queue[sess.current];
+  const mode = sess.currentAdaptiveMode || studyMode;
+  
+  // Trava para não gastar dicas à toa se a palavra já estiver toda revelada
+  if (mode === 'type' || mode === 'context') {
+      const cleanTarget = card.word.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+      if (sess.magicHintsActive >= cleanTarget.length) {
+          toast('A palavra inteira já foi revelada!', 'gold');
+          return;
+      }
+  }
+
+  if (!STATS.inventory || STATS.inventory.magicHints <= 0) {
+      toast('Você não tem Dicas de Atena!', 'err');
+      if (typeof triggerScreenShake === 'function') triggerScreenShake();
+      return;
+  }
+  
+  STATS.inventory.magicHints--;
+  if (typeof saveStats === 'function') saveStats();
+  
+  sess.magicHintUsed = true; 
+  sess.magicHintVisible = true; // Faz a caixinha aparecer
+  sess.magicHintsActive = (sess.magicHintsActive || 0) + 1; // Acumula o número de letras compradas
+  
+  updateDynamicHint();
+  toast('✨ -1 Dica Gasta', 'gold');
+  render(); 
+}
+
+// ✨ FUNÇÃO QUE ROUBA A DICA ASSIM QUE O JOGADOR CLICAR!
+function hideMagicHint() {
+   const sess = studySession;
+   if(!sess) return;
+   if(sess.magicHintVisible) {
+       sess.magicHintVisible = false; // Esconde para forçar a comprar outra!
+   } else if(sess.hintUsed) {
+       updateDynamicHint(); // A dica normal (punida) atualiza de graça
+   }
+}
+
+function useHint() {
+  const sess = studySession;
+  if (!sess || sess.hintUsed || sess.magicHintUsed) return;
+  
+  sess.hintUsed = true;
+  updateDynamicHint();
+  toast('Dica ativada! Nota máxima travada em "Difícil".', 'err'); 
+  render(); // Recria a tela atualizada
+}
+
+
+function useSkipItem() {
+  const sess = studySession;
+  if (!sess) return;
+  if (!STATS.inventory || STATS.inventory.skips <= 0) {
+      toast('Você não tem Saltos de Cronos!', 'err');
+      return;
+  }
+  
+  STATS.inventory.skips--;
+  if (typeof saveStats === 'function') saveStats();
+  
+  sess.queue.splice(sess.current, 1);
+  sess.currentAdaptiveMode = null; 
+  clearTimeout(sess.timerId);
+  sess.hintUsed = false;
+  sess.magicHintUsed = false;
+  
+  toast('⏭️ Salto Temporal! Card pulado sem punição.', 'ok');
+  render();
+}
+function useMiniShield() {
+  const sess = studySession;
+  if (!sess || sess.miniShieldActive) return;
+  if (!STATS.inventory || STATS.inventory.miniShields <= 0) {
+      toast('Você não tem a Égide Menor! Compre no Mercado.', 'err');
+      return;
+  }
+  
+  STATS.inventory.miniShields--;
+  if (typeof saveStats === 'function') saveStats();
+  sess.miniShieldActive = true;
+  
+  const btn = document.getElementById('btnMiniShield');
+  if (btn) {
+      btn.innerHTML = '🛡️ Ativado!';
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.borderColor = 'var(--gold)';
+      btn.style.color = 'var(--gold)';
+  }
+  toast('🛡️ Égide Ativada! Seu erro nesta carta será perdoado.', 'gold');
+}
 /* ═══════════════════════════════════════
    MODAIS
 ═══════════════════════════════════════ */
@@ -3043,12 +3836,141 @@ function loadStarter() {
 ═══════════════════════════════════════ */
 // funçao para falar e usar api de capturar audio para as respostas
 // ✨ SISTEMA DE NÍVEIS (GAMIFICAÇÃO)
+// ✨ SISTEMA DE PRESTÍGIO E TÍTULOS INFINITOS
 function getUserTitle() {
-  const revs = STATS.totalReviews || 0;
-  if (revs < 500) return { title: 'Plebeu', icon: '🥉', color: 'var(--stone)' };
-  if (revs < 2000) return { title: 'Estudioso', icon: '🥈', color: 'var(--blue2)' };
-  if (revs < 5000) return { title: 'Sofista', icon: '🥇', color: 'var(--gold)' };
-  return { title: 'Mestre da Retórica', icon: '👑', color: 'var(--gold2)' };
+  const totalCards = W.length; // Usa o total de cartas do seu Léxico
+  const cardsPerLevel = 10;    // A CADA 10 CARTAS, VOCÊ SOBE UM NÍVEL!
+  
+  const level = Math.floor(totalCards / cardsPerLevel);
+  
+  // Array de títulos que se repete infinitamente
+  const titles = [
+  { t: 'Plebeu', icon: '⛺' },
+  { t: 'Noviço', icon: '🪶' },
+  { t: 'Iniciado', icon: '📘' },
+  { t: 'Aprendiz', icon: '📖' },
+  { t: 'Discípulo', icon: '📚' },
+  { t: 'Leitor', icon: '👀' },
+  { t: 'Copista', icon: '✍️' },
+  { t: 'Escriba', icon: '🖋️' },
+  { t: 'Redator', icon: '📝' },
+  { t: 'Orador', icon: '🗣️' },
+  { t: 'Vocal', icon: '🎙️' },
+  { t: 'Locutor', icon: '📢' },
+  { t: 'Artífice', icon: '🛠️' },
+  { t: 'Lógico', icon: '🧠' },
+  { t: 'Analista', icon: '🔍' },
+  { t: 'Dialético', icon: '🔄' },
+  { t: 'Debatedor', icon: '⚔️' },
+  { t: 'Retórico', icon: '📜' },
+  { t: 'Persuasor', icon: '🎯' },
+  { t: 'Convincente', icon: '💬' },
+  { t: 'Influente', icon: '🌐' },
+  { t: 'Filósofo', icon: '🏛️' },
+  { t: 'Sofista', icon: '🎓' },
+  { t: 'Sábio', icon: '🦉' },
+  { t: 'Erudito', icon: '📚✨' },
+  { t: 'Mentor', icon: '🧑‍🏫' },
+  { t: 'Mestre', icon: '🎓' },
+  { t: 'Tribuno', icon: '🦁' },
+  { t: 'Magistrado', icon: '⚖️' },
+  { t: 'Preceptor', icon: '📘' },
+  { t: 'Senador', icon: '📜' },
+  { t: 'Cônsul', icon: '🦅' },
+  { t: 'Oráculo', icon: '🔮' },
+  { t: 'Arconte', icon: '👑' },
+  { t: 'Estratégico', icon: '♟️' },
+  { t: 'Dominante', icon: '💪' },
+  { t: 'Ascendente', icon: '⬆️' },
+  { t: 'Ilustre', icon: '✨' },
+  { t: 'Exímio', icon: '💎' },
+  { t: 'Magnífico', icon: '🌟' },
+  { t: 'Supremo', icon: '🔥' },
+  { t: 'Lendário', icon: '⚡' },
+  { t: 'Imortal', icon: '♾️' },
+  { t: 'Retor', icon: '🏆' },
+  { t: 'Eminente', icon: '👑✨' },
+  { t: 'Ícone', icon: '🌠' },
+  { t: 'Mítico', icon: '🐉' },
+  { t: 'Apogeu', icon: '🌅' },
+  { t: 'Ápice', icon: '🚀' },
+  { t: 'Demóstenes', icon: '👑🔥' }
+];
+  
+  const prestige = Math.floor(level / titles.length) + 1; // Qual a sua "Geração" (1, 2, 3...)
+  const titleIndex = level % titles.length; // Em qual título desta geração você está
+  
+  // Cores que vão evoluindo a cada Prestígio (Se passar do último, ele recomeça o ciclo de cores!)
+const prestigeColors = [
+  '#5a5a5a', // 1 ferro bruto
+  '#616161',
+  '#696969',
+  '#707070',
+  '#787878',
+
+  '#808080', // 6 aço
+  '#888888',
+  '#909090',
+  '#989898',
+  '#a0a0a0',
+
+  '#7a5c2e', // 11 bronze
+  '#8a6a35',
+  '#9a783c',
+  '#aa8643',
+  '#ba944a',
+
+  '#c0c0c0', // 16 prata
+  '#c8c8c8',
+  '#d0d0d0',
+  '#d8d8d8',
+  '#e0e0e0',
+
+  '#d4af37', // 21 ouro
+  '#ddb93f',
+  '#e6c347',
+  '#efcd4f',
+  '#f8d757',
+
+  '#ff6b6b', // 26 rubi
+  '#ff5252',
+  '#ff3b3b',
+  '#ff2424',
+  '#ff0d0d',
+
+  '#c77dff', // 31 ametista
+  '#b266ff',
+  '#9d4edd',
+  '#8936c9',
+  '#741fb5',
+
+  '#5a189a', // 36 roxo profundo
+  '#4a148c',
+  '#3c096c',
+  '#2d00f7',
+  '#240046',
+
+  '#4361ee', // 41 energia azul
+  '#3a0ca3',
+  '#3f37c9',
+  '#4895ef',
+  '#4cc9f0',
+
+  '#00e5ff', // 46 ciano lendário
+  '#00f5ff',
+  '#00ffff',
+  '#66ffff',
+  '#ccffff'  // 50 ápice (Demóstenes 👑)
+];
+  const color = prestigeColors[(prestige - 1) % prestigeColors.length];
+  
+  return {
+      title: titles[titleIndex].t,
+      icon: titles[titleIndex].icon,
+      color: color,
+      prestige: prestige,
+      level: level
+  };
 }
 // ✨ CONTROLE DO RELÓGIO DE SOBREVIVÊNCIA
 function toggleTimer() {
@@ -3140,50 +4062,6 @@ function startDictation(inputId, lang, btnElement) {
   };
 }
 /*dicas*/
-// ✨ MOTOR DE DICAS E PENALIDADES
-function useHint() {
-  const sess = studySession;
-  if (!sess || sess.hintUsed) return;
-  sess.hintUsed = true;
-  
-  const card = sess.queue[sess.current];
-  let target = card.word;
-  const mode = sess.currentAdaptiveMode || studyMode;
-  
-  // Acha qual é a palavra alvo real dependendo do jogo
-  if (mode === 'scramble' && sess.scrambleTarget) target = sess.scrambleTarget;
-  else if (mode === 'spell' && sess.spellTarget) target = sess.spellTarget;
-  else if (mode === 'syntax' && sess.syntaxTarget) target = sess.syntaxTarget.split(/\s+/)[0];
-  else if (mode === 'cloze' && sess.clozeAnswers && sess.clozeAnswers.length > 0) target = sess.clozeAnswers[0];
-  else if ((mode === 'type' || mode === 'context') && (card.cardType === 'sinônimo' || card.cardType === 'antônimo')) {
-     const valids = getValidAnswers(card);
-     target = valids[Math.floor(Math.random() * valids.length)];
-  }
-
-  // Monta o texto da dica (metade da palavra ou a primeira palavra da frase)
-  let hintText = '';
-  if (mode === 'syntax') {
-     hintText = `A frase começa com: "${target}"`;
-  } else if (mode === 'cloze') {
-     hintText = `A primeira lacuna é: "${target}"`;
-  } else {
-     const cleanTarget = target.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
-     const showLen = Math.max(2, Math.floor(cleanTarget.length / 2));
-     hintText = `Começa com: "${cleanTarget.substring(0, showLen).toUpperCase()}..."`;
-  }
-  sess.hintText = hintText;
-
-  // Injeta no HTML sem apagar o que o usuário já digitou!
-  const hintDiv = document.getElementById('hint-display');
-  if (hintDiv) {
-     hintDiv.innerHTML = `💡 <b>Dica:</b> ${esc(hintText)}`;
-     hintDiv.style.display = 'block';
-  }
-  const hintBtn = document.getElementById('hintBtn');
-  if (hintBtn) hintBtn.style.opacity = '0.5';
-
-  toast('Dica ativada! Nota máxima travada em "Difícil".', 'err'); // 'err' faz o toast ficar vermelho para alertar!
-}
 
 // ✨ GERADOR DE BOTÕES COM TRAVA DE SM-2
 function getRatingRowHtml(isCorrect, correctLabel = 'Correto ✓') {
@@ -3259,14 +4137,30 @@ function download(name, content, type) {
   a.download = name;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
+// ✨ GERENCIADOR DE SÉRIE COM ESCUDO DE ESPARTA 🛡️
 function updateStreak() {
   const t = today();
   const last = new Date(STATS.lastStudy || 0).toISOString().slice(0,10);
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0,10);
-  if (last === t) return;
-  if (last === yesterday) STATS.streak = (STATS.streak || 0) + 1;
-  else STATS.streak = 1;
+  
+  if (last === t) return; // Já estudou hoje
+  
+  if (last === yesterday) {
+      // Dia perfeito
+      STATS.streak = (STATS.streak || 0) + 1;
+  } else {
+      // Perdeu um ou mais dias! Verifica se tem Escudo
+      if (STATS.inventory && STATS.inventory.shields > 0) {
+          STATS.inventory.shields--;
+          STATS.streak = (STATS.streak || 0) + 1; // Salva o foguinho e ainda sobe +1!
+          toast('🛡️ Escudo de Esparta consumido! Sua ofensiva foi salva.', 'gold');
+      } else {
+          // Zero escudos, a série morre
+          STATS.streak = 1; 
+      }
+  }
   STATS.lastStudy = Date.now();
+  if (typeof saveStats === 'function') saveStats();
 }
 // ✨ CHAVE MESTRA DO ÁUDIO (Blindagem para iOS e Android)
 let isAudioUnlocked = false;
@@ -3452,7 +4346,85 @@ function renderVisual(card) {
     return `<div style="font-size:70px; line-height:1; margin-bottom:14px; text-align:center; filter:drop-shadow(0 4px 8px rgba(0,0,0,0.4))">${esc(card.image)}</div>`;
   }
 }
+// ✨ SISTEMA DE NUVEM E SINCRONIZAÇÃO (Backup e Restauração)
+function openBackupModal() {
+  openModal(`
+    <h3 style="margin-bottom:8px">💾 Sincronização do Demóstenes</h3>
+    <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Transfira todo o seu progresso, moedas, itens e léxico para outro dispositivo sem perder nada!</p>
+    
+    <div class="card" style="border-color:var(--blue); margin-bottom:10px">
+      <div class="card-body">
+         <div style="font-weight:bold; color:var(--blue)">📤 Salvar Progresso (Exportar)</div>
+         <div style="font-size:11px; margin-bottom:12px; color:var(--stone2)">Baixa um arquivo blindado com todo o seu jogo atual.</div>
+         <button class="btn info" style="width:100%" onclick="exportBackup()">Baixar Arquivo</button>
+      </div>
+    </div>
 
+    <div class="card" style="border-color:var(--green); margin-bottom:0">
+      <div class="card-body">
+         <div style="font-weight:bold; color:var(--green)">📥 Continuar Progresso (Importar)</div>
+         <div style="font-size:11px; margin-bottom:12px; color:var(--stone2)">Carrega um arquivo anterior para continuar de onde parou.</div>
+         <input type="file" id="backupInput" style="display:none" accept=".json" onchange="importBackup(event)">
+         <button class="btn success" style="width:100%; background:var(--green); color:white" onclick="document.getElementById('backupInput').click()">Carregar Arquivo</button>
+      </div>
+    </div>
+    
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn ghost" onclick="closeModal()">Cancelar</button>
+    </div>
+  `);
+}
+
+function exportBackup() {
+    const data = { words: W, stats: STATS };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+    const dl = document.createElement('a');
+    dl.setAttribute("href", dataStr);
+    
+    // Cria um nome de arquivo automático com a data de hoje!
+    const date = new Date().toISOString().slice(0,10);
+    dl.setAttribute("download", `demostenes_backup_${date}.json`);
+    
+    document.body.appendChild(dl);
+    dl.click();
+    dl.remove();
+    toast('💾 Backup exportado com sucesso!', 'ok');
+}
+
+function importBackup(event) {
+    const file = event.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if(data.words && data.stats) {
+                // Substitui a memória atual pela do arquivo
+                W = data.words;
+                STATS = data.stats;
+                
+                // Salva o STATS no banco de dados
+                if (typeof saveStats === 'function') saveStats();
+                
+                // Salva TODAS as cartas do arquivo no banco de dados na mesma hora
+                W.forEach(w => { if (typeof saveCard === 'function') saveCard(w); });
+                
+                toast('✨ Progresso restaurado com sucesso!', 'gold');
+                closeModal();
+                updateHeader();
+                if (typeof updateWordList === 'function') updateWordList();
+                render();
+            } else {
+                toast('Arquivo incompatível ou corrompido.', 'err');
+                triggerScreenShake();
+            }
+        } catch(err) {
+            toast('Erro ao ler o arquivo!', 'err');
+            triggerScreenShake();
+        }
+    };
+    reader.readAsText(file);
+}
 /* ═══════════════════════════════════════
    INIT
 ═══════════════════════════════════════ */
