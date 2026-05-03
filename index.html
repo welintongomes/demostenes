@@ -639,21 +639,23 @@ function playSfx(type) {
             
             let match = false;
             
-            // 🕵️ SUPER FAREJADOR DE MÚLTIPLA ESCOLHA
-            // Procura em todas as variáveis possíveis e até nos botões do HTML
-            const isQuizNow = sess.isQuiz || sess.isQuizMode || sess.mode === 'quiz' || sess.mode === 'multiple' || sess.multipleChoice || document.querySelector('.quiz-btn, .option-btn, [onclick*="checkAnswer"]');
+            // 🕵️ FAREJADOR DE MÚLTIPLA ESCOLHA (CORRIGIDO)
+            // Pega o modo exato ou verifica se a flag de múltipla escolha foi ativada
+            const activeMode = sess.currentAdaptiveMode || studyMode;
+            const isQuizNow = activeMode === 'choice' || sess.choiceAnswered;
             
             if (q.id === 'q_free' && sess.isFreeMode) match = true;
             if (q.id === 'q_smart' && !sess.isFreeMode && !isQuizNow) match = true; 
             if (q.id === 'q_quiz' && isQuizNow) match = true;
             if (q.id === 'q_crit' && isCrit) match = true;
             
-            // 🕵️ SUPER FAREJADOR DE CATEGORIA
+            // 🕵️ FAREJADOR DE CATEGORIA (CORRIGIDO)
+            // Pega a categoria diretamente da carta atual na fila do sistema
             let cardCat = '';
-            if (sess.currentCard && sess.currentCard.category) cardCat = sess.currentCard.category;
-            else if (sess.card && sess.card.category) cardCat = sess.card.category;
-            else if (document.querySelector('.category-badge')) cardCat = document.querySelector('.category-badge').textContent;
-            else if (document.getElementById('cardCategory')) cardCat = document.getElementById('cardCategory').textContent;
+            const cartaAtual = sess.queue[sess.current];
+            if (cartaAtual && cartaAtual.category) {
+                cardCat = cartaAtual.category;
+            }
             
             if (q.id === 'q_cat' && q.reqCat && cardCat) {
                 // Transforma as duas palavras em minúsculas e remove espaços antes de comparar!
