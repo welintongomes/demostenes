@@ -1139,12 +1139,7 @@ function buildStudyTab() {
 
   if (due.length > 0) {
     html += `<div class="card">
-      <h3 onclick="toggleSection('sec-rev')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none;">
-        <span>⚡ Revisão Pendente</span>
-        <span id="sec-rev-icon" style="color:var(--stone2); font-size:14px;">▼</span>
-    </h3>
-    <div id="sec-rev-content">
-        <div class="card-head"><button onclick="openQuestsModal()" style="background:none; border:none; font-size:20px; cursor:pointer" title="Trabalhos Diários">📜</button><div class="card-title">⚡ Revisão Pendente</div><span class="badge due">${due.length} card${due.length > 1 ? 's' : ''}</span></div>
+      <div class="card-head"><button onclick="openQuestsModal()" style="background:none; border:none; font-size:20px; cursor:pointer" title="Trabalhos Diários">📜</button><div class="card-title">⚡ Revisão Pendente</div><span class="badge due">${due.length} card${due.length > 1 ? 's' : ''}</span></div>
       <div class="card-body">
         <div class="quote" style="margin-bottom:14px">"A perseverança é a virtude dos fortes." — Demóstenes</div>
         
@@ -1167,9 +1162,7 @@ function buildStudyTab() {
           <button class="btn" onclick="openCustomModal(false)" style="flex:1;font-size:14px;padding:14px;letter-spacing:1px;border-color:var(--border2);color:var(--gold2)">🎛️ Seleções</button>
         </div>
       </div>
-    </div>
-    </div>
-      `;
+    </div>`;
   } else if (W.length === 0) {
     html += `<div class="empty"><div class="empty-icon">🏛️</div><div class="empty-title">Comece sua jornada</div><button class="btn gold" style="margin-top:8px" onclick="setTab('add')">✦ Adicionar palavras</button></div>`;
   } else {
@@ -1179,12 +1172,7 @@ function buildStudyTab() {
   // ✨ PAINEL DE TREINO LIVRE
   if (W.length > 0) {
      html += `<div class="card" style="border-color:var(--blue2)">
-      <h3 onclick="toggleSection('sec-free')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none; margin-top:0px;">
-        <span>♾️ Treino Livre</span>
-        <span id="sec-free-icon" style="color:var(--stone2); font-size:14px;">▼</span>
-    </h3>
-    <div id="sec-free-content">
-        <div class="card-head" style="background:rgba(52, 152, 219, 0.1); border-bottom:1px solid rgba(52, 152, 219, 0.2)">
+      <div class="card-head" style="background:rgba(52, 152, 219, 0.1); border-bottom:1px solid rgba(52, 152, 219, 0.2)">
         <div class="card-title" style="color:var(--blue2)">♾️ Treino Livre</div>
       </div>
       <div class="card-body">
@@ -1208,9 +1196,7 @@ function buildStudyTab() {
           <button class="btn" onclick="openCustomModal(true)" style="flex:1;border-color:var(--border2)">🎛️ Modos Específicos</button>
         </div>
       </div>
-    </div>
-    </div>
-      `;
+    </div>`;
   }
 // ✨ BANNER DA LOJA (Mercado de Atenas)
   if (W.length > 0) {
@@ -3009,30 +2995,19 @@ function buildAddTab() {
   const cats = [...new Set([...defaultCats, ...existingCats])].sort();
   
   return `
-  <h3 onclick="toggleSection('sec-manual')" style="cursor:pointer; display:flex; justify-content:space-around; align-items:center; user-select:none;">
-        <span>✦ Nova Palavra (Manual)</span>
-        <span id="sec-manual-icon" style="color:var(--stone2); font-size:14px;">▼</span>
-    </h3>
-    <!-- O conteúdo fica preso dentro desta div com o ID certo -->
-    <div id="sec-manual-content">
-      <div class="card">
-        
-        <div class="card-body" id="addForm">
-          ${buildWordForm()}
-          <div class="btn-row" style="margin-top:4px">
-            <button class="btn gold" onclick="saveNewWord()">✦ Adicionar ao Léxico</button>
-          </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title">✦ Nova Palavra (Manual)</div></div>
+      <div class="card-body" id="addForm">
+        ${buildWordForm()}
+        <div class="btn-row" style="margin-top:4px">
+          <button class="btn gold" onclick="saveNewWord()">✦ Adicionar ao Léxico</button>
         </div>
       </div>
     </div>
-    <h3 onclick="toggleSection('sec-magic')" style="cursor:pointer; display:flex; justify-content:space-around; align-items:center; user-select:none; margin-top:10px;">
-        <span>✨ Importação Mágica Universal</span>
-        <span id="sec-magic-icon" style="color:var(--stone2); font-size:14px;">▼</span>
-    </h3>
-    <div id="sec-magic-content">
-        <div class="card" style="border-color:var(--gold2)">
+    
+    <div class="card" style="border-color:var(--gold2)">
       <div class="card-head" style="background:rgba(212,175,55,0.1); border-bottom:1px solid rgba(212,175,55,0.2)">
-        <div class="card-title" style="color:var(--gold2)"></div>
+        <div class="card-title" style="color:var(--gold2)">✨ Importação Mágica Universal</div>
       </div>
       <div class="card-body">
         
@@ -3078,8 +3053,6 @@ eloquência | arte de falar bem | | fluência, oratória | | comunicação | �
              ${cats.map(c => `<option value="${esc(c)}">`).join('')}
           </datalist>
         </div>
-    </div>
-    
         
         <div class="btn-row">
           <button class="btn gold" onclick="importWords()" style="flex:2">✨ Processar e Importar</button>
@@ -3088,13 +3061,9 @@ eloquência | arte de falar bem | | fluência, oratória | | comunicação | �
         <div id="importPreview" style="margin-top:10px"></div>
       </div>
     </div>
-<h3 onclick="toggleSection('sec-free')" style="cursor:pointer; display:flex; justify-content:space-around; align-items:center; user-select:none; margin-top:10px;">
-        <span>💾 Exportar / Restaurar</span>
-        <span id="sec-free-icon" style="color:var(--stone2); font-size:14px;">▼</span>
-    </h3>
-    <div id="sec-free-content">
-        <div class="card">
-      <div class="card-head"><div class="card-title"></div></div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title">💾 Exportar / Restaurar</div></div>
       <div class="card-body">
         <div class="btn-row">
           <div class="form-group" style="margin-bottom:10px; width:100%">
@@ -3121,9 +3090,7 @@ eloquência | arte de falar bem | | fluência, oratória | | comunicação | �
           <button class="btn ghost" style="margin-top:4px" onclick="loadStarter()">🏛️ Carregar vocabulário retórico</button>
         </div>
       </div>
-    </div>
-    </div>
-    `;
+    </div>`;
 }
 
 function buildWordForm(word) {
@@ -5463,53 +5430,38 @@ function playGachaSound(type) {
   render();
 })();
 /* ═══════════════════════════════════════
-   🧠 MOTOR DE MEMÓRIA DE INTERFACE E GAVETAS (INTELIGENTE)
+   🧠 MOTOR DE MEMÓRIA DE INTERFACE (INTELIGENTE)
 ═══════════════════════════════════════ */
 const ignoreList = ['fw_type', 'fw_lang_word', 'fw_lang_def', 'fw_class']; 
 
-// O EventListener original (Intacto!)
+// ✨ A MÁGICA ESTÁ AQUI: O "true" no final faz isso rodar ANTES de qualquer 
+// atualização visual da tela, evitando a Condição de Corrida!
 document.addEventListener('change', (e) => {
+  // Salva os Selects (Filtros, Categorias, Importações)
   if (e.target.tagName === 'SELECT' && e.target.id && !ignoreList.includes(e.target.id)) {
     localStorage.setItem('ui_pref_' + e.target.id, e.target.value);
   }
+  // Salva os Checkboxes dos Modos de Jogo
   if (e.target.classList.contains('custom-mode-cb')) {
     localStorage.setItem('ui_pref_cb_' + e.target.value, e.target.checked);
   }
-}, true);
+}, true); // <--- Este "true" mudou tudo!
 
-// ✨ NOVA FUNÇÃO: O botão que abre e fecha as Gavetas Manuais
-function toggleSection(sectionId) {
-    const content = document.getElementById(sectionId + '-content');
-    const icon = document.getElementById(sectionId + '-icon');
-    if (!content) return;
-    
-    const isCollapsed = content.style.display === 'none';
-    
-    if (isCollapsed) {
-        content.style.display = 'block';
-        if (icon) icon.textContent = '▼';
-        localStorage.setItem('ui_toggle_' + sectionId, 'open'); // Salva no dispositivo
-    } else {
-        content.style.display = 'none';
-        if (icon) icon.textContent = '▶';
-        localStorage.setItem('ui_toggle_' + sectionId, 'closed'); // Salva no dispositivo
-    }
-}
-
-// O seu Observador Ninja Único!
 const uiObserver = new MutationObserver(() => {
   let needsListUpdate = false;
   let needsImportUpdate = false;
 
-  // --- 1. A SUA LÓGICA ORIGINAL (Selects e Checkboxes) ---
   document.querySelectorAll('select[id]').forEach(sel => {
-    if (ignoreList.includes(sel.id)) return; 
+    if (ignoreList.includes(sel.id)) return; // Fica longe do form de edição!
     
     const saved = localStorage.getItem('ui_pref_' + sel.id);
     if (saved !== null && sel.value !== saved) {
+      // Garante que a opção salva na memória ainda existe no menu
       const optionExists = Array.from(sel.options).some(opt => opt.value === saved);
       if (optionExists) {
         sel.value = saved;
+        
+        // Se o Motor forçou uma mudança visual ao abrir a tela, ele avisa para atualizar
         if (sel.id === 'wordCat' || sel.id === 'wordSort') needsListUpdate = true;
         if (sel.id === 'importType') needsImportUpdate = true;
       }
@@ -5528,35 +5480,12 @@ const uiObserver = new MutationObserver(() => {
     }
   });
 
-  // --- 2. ✨ A NOVA LÓGICA (Vigiando as Gavetas) ---
-  const sections = ['sec-manual', 'sec-magic', 'sec-rev', 'sec-free'];
-  
-  sections.forEach(sec => {
-      const content = document.getElementById(sec + '-content');
-      const icon = document.getElementById(sec + '-icon');
-      
-      // Se a gaveta acabou de renderizar na tela...
-      if (content && !content.dataset.loaded) {
-          const state = localStorage.getItem('ui_toggle_' + sec) || 'open'; 
-          
-          if (state === 'closed') {
-              content.style.display = 'none';
-              if (icon) icon.textContent = '▶';
-          } else {
-              content.style.display = 'block';
-              if (icon) icon.textContent = '▼';
-          }
-          
-          content.dataset.loaded = 'true'; // Evita piscar a tela infinitamente!
-      }
-  });
-
-  // Dispara as atualizações visuais finais do seu código original
+  // Dispara as atualizações visuais que os selects exigem logo ao abrir o app
   if (needsListUpdate && typeof updateWordList === 'function') updateWordList();
   if (needsImportUpdate && typeof handleImportTypeChange === 'function') handleImportTypeChange();
 });
 
-// Liga o observador unificado!
+// Liga o observador no corpo do aplicativo
 uiObserver.observe(document.body, { childList: true, subtree: true });
 </script>
 </body>
