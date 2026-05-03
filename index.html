@@ -536,9 +536,7 @@ function playSfx(type) {
     const isMilestone = (sess.combo % 5 === 0);
     const isCrit = isMilestone || Math.random() < 0.10 || type === 'crit'; 
 
-
-    // 3. ✨ SISTEMA DE PAGAMENTO DE MOEDAS E XP (Com Eventos, Loja e TODOS OS PETS!)
-  // 3. ✨ SISTEMA DE PAGAMENTO DE MOEDAS E XP (Com Punição do Relógio!)
+  // 3. ✨ SISTEMA DE PAGAMENTO DE MOEDAS E XP (Com Punição do Relógio!Com Eventos, Loja e TODOS OS PETS!)
     
     // Matemática Base Risco vs Recompensa
     let baseMoedas = sess.isFreeMode ? 1 : 3; 
@@ -628,10 +626,98 @@ function playSfx(type) {
     const moedasEl = document.getElementById('hMoedas');
     if (moedasEl) moedasEl.textContent = STATS.moedas + '🪙';
     
-    // 4. Feedback Visual de Dopamina Expandido
+// ✨ 🎯 RASTREADOR INVISÍVEL DUPLO (Diárias e Semanais)
+    let questUpdated = false;
+
+    // 1. Rastreia as Diárias
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (STATS.quests && STATS.questsDate === todayStr) {
+        STATS.quests.forEach(q => {
+            if (q.progress >= q.target) return; 
+            
+            let match = false;
+            if (q.id === 'q_free' && sess.isFreeMode) match = true;
+            if (q.id === 'q_smart' && !sess.isFreeMode && !sess.isQuiz && !sess.isQuizMode) match = true; 
+            if (q.id === 'q_quiz' && (sess.isQuiz || sess.isQuizMode || sess.mode === 'quiz')) match = true;
+            if (q.id === 'q_crit' && isCrit) match = true;
+            
+            let cardCat = '';
+            if (sess.currentCard && sess.currentCard.category) cardCat = sess.currentCard.category;
+            else if (sess.card && sess.card.category) cardCat = sess.card.category;
+            else if (document.querySelector('.category-badge')) cardCat = document.querySelector('.category-badge').textContent;
+            else if (document.getElementById('cardCategory')) cardCat = document.getElementById('cardCategory').textContent;
+            
+            if (q.id === 'q_cat' && q.reqCat && cardCat.includes(q.reqCat)) match = true;
+
+            if (match) {
+                q.progress++;
+                questUpdated = true;
+                if (q.progress === q.target) {
+                    setTimeout(() => { toast(`📜 Missão Diária Concluída!`, 'gold'); if(typeof shootConfetti === 'function') shootConfetti(); }, 1200);
+                }
+            }
+        });
+    }
+
+    // 2. Rastreia as Semanais (O Grind Gigante!)
+    if (STATS.weeklyQuests) {
+        STATS.weeklyQuests.forEach(wq => {
+            if (wq.progress >= wq.target) return; // Ignora se já terminou
+            
+            let prevProgress = wq.progress;
+            
+            // Aqui a mágica matemática acontece em tempo real:
+            if (wq.id === 'wq_xp') wq.progress += ganhoXP;
+            if (wq.id === 'wq_coins') wq.progress += ganhoMoedas;
+            if (wq.id === 'wq_cards') wq.progress += 1;
+            if (wq.id === 'wq_crits' && isCrit) wq.progress += 1;
+            if (wq.id === 'wq_pet' && petActiveFlag) wq.progress += 1; // 1 de Afinidade = 1 de progresso na missão
+            
+            // Trava o limite da barra para não passar do máximo (ex: 5015 / 5000 vira 5000 / 5000)
+            if (wq.progress > wq.target) wq.progress = wq.target;
+            
+            if (wq.progress > prevProgress) {
+                questUpdated = true;
+                if (wq.progress === wq.target && prevProgress < wq.target) {
+                    setTimeout(() => { toast(`📅 TRABALHO SEMANAL CONCLUÍDO!`, '#e024ff'); if(typeof shootConfetti === 'function') shootConfetti(); }, 1600);
+                }
+            }
+        });
+    }
+
+    if (questUpdated && typeof saveStats === 'function') saveStats();
+    // 3. ✨ RASTREIA AS CONQUISTAS DE PRESTÍGIO (O Foco de Longo Prazo)
+    if (STATS.achievements && STATS.achievements.list) {
+        STATS.achievements.list.forEach(ach => {
+            if (ach.progress >= ach.target) return; // Ignora se já terminou
+            
+            let prevProg = ach.progress;
+            
+            // A Matemática das Conquistas
+            if (ach.id === 'ach_cards') ach.progress += 1;
+            if (ach.id === 'ach_crits' && isCrit) ach.progress += 1;
+            if (ach.id === 'ach_gold') ach.progress += ganhoMoedas;
+            if (ach.id === 'ach_pets' && petActiveFlag) ach.progress += 1;
+            
+            if (ach.progress > ach.target) ach.progress = ach.target;
+            
+            // Verifica se a Conquista acabou de ser concluída neste clique
+            if (ach.progress > prevProg) {
+                questUpdated = true;
+                if (ach.progress === ach.target && prevProg < ach.target) {
+                    setTimeout(() => { toast(`🏆 CONQUISTA DE PRESTÍGIO DESBLOQUEADA!`, '#00f5ff'); if(typeof shootConfetti === 'function') shootConfetti(); }, 2000);
+                }
+            }
+        });
+    }
+    // 4. Feedback Visual de Dopamina e GACHA!
     if (isCrit) {
       showFloatingText(`CRÍTICO! +${ganhoMoedas} 🪙${petVisualCoins} | +${ganhoXP} ✨${petVisualXP}`, '#e024ff'); 
       if (typeof shootConfetti === 'function') shootConfetti();
+      
+      // ✨ O Símbolo do Destino aparece na tela!
+      if (typeof showYinYang === 'function') showYinYang(); 
+      
     } else {
       const iconCoins = nectarActive ? '🍷' : '';
       const iconXP = aguaActive ? '💧' : '';
@@ -1053,7 +1139,12 @@ function buildStudyTab() {
 
   if (due.length > 0) {
     html += `<div class="card">
-      <div class="card-head"><div class="card-title">⚡ Revisão Pendente</div><span class="badge due">${due.length} card${due.length > 1 ? 's' : ''}</span></div>
+      <h3 onclick="toggleSection('sec-rev')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none;">
+        <span>⚡ Revisão Pendente</span>
+        <span id="sec-rev-icon" style="color:var(--stone2); font-size:14px;">▼</span>
+    </h3>
+    <div id="sec-rev-content">
+        <div class="card-head"><button onclick="openQuestsModal()" style="background:none; border:none; font-size:20px; cursor:pointer" title="Trabalhos Diários">📜</button><div class="card-title">⚡ Revisão Pendente</div><span class="badge due">${due.length} card${due.length > 1 ? 's' : ''}</span></div>
       <div class="card-body">
         <div class="quote" style="margin-bottom:14px">"A perseverança é a virtude dos fortes." — Demóstenes</div>
         
@@ -1076,7 +1167,9 @@ function buildStudyTab() {
           <button class="btn" onclick="openCustomModal(false)" style="flex:1;font-size:14px;padding:14px;letter-spacing:1px;border-color:var(--border2);color:var(--gold2)">🎛️ Seleções</button>
         </div>
       </div>
-    </div>`;
+    </div>
+    </div>
+      `;
   } else if (W.length === 0) {
     html += `<div class="empty"><div class="empty-icon">🏛️</div><div class="empty-title">Comece sua jornada</div><button class="btn gold" style="margin-top:8px" onclick="setTab('add')">✦ Adicionar palavras</button></div>`;
   } else {
@@ -1086,7 +1179,12 @@ function buildStudyTab() {
   // ✨ PAINEL DE TREINO LIVRE
   if (W.length > 0) {
      html += `<div class="card" style="border-color:var(--blue2)">
-      <div class="card-head" style="background:rgba(52, 152, 219, 0.1); border-bottom:1px solid rgba(52, 152, 219, 0.2)">
+      <h3 onclick="toggleSection('sec-free')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none; margin-top:0px;">
+        <span>♾️ Treino Livre</span>
+        <span id="sec-free-icon" style="color:var(--stone2); font-size:14px;">▼</span>
+    </h3>
+    <div id="sec-free-content">
+        <div class="card-head" style="background:rgba(52, 152, 219, 0.1); border-bottom:1px solid rgba(52, 152, 219, 0.2)">
         <div class="card-title" style="color:var(--blue2)">♾️ Treino Livre</div>
       </div>
       <div class="card-body">
@@ -1110,7 +1208,9 @@ function buildStudyTab() {
           <button class="btn" onclick="openCustomModal(true)" style="flex:1;border-color:var(--border2)">🎛️ Modos Específicos</button>
         </div>
       </div>
-    </div>`;
+    </div>
+    </div>
+      `;
   }
 // ✨ BANNER DA LOJA (Mercado de Atenas)
   if (W.length > 0) {
@@ -2909,19 +3009,30 @@ function buildAddTab() {
   const cats = [...new Set([...defaultCats, ...existingCats])].sort();
   
   return `
-    <div class="card">
-      <div class="card-head"><div class="card-title">✦ Nova Palavra (Manual)</div></div>
-      <div class="card-body" id="addForm">
-        ${buildWordForm()}
-        <div class="btn-row" style="margin-top:4px">
-          <button class="btn gold" onclick="saveNewWord()">✦ Adicionar ao Léxico</button>
+  <h3 onclick="toggleSection('sec-manual')" style="cursor:pointer; display:flex; justify-content:space-around; align-items:center; user-select:none;">
+        <span>✦ Nova Palavra (Manual)</span>
+        <span id="sec-manual-icon" style="color:var(--stone2); font-size:14px;">▼</span>
+    </h3>
+    <!-- O conteúdo fica preso dentro desta div com o ID certo -->
+    <div id="sec-manual-content">
+      <div class="card">
+        
+        <div class="card-body" id="addForm">
+          ${buildWordForm()}
+          <div class="btn-row" style="margin-top:4px">
+            <button class="btn gold" onclick="saveNewWord()">✦ Adicionar ao Léxico</button>
+          </div>
         </div>
       </div>
     </div>
-    
-    <div class="card" style="border-color:var(--gold2)">
+    <h3 onclick="toggleSection('sec-magic')" style="cursor:pointer; display:flex; justify-content:space-around; align-items:center; user-select:none; margin-top:10px;">
+        <span>✨ Importação Mágica Universal</span>
+        <span id="sec-magic-icon" style="color:var(--stone2); font-size:14px;">▼</span>
+    </h3>
+    <div id="sec-magic-content">
+        <div class="card" style="border-color:var(--gold2)">
       <div class="card-head" style="background:rgba(212,175,55,0.1); border-bottom:1px solid rgba(212,175,55,0.2)">
-        <div class="card-title" style="color:var(--gold2)">✨ Importação Mágica Universal</div>
+        <div class="card-title" style="color:var(--gold2)"></div>
       </div>
       <div class="card-body">
         
@@ -2967,6 +3078,8 @@ eloquência | arte de falar bem | | fluência, oratória | | comunicação | �
              ${cats.map(c => `<option value="${esc(c)}">`).join('')}
           </datalist>
         </div>
+    </div>
+    
         
         <div class="btn-row">
           <button class="btn gold" onclick="importWords()" style="flex:2">✨ Processar e Importar</button>
@@ -2975,9 +3088,13 @@ eloquência | arte de falar bem | | fluência, oratória | | comunicação | �
         <div id="importPreview" style="margin-top:10px"></div>
       </div>
     </div>
-
-    <div class="card">
-      <div class="card-head"><div class="card-title">💾 Exportar / Restaurar</div></div>
+<h3 onclick="toggleSection('sec-free')" style="cursor:pointer; display:flex; justify-content:space-around; align-items:center; user-select:none; margin-top:10px;">
+        <span>💾 Exportar / Restaurar</span>
+        <span id="sec-free-icon" style="color:var(--stone2); font-size:14px;">▼</span>
+    </h3>
+    <div id="sec-free-content">
+        <div class="card">
+      <div class="card-head"><div class="card-title"></div></div>
       <div class="card-body">
         <div class="btn-row">
           <div class="form-group" style="margin-bottom:10px; width:100%">
@@ -3004,7 +3121,9 @@ eloquência | arte de falar bem | | fluência, oratória | | comunicação | �
           <button class="btn ghost" style="margin-top:4px" onclick="loadStarter()">🏛️ Carregar vocabulário retórico</button>
         </div>
       </div>
-    </div>`;
+    </div>
+    </div>
+    `;
 }
 
 function buildWordForm(word) {
@@ -3398,12 +3517,30 @@ function confirmClearAll() {
     W = []; save(); toast('Léxico limpo.'); render();
   });
 }
-// ✨ LOJA: MERCADO DE ATENAS E ITENS (AGORA COM VIDAS E MINI ESCUDOS)
+// ✨ LOJA: MERCADO DE ATENAS E ITENS (AGORA COM CONSUMIVEIS, VIDAS, MINI ESCUDOS, LOOT BOXES, PETS)
 function openStoreModal() {
-if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, doubleXp: 0 };
-if (!STATS.pets) STATS.pets = { owned: [], active: null, fedCharges: 0 }; // INICIA O BANCO DE PETS 
-if (!STATS.pets.affinity) STATS.pets.affinity = {};
+  if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, doubleXp: 0 };
+  if (!STATS.pets) STATS.pets = { owned: [], active: null, fedCharges: 0 };
+  if (!STATS.pets.affinity) STATS.pets.affinity = {};
 
+  // ✨ SISTEMA DE BLOQUEIO POR NÍVEL
+  const currentLevel = getUserTitle().level;
+
+  // Fábrica Automática de Botões de Pets (Tranca, Compra ou Equipa)
+  function getPetBtn(id, price, reqLvl, colorHex) {
+      if (currentLevel < reqLvl) return `<button class="btn sm ghost" disabled style="padding:8px; border-color:var(--stone); color:var(--stone)">🔒 Nv. ${reqLvl}</button>`;
+      if (STATS.pets.owned.includes(id)) {
+          if (STATS.pets.active === id) return `<button class="btn sm ghost" disabled style="padding:8px; border-color:${colorHex}; color:${colorHex}">Equipado</button>`;
+          return `<button class="btn sm" style="padding:8px; border-color:${colorHex}; color:${colorHex}" onclick="equipPet('${id}')">Equipar</button>`;
+      }
+      return `<button class="btn sm ghost" style="padding:8px; border-color:${colorHex}; color:${colorHex}; font-weight:bold" onclick="buyPet('${id}', ${price})">${price} 🪙</button>`;
+  }
+
+  // Fábrica Automática de Botões de Itens e Comida (Tranca ou Compra)
+  function getItemBtn(action, price, reqLvl, colorHex) {
+      if (currentLevel < reqLvl) return `<button class="btn sm ghost" disabled style="padding:8px; border-color:var(--stone); color:var(--stone)">🔒 Nv. ${reqLvl}</button>`;
+      return `<button class="btn sm" style="padding:8px; border-color:${colorHex}; color:${colorHex}" onclick="${action}">${price} 🪙</button>`;
+  }
   // ✨ Cálculos de Status de TODOS os Pets
   const getLvl = (id) => Math.floor((STATS.pets.affinity[id] || 0) / 50) + 1;
   const getNext = (id) => 50 - ((STATS.pets.affinity[id] || 0) % 50);
@@ -3422,6 +3559,44 @@ if (!STATS.pets.affinity) STATS.pets.affinity = {};
     </div>
     
     <div style="max-height: 50vh; overflow-y: auto; padding-right:4px; display:flex; flex-direction:column; gap:8px">
+        <!-- ✨ SEÇÃO DE GACHA: O MERCADO CLANDESTINO -->
+        <div style="margin-top:20px; margin-bottom:4px; font-weight:bold; color:#e024ff; border-bottom:1px solid rgba(224,36,255,0.5); padding-bottom:4px; font-size:14px; text-transform:uppercase; letter-spacing:1px">
+           🎲 Baús da Fortuna (Gacha)
+        </div>
+        <p style="font-size:10px; color:var(--stone2); margin-top:-2px; margin-bottom:10px; line-height:1.2">Arrisque suas moedas. Você pode tirar a sorte grande... ou sair no prejuízo.</p>
+
+        <!-- Caixa 1: Bronze -->
+        <div class="card" style="border-color:#cd7f32; margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">📦 Ânfora de Bronze</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Chance de ganhar <span style="color:#00e5ff">Água de Mnemósine</span> ou <span style="color:var(--gold)">Néctar</span>.</div>
+             </div>
+             ${getItemBtn(`buyGachaBox('bronze', 150)`, 150, 5, '#cd7f32')}
+          </div>
+        </div>
+
+        <!-- Caixa 2: Prata/Pandora -->
+        <div class="card" style="border-color:#c0c0c0; margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px">📦 Caixa de Pandora</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Chance de ganhar até <span style="color:#e024ff; font-weight:bold">1.500 XP</span> de uma vez!</div>
+             </div>
+             ${getItemBtn(`buyGachaBox('prata', 400)`, 400, 10, '#c0c0c0')}
+          </div>
+        </div>
+
+        <!-- Caixa 3: Olimpo -->
+        <div class="card" style="border-color:#ffcc00; box-shadow: 0 0 10px rgba(255, 204, 0, 0.2); margin-bottom:0">
+          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+             <div style="text-align:left; flex:1; padding-right:8px">
+                <div style="font-weight:bold; font-size:14px; color:#ffcc00">🎁 Baú do Olimpo</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alto risco. O Jackpot supremo paga <span style="color:#ff245e; font-weight:bold">3.000 🪙 e 5.000 XP!</span></div>
+             </div>
+             ${getItemBtn(`buyGachaBox('ouro', 1200)`, 1200, 20, '#ffcc00')}
+          </div>
+        </div>
         
         <!-- Item 1: Dica -->
         <div class="card" style="border-color:var(--gold2); margin-bottom:0">
@@ -3491,7 +3666,7 @@ if (!STATS.pets.affinity) STATS.pets.affinity = {};
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A deusa da memória aguça sua mente. As próximas 20 respostas dão o DOBRO de XP.</div>
                 <div style="font-size:11px; margin-top:4px; color:#00e5ff;">Cargas ativas: ${STATS.inventory.doubleXp || 0}</div>
              </div>
-             <button class="btn sm" style="padding:8px; border-color:#00e5ff; color:#00e5ff" onclick="buyItem('doubleXp', 250, 20)">250 🪙</button>
+             ${getItemBtn(`buyItem('doubleXp', 250, 20)`, 250, 5, '#00e5ff')}
           </div>
         </div>
 
@@ -3533,7 +3708,7 @@ if (!STATS.pets.affinity) STATS.pets.affinity = {};
              </div>
              ${STATS.pets.owned.includes('tartaruga')
                 ? (STATS.pets.active === 'tartaruga' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#27ae60; color:#27ae60">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#27ae60; color:#27ae60" onclick="equipPet('tartaruga')">Equipar</button>`)
-                : `<button class="btn sm ghost" style="padding:8px; border-color:#27ae60; color:#27ae60" onclick="buyPet('tartaruga', 500)">500 🪙</button>`}
+                : `${getPetBtn('tartaruga', 500, 0, '#27ae60')}`}
           </div>
         </div>
 
@@ -3547,7 +3722,7 @@ if (!STATS.pets.affinity) STATS.pets.affinity = {};
              </div>
              ${STATS.pets.owned.includes('formiga')
                 ? (STATS.pets.active === 'formiga' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#d35400; color:#d35400">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#d35400; color:#d35400" onclick="equipPet('formiga')">Equipar</button>`)
-                : `<button class="btn sm ghost" style="padding:8px; border-color:#d35400; color:#d35400" onclick="buyPet('formiga', 750)">750 🪙</button>`}
+                : `${getPetBtn('formiga', 750, 8, '#d35400')}`}
           </div>
         </div>
 
@@ -3561,7 +3736,7 @@ if (!STATS.pets.affinity) STATS.pets.affinity = {};
              </div>
              ${STATS.pets.owned.includes('coruja')
                 ? (STATS.pets.active === 'coruja' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#b4a7d6; color:#b4a7d6">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#b4a7d6; color:#b4a7d6" onclick="equipPet('coruja')">Equipar</button>`)
-                : `<button class="btn sm ghost" style="padding:8px; border-color:#b4a7d6; color:#b4a7d6" onclick="buyPet('coruja', 1500)">1500 🪙</button>`}
+                : `${getPetBtn('coruja', 1500, 15, '#b4a7d6')}`}
           </div>
         </div>
 
@@ -3575,7 +3750,7 @@ if (!STATS.pets.affinity) STATS.pets.affinity = {};
              </div>
              ${STATS.pets.owned.includes('fenix')
                 ? (STATS.pets.active === 'fenix' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#ff5e00; color:#ff5e00">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#ff5e00; color:#ff5e00" onclick="equipPet('fenix')">Equipar</button>`)
-                : `<button class="btn sm ghost" style="padding:8px; border-color:#ff5e00; color:#ff5e00" onclick="buyPet('fenix', 2500)">2500 🪙</button>`}
+                : `${getPetBtn('fenix', 2500, 25, '#ff5e00')}`}
           </div>
         </div>
 
@@ -3589,7 +3764,7 @@ if (!STATS.pets.affinity) STATS.pets.affinity = {};
              </div>
              ${STATS.pets.owned.includes('dragao')
                 ? (STATS.pets.active === 'dragao' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#e024ff; color:#e024ff">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#e024ff; color:#e024ff" onclick="equipPet('dragao')">Equipar</button>`)
-                : `<button class="btn sm ghost" style="padding:8px; border-color:#e024ff; color:#e024ff; font-weight:bold" onclick="buyPet('dragao', 10000)">10000 🪙</button>`}
+                : `${getPetBtn('dragao', 10000, 45, '#e024ff')}`}
           </div>
         </div>
 
@@ -3607,7 +3782,7 @@ if (!STATS.pets.affinity) STATS.pets.affinity = {};
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Petisco do Submundo. Sacia seu mascote por apenas <span style="color:#8e44ad; font-weight:bold">5 cartas</span>.</div>
              </div>
              <!-- Preço base: 25 (Mas você pode alterar depois pra deixar mais caro kkk) -->
-             <button class="btn sm" style="padding:8px; border-color:#8e44ad; color:#8e44ad" onclick="feedPet(40, 5)">40 🪙</button>
+             ${getItemBtn(`feedPet(40, 5)`, 40, 0, '#8e44ad')}
           </div>
         </div>
 
@@ -3619,7 +3794,7 @@ if (!STATS.pets.affinity) STATS.pets.affinity = {};
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Lanche suculento. Sacia seu mascote por <span style="color:#9b59b6; font-weight:bold">10 cartas</span>.</div>
              </div>
              <!-- Preço base: 45 -->
-             <button class="btn sm" style="padding:8px; border-color:#9b59b6; color:#9b59b6" onclick="feedPet(80, 10)">80 🪙</button>
+             ${getItemBtn(`feedPet(80, 10)`, 80, 10, '#9b59b6')}
           </div>
         </div>
 
@@ -3631,7 +3806,7 @@ if (!STATS.pets.affinity) STATS.pets.affinity = {};
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimento Mítico completo. Sacia seu mascote por <span style="color:#ffcc00; font-weight:bold">20 cartas</span>.</div>
              </div>
              <!-- Preço base: 80 -->
-             <button class="btn sm" style="padding:8px; border-color:#ffcc00; color:#ffcc00" onclick="feedPet(150, 20)">150 🪙</button>
+             ${getItemBtn(`feedPet(150, 20)`, 150, 20, '#ffcc00')}
           </div>
         </div>
     </div>
@@ -4150,61 +4325,61 @@ function getUserTitle() {
   const baseXP = W.length * 50; 
   const totalXP = baseXP + STATS.earnedXP;
   
-  const xpPerLevel = 500; // A cada 500 XP, você sobe de nível e ganha vida!
+  const xpPerLevel = 1000; // A cada 1000 XP, você sobe de nível e ganha vida!
   const level = Math.floor(totalXP / xpPerLevel);
   const currentLevelXP = totalXP % xpPerLevel; // O XP que sobra para mostrar na barrinha
   
   const titles = [
-      { t: 'Plebeu', icon: '⛺' },
-  { t: 'Noviço', icon: '🪶' },
-  { t: 'Iniciado', icon: '📘' },
-  { t: 'Aprendiz', icon: '📖' },
-  { t: 'Discípulo', icon: '📚' },
-  { t: 'Leitor', icon: '👀' },
-  { t: 'Copista', icon: '✍️' },
-  { t: 'Escriba', icon: '🖋️' },
-  { t: 'Redator', icon: '📝' },
-  { t: 'Orador', icon: '🗣️' },
-  { t: 'Vocal', icon: '🎙️' },
-  { t: 'Locutor', icon: '📢' },
-  { t: 'Artífice', icon: '🛠️' },
-  { t: 'Lógico', icon: '🧠' },
-  { t: 'Analista', icon: '🔍' },
-  { t: 'Dialético', icon: '🔄' },
-  { t: 'Debatedor', icon: '⚔️' },
-  { t: 'Retórico', icon: '📜' },
-  { t: 'Persuasor', icon: '🎯' },
-  { t: 'Convincente', icon: '💬' },
-  { t: 'Influente', icon: '🌐' },
-  { t: 'Filósofo', icon: '🏛️' },
-  { t: 'Sofista', icon: '🎓' },
-  { t: 'Sábio', icon: '🦉' },
-  { t: 'Erudito', icon: '📚✨' },
-  { t: 'Mentor', icon: '🧑‍🏫' },
-  { t: 'Mestre', icon: '🎓' },
-  { t: 'Tribuno', icon: '🦁' },
-  { t: 'Magistrado', icon: '⚖️' },
-  { t: 'Preceptor', icon: '📘' },
-  { t: 'Senador', icon: '📜' },
-  { t: 'Cônsul', icon: '🦅' },
-  { t: 'Oráculo', icon: '🔮' },
-  { t: 'Arconte', icon: '👑' },
-  { t: 'Estratégico', icon: '♟️' },
-  { t: 'Dominante', icon: '💪' },
-  { t: 'Ascendente', icon: '⬆️' },
-  { t: 'Ilustre', icon: '✨' },
-  { t: 'Exímio', icon: '💎' },
-  { t: 'Magnífico', icon: '🌟' },
-  { t: 'Supremo', icon: '🔥' },
-  { t: 'Lendário', icon: '⚡' },
-  { t: 'Imortal', icon: '♾️' },
-  { t: 'Retor', icon: '🏆' },
-  { t: 'Eminente', icon: '👑✨' },
-  { t: 'Ícone', icon: '🌠' },
-  { t: 'Mítico', icon: '🐉' },
-  { t: 'Apogeu', icon: '🌅' },
-  { t: 'Ápice', icon: '🚀' },
-  { t: 'Demóstenes', icon: '👑🔥' }
+    { t: 'Plebeu', icon: '⛺' },
+    { t: 'Noviço', icon: '🪶' },
+    { t: 'Iniciado', icon: '📘' },
+    { t: 'Aprendiz', icon: '📖' },
+    { t: 'Discípulo', icon: '📚' },
+    { t: 'Leitor', icon: '👀' },
+    { t: 'Copista', icon: '✍️' },
+    { t: 'Escriba', icon: '🖋️' },
+    { t: 'Redator', icon: '📝' },
+    { t: 'Orador', icon: '🗣️' },
+    { t: 'Vocal', icon: '🎙️' },
+    { t: 'Locutor', icon: '📢' },
+    { t: 'Artífice', icon: '🛠️' },
+    { t: 'Lógico', icon: '🧠' },
+    { t: 'Analista', icon: '🔍' },
+    { t: 'Dialético', icon: '🔄' },
+    { t: 'Debatedor', icon: '⚔️' },
+    { t: 'Retórico', icon: '📜' },
+    { t: 'Persuasor', icon: '🎯' },
+    { t: 'Convincente', icon: '💬' },
+    { t: 'Influente', icon: '🌐' },
+    { t: 'Filósofo', icon: '🏛️' },
+    { t: 'Sofista', icon: '🎓' },
+    { t: 'Sábio', icon: '🦉' },
+    { t: 'Erudito', icon: '📚✨' },
+    { t: 'Mentor', icon: '🧑‍🏫' },
+    { t: 'Mestre', icon: '🎓' },
+    { t: 'Tribuno', icon: '🦁' },
+    { t: 'Magistrado', icon: '⚖️' },
+    { t: 'Preceptor', icon: '📘' },
+    { t: 'Senador', icon: '📜' },
+    { t: 'Cônsul', icon: '🦅' },
+    { t: 'Oráculo', icon: '🔮' },
+    { t: 'Arconte', icon: '👑' },
+    { t: 'Estratégico', icon: '♟️' },
+    { t: 'Dominante', icon: '💪' },
+    { t: 'Ascendente', icon: '⬆️' },
+    { t: 'Ilustre', icon: '✨' },
+    { t: 'Exímio', icon: '💎' },
+    { t: 'Magnífico', icon: '🌟' },
+    { t: 'Supremo', icon: '🔥' },
+    { t: 'Lendário', icon: '⚡' },
+    { t: 'Imortal', icon: '♾️' },
+    { t: 'Retor', icon: '🏆' },
+    { t: 'Eminente', icon: '👑✨' },
+    { t: 'Ícone', icon: '🌠' },
+    { t: 'Mítico', icon: '🐉' },
+    { t: 'Apogeu', icon: '🌅' },
+    { t: 'Ápice', icon: '🚀' },
+    { t: 'Demóstenes', icon: '👑🔥' }
   ];
   
   const prestige = Math.floor(level / titles.length) + 1;
@@ -4271,7 +4446,8 @@ function getUserTitle() {
   '#66ffff',
   '#ccffff'  // 50 ápice (Demóstenes 👑)
    ];
-  const color = prestigeColors[(prestige - 1) % prestigeColors.length];
+// ✨ A CORREÇÃO: Agora a cor acompanha o Nível exato do título, e não o Prestígio!
+  const color = prestigeColors[titleIndex]; 
   
   return {
       title: titles[titleIndex].t,
@@ -4742,6 +4918,206 @@ function importBackup(event) {
     };
     reader.readAsText(file);
 }
+// ✨ SISTEMA DE MISSÕES (Diárias e Semanais)
+function generateDailyQuests() {
+    if (!STATS) return;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (STATS.questsDate === todayStr && STATS.quests) return;
+
+    const cats = [...new Set(W.map(w => w.category).filter(c => c))];
+    const randomCat = cats.length > 0 ? cats[Math.floor(Math.random() * cats.length)] : 'Geral';
+
+    const possibleQuests = [
+        { id: 'q_free', desc: 'Responda 15 cartas no Modo Livre', target: 15, rewardCoins: 30, rewardXP: 100 },
+        { id: 'q_smart', desc: 'Revise 10 cartas na Revisão Inteligente', target: 10, rewardCoins: 40, rewardXP: 150 },
+        { id: 'q_quiz', desc: 'Acerte 10 cartas no Múltipla Escolha', target: 10, rewardCoins: 50, rewardXP: 200 },
+        { id: 'q_cat', desc: `Estude 10 cartas da categoria: ${randomCat}`, target: 10, rewardCoins: 45, rewardXP: 120, reqCat: randomCat },
+        { id: 'q_crit', desc: 'Consiga 5 Acertos Críticos', target: 5, rewardCoins: 60, rewardXP: 250 }
+    ];
+
+    possibleQuests.sort(() => 0.5 - Math.random());
+    STATS.questsDate = todayStr;
+    STATS.quests = possibleQuests.slice(0, 3).map(q => ({ ...q, progress: 0, claimed: false }));
+    if (typeof saveStats === 'function') saveStats();
+}
+
+function generateWeeklyQuests() {
+    if (!STATS) return;
+    
+    // Descobre qual foi o último Domingo para criar o "ID da Semana"
+    const dateObj = new Date();
+    const dayOfWeek = dateObj.getDay(); 
+    const sundayDate = new Date(dateObj);
+    sundayDate.setDate(dateObj.getDate() - dayOfWeek);
+    const weekId = sundayDate.toISOString().slice(0, 10);
+
+    // Se já gerou as semanais desta semana, não faz nada!
+    if (STATS.weeklyQuestsDate === weekId && STATS.weeklyQuests) return;
+
+    // As missões Épicas de longo prazo
+    const possibleWeekly = [
+        { id: 'wq_xp', desc: 'Acumule 5.000 XP ✨', target: 5000, rewardCoins: 300, rewardXP: 1000 },
+        { id: 'wq_coins', desc: 'Acumule 1.000 🪙', target: 1000, rewardCoins: 500, rewardXP: 1500 },
+        { id: 'wq_cards', desc: 'Acerte 200 cartas no total', target: 200, rewardCoins: 250, rewardXP: 800 },
+        { id: 'wq_crits', desc: 'Consiga 30 Acertos Críticos', target: 30, rewardCoins: 400, rewardXP: 1200 },
+        { id: 'wq_pet', desc: 'Gere 100 Pontos de Afinidade com Pets (2 Níveis)', target: 100, rewardCoins: 600, rewardXP: 2000 }
+    ];
+
+    possibleWeekly.sort(() => 0.5 - Math.random());
+    STATS.weeklyQuestsDate = weekId;
+    // Sorteia 2 Semanais Gigantes
+    STATS.weeklyQuests = possibleWeekly.slice(0, 2).map(q => ({ ...q, progress: 0, claimed: false }));
+    if (typeof saveStats === 'function') saveStats();
+}
+
+// ✨ MOTOR DE PRESTÍGIO E CONQUISTAS (A Bolinha)
+function manageAchievements() {
+    if (!STATS) return;
+    
+    // 1. Cria o banco de dados das Conquistas na primeira vez
+    if (!STATS.achievements) {
+        STATS.achievements = {
+            currentPrestige: 1, 
+            list: [
+                { id: 'ach_cards', name: 'Estudioso Feroz 📚', desc: 'Responda {X} cartas no total', target: 1000, progress: 0, claimed: false, rewardCoins: 1500, rewardXP: 5000 },
+                { id: 'ach_crits', name: 'Sorte Divina 🎲', desc: 'Dê {X} Acertos Críticos', target: 100, progress: 0, claimed: false, rewardCoins: 2000, rewardXP: 8000 },
+                { id: 'ach_gold', name: 'Toque de Midas 💰', desc: 'Acumule {X} 🪙 jogando', target: 15000, progress: 0, claimed: false, rewardCoins: 3000, rewardXP: 10000 },
+                { id: 'ach_pets', name: 'Senhor das Feras 🐉', desc: 'Gere {X} de Afinidade com Pets', target: 500, progress: 0, claimed: false, rewardCoins: 2500, rewardXP: 7000 }
+            ]
+        };
+    }
+
+    // 2. O Olho que tudo vê (Verifica a Bolinha atual)
+    const currentTitleInfo = typeof getUserTitle === 'function' ? getUserTitle() : { prestige: 1 };
+    const realPrestige = currentTitleInfo.prestige;
+
+    // 3. O RESET ÉPICO: Se a bolinha subiu de nível!
+    if (realPrestige > STATS.achievements.currentPrestige) {
+        STATS.achievements.list.forEach(ach => {
+            // Só reseta e dobra a dificuldade se a conquista já foi concluída E resgatada!
+            if (ach.claimed) {
+                ach.claimed = false;
+                ach.progress = 0; 
+                ach.target = ach.target * 2; // O dobro da dificuldade!
+                // O prêmio aumenta em 50% para valer a pena o sofrimento
+                ach.rewardCoins = Math.floor(ach.rewardCoins * 1.5); 
+                ach.rewardXP = Math.floor(ach.rewardXP * 1.5);
+            }
+        });
+        
+        STATS.achievements.currentPrestige = realPrestige;
+        if (typeof saveStats === 'function') saveStats();
+    }
+}
+
+// ✨ INTERFACE: O Mural Triplo (Diárias, Semanais e Conquistas)
+function openQuestsModal() {
+    generateDailyQuests(); 
+    generateWeeklyQuests(); 
+    manageAchievements(); // Checa se a bolinha subiu antes de abrir!
+    
+    function buildQuestCard(q, index, type) {
+        const isDone = q.progress >= q.target;
+        const pct = Math.min(100, Math.floor((q.progress / q.target) * 100));
+        const formattedDesc = q.desc.replace('{X}', q.target.toLocaleString('pt-BR'));
+        
+        let btnHtml = '';
+        if (q.claimed) {
+            btnHtml = `<button class="btn sm ghost" disabled style="color:var(--stone2); border-color:var(--stone)">✔ Resgatado</button>`;
+        } else if (isDone) {
+            const func = type === 'achievement' ? `claimAchievement(${index})` : `claimQuest(${index}, '${type}')`;
+            btnHtml = `<button class="btn sm success" style="background:var(--gold); color:#000; border:none; font-weight:bold; box-shadow: 0 0 10px rgba(212, 175, 55, 0.5)" onclick="${func}">🏆 Resgatar</button>`;
+        } else {
+            btnHtml = `<span style="font-size:12px; color:var(--stone2); font-weight:bold">${q.progress.toLocaleString('pt-BR')} / ${q.target.toLocaleString('pt-BR')}</span>`;
+        }
+        
+        let barColor = 'var(--blue)'; // Diárias
+        if (type === 'weekly') barColor = '#e024ff'; // Semanais
+        if (type === 'achievement') barColor = '#00f5ff'; // Conquistas
+        if (isDone) barColor = 'var(--gold)'; // Concluído
+        
+        return `
+        <div class="card" style="border-color:${isDone && !q.claimed ? 'var(--gold)' : 'var(--stone)'}; background:rgba(0,0,0,0.2); margin-bottom:10px">
+            <div class="card-body">
+                ${q.name ? `<div style="font-size:11px; font-weight:bold; color:${barColor}; margin-bottom:2px">${q.name}</div>` : ''}
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+                    <div style="font-weight:bold; font-size:13px; color:${isDone && !q.claimed ? 'var(--gold)' : 'white'}; width:70%">${formattedDesc}</div>
+                    ${btnHtml}
+                </div>
+                <div style="display:flex; gap:10px; font-size:11px; margin-bottom:8px">
+                    <span style="color:var(--gold)">💰 +${q.rewardCoins.toLocaleString('pt-BR')} 🪙</span>
+                    <span style="color:#00e5ff">✨ +${q.rewardXP.toLocaleString('pt-BR')} XP</span>
+                </div>
+                <div style="width:100%; background:rgba(255,255,255,0.1); border-radius:4px; height:6px; overflow:hidden">
+                    <div style="width:${pct}%; background:${barColor}; height:100%; transition: width 0.3s"></div>
+                </div>
+            </div>
+        </div>`;
+    }
+    
+    let html = `
+    <h3 style="margin-bottom:8px; color:var(--gold)">📜 Os Trabalhos de Atena</h3>
+    <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Cumpra os objetivos para a Glória do Olimpo!</p>
+    
+    <div style="height: 65vh; overflow-y: auto; padding-right:5px">
+        <div style="font-weight:bold; margin-bottom:10px; color:#00e5ff; text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(0, 229, 255, 0.3); padding-bottom:4px">⏳ Diárias</div>
+        ${STATS.quests.map((q, i) => buildQuestCard(q, i, 'daily')).join('')}
+        
+        <div style="font-weight:bold; margin-top:15px; margin-bottom:10px; color:#e024ff; text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(224, 36, 255, 0.3); padding-bottom:4px">📅 Semanais</div>
+        ${STATS.weeklyQuests.map((q, i) => buildQuestCard(q, i, 'weekly')).join('')}
+
+        <div style="font-weight:bold; margin-top:15px; margin-bottom:10px; color:#00f5ff; text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(0, 245, 255, 0.3); padding-bottom:4px">🏆 Conquistas de Prestígio (Nv. ${STATS.achievements.currentPrestige})</div>
+        <p style="font-size:10px; color:var(--stone2); margin-top:-6px; margin-bottom:10px">Conquistas resgatadas dobram de dificuldade quando sua Bolinha subir de nível!</p>
+        ${STATS.achievements.list.map((q, i) => buildQuestCard(q, i, 'achievement')).join('')}
+    </div>
+    
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn ghost" onclick="closeModal()">Fechar Mural</button>
+    </div>`;
+    
+    openModal(html);
+}
+
+// ✨ MOTOR DE PAGAMENTO DAS CONQUISTAS
+function claimAchievement(index) {
+    const q = STATS.achievements.list[index];
+    if (q && q.progress >= q.target && !q.claimed) {
+        q.claimed = true;
+        STATS.moedas = (STATS.moedas || 0) + q.rewardCoins;
+        STATS.earnedXP = (STATS.earnedXP || 0) + q.rewardXP;
+        
+        if (typeof saveStats === 'function') saveStats();
+        if (typeof shootConfetti === 'function') shootConfetti();
+        toast('🏆 Conquista Épica Resgatada!', '#00f5ff');
+        
+        const moedasEl = document.getElementById('hMoedas');
+        if (moedasEl) moedasEl.textContent = STATS.moedas + '🪙';
+        if (typeof updateHeader === 'function') updateHeader(); 
+        
+        openQuestsModal(); 
+    }
+}
+// ✨ MOTOR UNIVERSAL DE PAGAMENTO
+function claimQuest(index, type = 'daily') {
+    const qList = type === 'weekly' ? STATS.weeklyQuests : STATS.quests;
+    const q = qList[index];
+    
+    if (q && q.progress >= q.target && !q.claimed) {
+        q.claimed = true;
+        STATS.moedas = (STATS.moedas || 0) + q.rewardCoins;
+        STATS.earnedXP = (STATS.earnedXP || 0) + q.rewardXP;
+        
+        if (typeof saveStats === 'function') saveStats();
+        if (typeof shootConfetti === 'function') shootConfetti();
+        toast(`🎁 Recompensa ${type === 'weekly' ? 'Semanal' : 'Diária'} Resgatada!`, 'gold');
+        
+        const moedasEl = document.getElementById('hMoedas');
+        if (moedasEl) moedasEl.textContent = STATS.moedas + '🪙';
+        if (typeof updateHeader === 'function') updateHeader(); 
+        
+        openQuestsModal(); 
+    }
+}
 // ✨ SISTEMA LIVE-OPS: EVENTOS E MARATONAS DE FIM DE SEMANA
 function runEventManager() {
     if (!STATS) return;
@@ -4824,6 +5200,258 @@ function runEventManager() {
         if (typeof saveStats === 'function') saveStats();
     }
 }
+// ✨ SISTEMA GACHA: O CASSINO DO DESTINO (Yin-Yang)
+function showYinYang() {
+    let btn = document.getElementById('btnYinYang');
+    if (!btn) {
+        btn = document.createElement('button');
+        btn.id = 'btnYinYang';
+        btn.innerHTML = '☯︎';
+        // Estilo dramático: Grande, brilhante e no centro da tela!
+        btn.style.cssText = `
+            position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 80px; background: none; border: none; color: white;
+            text-shadow: 0 0 20px #e024ff, 0 0 40px #00e5ff;
+            cursor: pointer; z-index: 9999;
+            animation: pulseYinYang 0.8s infinite alternate;
+        `;
+        btn.onclick = openGachaModal;
+        document.body.appendChild(btn);
+        
+        // Injeta a animação CSS de pulsar se não existir
+        if (!document.getElementById('cssYinYang')) {
+            const style = document.createElement('style');
+            style.id = 'cssYinYang';
+            style.innerHTML = '@keyframes pulseYinYang { from { transform: translate(-50%, -50%) scale(1); } to { transform: translate(-50%, -50%) scale(1.1); } }';
+            document.head.appendChild(style);
+        }
+    }
+    
+    btn.style.display = 'block';
+    
+    // ⏱️ PRESSÃO PSICOLÓGICA: O botão foge depois de 3.5 segundos!
+    setTimeout(() => {
+        if (btn && btn.style.display === 'block') {
+            btn.style.display = 'none';
+        }
+    }, 3500);
+}
+
+function openGachaModal() {
+    // Esconde o botão Yin-Yang da tela, pois você já o capturou!
+    const btn = document.getElementById('btnYinYang');
+    if (btn) btn.style.display = 'none';
+
+    openModal(`
+        <h3 style="text-align:center; color:white; margin-bottom:10px; font-size:24px">☯︎ A Roda da Fortuna</h3>
+        <p style="text-align:center; font-size:12px; color:var(--stone2); margin-bottom:20px">Os Deuses notaram seu Acerto Crítico. Deseja testar sua sorte?<br><br><b style="color:#00e5ff">Vitória (50%):</b> Ganha um consumível mágico.<br><b style="color:var(--red)">Derrota (50%):</b> Os deuses tomam um item do seu inventário.</p>
+        <div style="display:flex; justify-content:center; gap:15px; margin-bottom:10px">
+            <button class="btn success" style="background:#e024ff; color:white; border:none; padding:10px 20px; font-weight:bold; font-size:16px; box-shadow: 0 0 15px rgba(224, 36, 255, 0.4)" onclick="playGacha()">🎲 Girar a Roleta</button>
+            <button class="btn ghost" onclick="closeModal()">Sair Correndo</button>
+        </div>
+    `);
+}
+
+function playGacha() {
+    // A Máquina da Sorte!
+    const win = Math.random() >= 0.5;
+    
+    const possibleItems = [
+        { id: 'doubleCoins', name: 'Néctar dos Deuses 🍷' },
+        { id: 'doubleXp', name: 'Água de Mnemósine 💧' },
+        { id: 'miniShields', name: 'Égide Menor 🛡️' }
+    ];
+    
+    let resultHtml = '';
+    if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, doubleXp: 0 };
+    
+    if (win) {
+        // 🎉 VITÓRIA: Sorteia um item e te dá!
+        const item = possibleItems[Math.floor(Math.random() * possibleItems.length)];
+        STATS.inventory[item.id] = (STATS.inventory[item.id] || 0) + 1;
+        resultHtml = `
+            <div style="text-align:center; animation: fadeIn 0.5s">
+                <div style="font-size:50px; margin-bottom:10px">🎉</div>
+                <h3 style="color:var(--gold)">VITÓRIA!</h3>
+                <p style="font-size:14px; color:white; margin-top:10px">Os deuses sorriram! Você ganhou:<br><b style="color:#00e5ff; font-size:16px">${item.name}</b></p>
+            </div>`;
+        toast('Sorte Grande!', 'gold');
+        if (typeof shootConfetti === 'function') shootConfetti();
+    } else {
+        // 🌩️ DERROTA: Varre seu inventário para ver se você tem algo para perder
+        const ownedItems = possibleItems.filter(i => STATS.inventory[i.id] > 0);
+        
+        if (ownedItems.length > 0) {
+            // Pega um item que você tem e subtrai 1
+            const itemToLose = ownedItems[Math.floor(Math.random() * ownedItems.length)];
+            STATS.inventory[itemToLose.id]--;
+            resultHtml = `
+                <div style="text-align:center; animation: fadeIn 0.5s">
+                    <div style="font-size:50px; margin-bottom:10px">🌩️</div>
+                    <h3 style="color:var(--red)">DERROTA!</h3>
+                    <p style="font-size:14px; color:white; margin-top:10px">A sorte virou as costas! Você perdeu 1x:<br><b style="color:var(--red); font-size:16px">${itemToLose.name}</b></p>
+                </div>`;
+            toast('Azar...', 'err');
+            if(typeof triggerScreenShake === 'function') triggerScreenShake();
+        } else {
+            // Se você é pobre e não tem itens, você escapa impune!
+            resultHtml = `
+                <div style="text-align:center; animation: fadeIn 0.5s">
+                    <div style="font-size:50px; margin-bottom:10px">💨</div>
+                    <h3 style="color:var(--stone)">ESCAPOU!</h3>
+                    <p style="font-size:14px; color:white; margin-top:10px">Você perdeu na roleta, mas como seus bolsos estão vazios, os deuses ficaram com pena. Nada foi levado!</p>
+                </div>`;
+            toast('Sorte na miséria!', 'ok');
+        }
+    }
+    
+    if (typeof saveStats === 'function') saveStats();
+    
+    // Atualiza o HTML do Modal com o resultado final
+    openModal(`
+        ${resultHtml}
+        <div style="display:flex; justify-content:center; margin-top:20px">
+            <button class="btn ghost" onclick="closeModal()">Aceitar o Destino</button>
+        </div>
+    `);
+}
+// ✨ SISTEMA GACHA DA LOJA (Loot Boxes)
+// ✨ SISTEMA GACHA DA LOJA (Loot Boxes com Som!)
+function buyGachaBox(boxType, price) {
+    if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, doubleXp: 0 };
+    
+    if ((STATS.moedas || 0) < price) { 
+        toast('Moedas insuficientes para apostar!', 'err'); 
+        if(typeof triggerScreenShake === 'function') triggerScreenShake(); 
+        return; 
+    }
+    
+    STATS.moedas -= price;
+    if (typeof updateHeader === 'function') updateHeader();
+
+    const roll = Math.random(); 
+    let rewardHtml = '';
+    let boxName = '';
+    let soundType = 'loss'; // O som padrão é o de tristeza kkkk
+
+    if (boxType === 'bronze') {
+        boxName = 'Ânfora de Bronze';
+        if (roll < 0.60) {
+            STATS.moedas += 50; STATS.earnedXP += 50;
+            rewardHtml = `<b>50 🪙</b> e <b>50 XP ✨</b><br><span style="color:var(--stone2); font-size:10px">(Ficou no prejuízo...)</span>`;
+        } else if (roll < 0.90) {
+            STATS.inventory.doubleXp += 1;
+            rewardHtml = `<b style="color:#00e5ff">1x Água de Mnemósine 💧</b><br><span style="color:var(--green); font-size:10px">(Vale 250 🪙!)</span>`;
+            soundType = 'win';
+        } else {
+            STATS.inventory.doubleCoins += 1; STATS.inventory.doubleXp += 1;
+            rewardHtml = `<b style="color:var(--gold)">1x Néctar 🍷 + 1x Água 💧</b><br><span style="color:var(--gold); font-size:10px">(Sorte Grande! Vale 500 🪙)</span>`;
+            soundType = 'jackpot';
+        }
+    } 
+    else if (boxType === 'prata') {
+        boxName = 'Caixa de Pandora';
+        if (roll < 0.50) {
+            STATS.moedas += 100; STATS.earnedXP += 100;
+            rewardHtml = `<b>100 🪙</b> e <b>100 XP ✨</b><br><span style="color:var(--stone2); font-size:10px">(A esperança foi a última a morrer...)</span>`;
+        } else if (roll < 0.85) {
+            STATS.inventory.doubleCoins += 2;
+            rewardHtml = `<b style="color:var(--gold)">2x Néctar dos Deuses 🍷</b><br><span style="color:var(--green); font-size:10px">(Vale 500 🪙!)</span>`;
+            soundType = 'win';
+        } else {
+            STATS.earnedXP += 1500;
+            rewardHtml = `<b style="color:#e024ff; font-size:20px">1.500 XP ✨</b><br><span style="color:#e024ff; font-size:10px">(JACKPOT DE SABEDORIA!)</span>`;
+            soundType = 'jackpot';
+        }
+    }
+    else if (boxType === 'ouro') {
+        boxName = 'Baú do Olimpo';
+        if (roll < 0.50) {
+            STATS.inventory.doubleXp += 3;
+            rewardHtml = `<b style="color:#00e5ff">3x Água de Mnemósine 💧</b><br><span style="color:var(--stone2); font-size:10px">(Vale 750 🪙. Você perdeu dinheiro...)</span>`;
+        } else if (roll < 0.85) {
+            STATS.inventory.doubleCoins += 4; STATS.inventory.doubleXp += 4;
+            rewardHtml = `<b style="color:var(--gold)">4x Néctar 🍷 e 4x Água 💧</b><br><span style="color:var(--green); font-size:10px">(Vale 2.000 🪙! Lucrou absurdo!)</span>`;
+            soundType = 'win';
+        } else {
+            STATS.moedas += 3000; STATS.earnedXP += 5000;
+            rewardHtml = `<b style="color:#ff245e; font-size:24px; text-shadow: 0 0 10px #ff245e">3.000 🪙 e 5.000 XP ✨</b><br><b style="color:var(--gold); font-size:12px">O JACKPOT SUPREMO!</b>`;
+            soundType = 'jackpot';
+            if (typeof triggerScreenShake === 'function') triggerScreenShake();
+        }
+    }
+
+    if (typeof saveStats === 'function') saveStats();
+    if (soundType !== 'loss' && typeof shootConfetti === 'function') shootConfetti();
+
+    // Toca o som exato que combina com a sua sorte antes de abrir a tela!
+    playGachaSound(soundType);
+
+    openModal(`
+        <div style="text-align:center; padding:10px">
+            <h3 style="color:var(--gold); margin-bottom:15px">🎁 ${boxName} Aberta!</h3>
+            <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:20px; margin-bottom:20px; animation: fadeIn 0.5s">
+                <p style="font-size:12px; color:var(--stone2); margin-bottom:10px">O que havia lá dentro:</p>
+                <div style="font-size:16px;">${rewardHtml}</div>
+            </div>
+            <button class="btn success" style="width:100%" onclick="openStoreModal()">Voltar para a Loja</button>
+        </div>
+    `);
+}
+// ✨ SINTETIZADOR RETRÔ DE ÁUDIO PARA O GACHA
+function playGachaSound(type) {
+    // Obedece ao seu botão de Áudio do topo da tela!
+    if (typeof autoPlayAudio !== 'undefined' && !autoPlayAudio) return;
+    
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        const now = ctx.currentTime;
+        
+        if (type === 'loss') {
+            // 🌩️ Som de Decepção (Trombone triste caindo)
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(300, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.6);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+            osc.start(now);
+            osc.stop(now + 0.6);
+        } 
+        else if (type === 'win') {
+            // 🎉 Som Feliz (Moedinhas / Lucro)
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.setValueAtTime(600, now + 0.1);
+            osc.frequency.setValueAtTime(800, now + 0.2);
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+            osc.start(now);
+            osc.stop(now + 0.4);
+        } 
+        else if (type === 'jackpot') {
+            // 💎 Som ÉPICO de Jackpot (Arpejo subindo aos céus)
+            osc.type = 'sine';
+            const notes = [440, 554.37, 659.25, 880, 1108.73, 1318.51, 1760]; // Acorde Épico Subindo
+            notes.forEach((freq, i) => {
+                osc.frequency.setValueAtTime(freq, now + (i * 0.08));
+            });
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.linearRampToValueAtTime(0, now + (notes.length * 0.08));
+            osc.start(now);
+            osc.stop(now + (notes.length * 0.08));
+        }
+    } catch(e) { 
+        console.log('Áudio não suportado no navegador.'); 
+    }
+}
 /* ═══════════════════════════════════════
    INIT
 ═══════════════════════════════════════ */
@@ -4835,38 +5463,53 @@ function runEventManager() {
   render();
 })();
 /* ═══════════════════════════════════════
-   🧠 MOTOR DE MEMÓRIA DE INTERFACE (INTELIGENTE)
+   🧠 MOTOR DE MEMÓRIA DE INTERFACE E GAVETAS (INTELIGENTE)
 ═══════════════════════════════════════ */
 const ignoreList = ['fw_type', 'fw_lang_word', 'fw_lang_def', 'fw_class']; 
 
-// ✨ A MÁGICA ESTÁ AQUI: O "true" no final faz isso rodar ANTES de qualquer 
-// atualização visual da tela, evitando a Condição de Corrida!
+// O EventListener original (Intacto!)
 document.addEventListener('change', (e) => {
-  // Salva os Selects (Filtros, Categorias, Importações)
   if (e.target.tagName === 'SELECT' && e.target.id && !ignoreList.includes(e.target.id)) {
     localStorage.setItem('ui_pref_' + e.target.id, e.target.value);
   }
-  // Salva os Checkboxes dos Modos de Jogo
   if (e.target.classList.contains('custom-mode-cb')) {
     localStorage.setItem('ui_pref_cb_' + e.target.value, e.target.checked);
   }
-}, true); // <--- Este "true" mudou tudo!
+}, true);
 
+// ✨ NOVA FUNÇÃO: O botão que abre e fecha as Gavetas Manuais
+function toggleSection(sectionId) {
+    const content = document.getElementById(sectionId + '-content');
+    const icon = document.getElementById(sectionId + '-icon');
+    if (!content) return;
+    
+    const isCollapsed = content.style.display === 'none';
+    
+    if (isCollapsed) {
+        content.style.display = 'block';
+        if (icon) icon.textContent = '▼';
+        localStorage.setItem('ui_toggle_' + sectionId, 'open'); // Salva no dispositivo
+    } else {
+        content.style.display = 'none';
+        if (icon) icon.textContent = '▶';
+        localStorage.setItem('ui_toggle_' + sectionId, 'closed'); // Salva no dispositivo
+    }
+}
+
+// O seu Observador Ninja Único!
 const uiObserver = new MutationObserver(() => {
   let needsListUpdate = false;
   let needsImportUpdate = false;
 
+  // --- 1. A SUA LÓGICA ORIGINAL (Selects e Checkboxes) ---
   document.querySelectorAll('select[id]').forEach(sel => {
-    if (ignoreList.includes(sel.id)) return; // Fica longe do form de edição!
+    if (ignoreList.includes(sel.id)) return; 
     
     const saved = localStorage.getItem('ui_pref_' + sel.id);
     if (saved !== null && sel.value !== saved) {
-      // Garante que a opção salva na memória ainda existe no menu
       const optionExists = Array.from(sel.options).some(opt => opt.value === saved);
       if (optionExists) {
         sel.value = saved;
-        
-        // Se o Motor forçou uma mudança visual ao abrir a tela, ele avisa para atualizar
         if (sel.id === 'wordCat' || sel.id === 'wordSort') needsListUpdate = true;
         if (sel.id === 'importType') needsImportUpdate = true;
       }
@@ -4885,12 +5528,35 @@ const uiObserver = new MutationObserver(() => {
     }
   });
 
-  // Dispara as atualizações visuais que os selects exigem logo ao abrir o app
+  // --- 2. ✨ A NOVA LÓGICA (Vigiando as Gavetas) ---
+  const sections = ['sec-manual', 'sec-magic', 'sec-rev', 'sec-free'];
+  
+  sections.forEach(sec => {
+      const content = document.getElementById(sec + '-content');
+      const icon = document.getElementById(sec + '-icon');
+      
+      // Se a gaveta acabou de renderizar na tela...
+      if (content && !content.dataset.loaded) {
+          const state = localStorage.getItem('ui_toggle_' + sec) || 'open'; 
+          
+          if (state === 'closed') {
+              content.style.display = 'none';
+              if (icon) icon.textContent = '▶';
+          } else {
+              content.style.display = 'block';
+              if (icon) icon.textContent = '▼';
+          }
+          
+          content.dataset.loaded = 'true'; // Evita piscar a tela infinitamente!
+      }
+  });
+
+  // Dispara as atualizações visuais finais do seu código original
   if (needsListUpdate && typeof updateWordList === 'function') updateWordList();
   if (needsImportUpdate && typeof handleImportTypeChange === 'function') handleImportTypeChange();
 });
 
-// Liga o observador no corpo do aplicativo
+// Liga o observador unificado!
 uiObserver.observe(document.body, { childList: true, subtree: true });
 </script>
 </body>
