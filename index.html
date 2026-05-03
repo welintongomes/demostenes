@@ -65,7 +65,7 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Crimson
 /* ── CARDS ── */
 .card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);overflow:clip;margin-bottom:12px;position:relative;}
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.4),transparent);}
-.card-head{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2);}
+.card-head{padding:0px 0px;display:flex;align-items:baseline;gap: 31px;justify-content:space-between;}
 .card-title{font-family:'Cinzel',serif;font-size:13px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--stone3);}
 .card-body{padding:14px;}
 
@@ -336,11 +336,37 @@ svg.ring{transform:rotate(-90deg);}
     <div class="tab" data-tab="words" onclick="setTab('words')">📖 Léxico</div>
     <div class="tab" data-tab="add" onclick="setTab('add')">✦ Adicionar</div>
     <div class="tab" data-tab="stats" onclick="setTab('stats')">⚑ Progresso</div>
+    <!-- ⚙️ BOTÃO DE CONFIGURAÇÕES -->
+    <button onclick="abrirConfig()" style="width: 40px; height: 40px; border-radius: 50%; background: #14121000; border: none; color: white; font-size: 20px; display: inline-flex; justify-content: center; align-items: center; cursor: pointer;" title="Configurações">⚙️</button>
   </div>
 
   <div id="body"></div>
 </div>
+<!-- ⚙️ MODAL DE CONFIGURAÇÕES -->
+<div id="modalConfig" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center;">
+    <div style="background:var(--bg2, #2a2a2a); padding:25px; border-radius:12px; width:90%; max-width:400px; color:white; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+        
+        <h2 style="margin-top:0; border-bottom:1px solid #444; padding-bottom:10px; font-size: 20px;">⚙️ Configurações</h2>
+        
+        <!-- OPÇÃO 1: Intervalo Mínimo do Relógio -->
+        <div style="margin: 20px 0;">
+            <label style="display:block; margin-bottom:8px; font-weight: bold; color: var(--gold, #ffd700);">
+                🕒 Ativar relógio a partir de qual intervalo? (Dias)
+            </label>
+            <input type="number" id="inputTimerInterval" min="0" max="30" style="width:100%; padding:10px; border-radius:6px; border:1px solid #555; background:#1a1a1a; color:white; font-size: 16px;">
+            <small style="color:#aaa; display:block; margin-top:5px; font-size:12px;">
+                Cartões com intervalo menor que este não terão pressão de tempo. (Deixe 0 para todos).
+            </small>
+        </div>
 
+        <!-- Botoes de Ação -->
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:30px;">
+            <button onclick="fecharConfig()" style="padding:10px 15px; border:none; border-radius:6px; background:#444; color:white; font-weight:bold; cursor:pointer;">Cancelar</button>
+            <button onclick="salvarConfig()" style="padding:10px 20px; border:none; border-radius:6px; background:#4CAF50; color:white; font-weight:bold; cursor:pointer;">💾 Salvar</button>
+        </div>
+
+    </div>
+</div>
 <script>
 'use strict';
 
@@ -377,10 +403,6 @@ function sm2(card, quality) {
 function getQualityLabel(q) {
   return [{txt:'De novo',days:'1d'},{txt:'Difícil',days:'?'},{txt:'Bom',days:'?'},{txt:'Fácil',days:'?'}][q];
 }
-
-/* ═══════════════════════════════════════
-   STORAGE (INDEXEDDB)
-═══════════════════════════════════════ */
 /* ═══════════════════════════════════════
    STORAGE (INDEXEDDB) - ALTA PERFORMANCE
 ═══════════════════════════════════════ */
@@ -501,6 +523,14 @@ let wordDisplayLimit = 50;
 let confirmCallback = null;
 let autoPlayAudio = false;
 let enableTimer = false;
+//botão de configuraçoes tudo ficará aqui para ser configurado em game
+// ⚙️ Variáveis Globais de Configuração
+let configJogo = {
+    timerMinInterval: 0 // Valor padrão que você está usando agora
+    // Futuramente você vai adicionar outras aqui:
+    // tempoBoss: 15,
+    // mostrarDica: false, etc...
+};
 // ✨ DETECTOR DE RARIDADE DAS CARTAS (Risco Zero)
 function getCardRarity(card) {
   if (card.isLeech) return { cls: 'rarity-ferro', txtCls: '', label: 'Sanguessuga' };
@@ -514,9 +544,17 @@ function getCardRarity(card) {
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
 // ✨ MOTOR GAMIFICADO: Áudio, Combos, Críticos e MOEDAS 🪙
+// ✨ A TRAVA GLOBAL ANTI-LOOP (Deve ficar fora da função!)
+let checandoMissoes = false;
+
 function playSfx(type) {
   if (!studySession) return;
   const sess = studySession;
+
+  // 🛑 SISTEMA ANTI-LOOP: Se já estamos calculando os prêmios e o toast tentar tocar outro som 'ok', nós cancelamos para não explodir a memória!
+  if (checandoMissoes && (type === 'ok' || type === 'crit')) {
+      return; 
+  }
 
   if(audioCtx.state === 'suspended') audioCtx.resume();
   const osc = audioCtx.createOscillator();
@@ -530,235 +568,248 @@ function playSfx(type) {
   if (STATS.moedas === undefined || isNaN(STATS.moedas)) STATS.moedas = 0;
 
   if (type === 'ok' || type === 'crit') {
-    // 1. Aumenta o combo de acertos
-    sess.combo++;
     
-    // 2. Sorteio de Crítico (A cada 5 acertos ou 10% sorte ou acionamento forçado)
-    const isMilestone = (sess.combo % 5 === 0);
-    const isCrit = isMilestone || Math.random() < 0.10 || type === 'crit'; 
+    // 🔒 TRANCA O CADEADO ANTES DE COMEÇAR A DAR PRÊMIOS
+    checandoMissoes = true;
 
-  // 3. ✨ SISTEMA DE PAGAMENTO DE MOEDAS E XP (Com Punição do Relógio!Com Eventos, Loja e TODOS OS PETS!)
-    
-    // Matemática Base Risco vs Recompensa
-    let baseMoedas = sess.isFreeMode ? 1 : 3; 
-    let baseXP = sess.isFreeMode ? 5 : 15; 
-    let critMoedas = sess.isFreeMode ? 2 : 5;
-    let critXP = 25;
-
-    // 🛑 A PUNIÇÃO: Corta os lucros violentamente se o Relógio estiver pausado!
-    if (!enableTimer) {
-        baseMoedas = sess.isFreeMode ? 0 : 1; // Modo livre não dá ouro sem relógio!
-        baseXP = sess.isFreeMode ? 2 : 5;     // XP cai para 1/3 do valor original
-        critMoedas = sess.isFreeMode ? 0 : 2; 
-        critXP = 10;
-    }
-
-    let ganhoMoedas = baseMoedas; 
-    let ganhoXP = baseXP; 
-
-    if (isCrit) {
-        ganhoMoedas += critMoedas; 
-        ganhoXP += critXP; 
-    }
-
-    // 🔥 LIVE-OPS: Multiplicador do Evento Ativo
-    if (STATS.activeEvent && STATS.activeEvent.id === 'coins_double') ganhoMoedas *= 2;
-    if (STATS.activeEvent && STATS.activeEvent.id === 'coins_triple') ganhoMoedas *= 3;
-    if (STATS.activeEvent && STATS.activeEvent.id === 'xp_double') ganhoXP *= 2;
-    if (STATS.activeEvent && STATS.activeEvent.id === 'xp_triple') ganhoXP *= 3;
-
-    // 🍷 ITEM: Néctar dos Deuses
-    let nectarActive = false;
-    if (STATS.inventory && STATS.inventory.doubleCoins > 0) {
-        ganhoMoedas *= 2; STATS.inventory.doubleCoins--; nectarActive = true;
-    }
-
-    // 💧 ITEM: Água de Mnemósine
-    let aguaActive = false;
-    if (STATS.inventory && STATS.inventory.doubleXp > 0) {
-        ganhoXP *= 2; STATS.inventory.doubleXp--; aguaActive = true;
-    }
-
-    // 🐾 COMPANHEIROS MÍTICOS (Afinidade e Bônus)
-    let petVisualCoins = ''; let petVisualXP = ''; let petActiveFlag = false;
-
-    if (STATS.pets && STATS.pets.active) {
-        petActiveFlag = true;
-        const activePet = STATS.pets.active;
-        const isFed = STATS.pets.fedCharges > 0;
+    try {
+        // 1. Aumenta o combo de acertos
+        sess.combo++;
         
-        if (!STATS.pets.affinity) STATS.pets.affinity = {};
-        if (STATS.pets.affinity[activePet] === undefined) STATS.pets.affinity[activePet] = 0;
-        
-        STATS.pets.affinity[activePet]++;
-        const petLevel = Math.floor(STATS.pets.affinity[activePet] / 50) + 1;
-        
-        if (activePet === 'coruja') {
-            ganhoXP += isFed ? (10 + ((petLevel - 1) * 2)) : (2 + Math.floor((petLevel - 1) * 0.5));     
-            petVisualXP = isFed ? '🦉🍎' : '🦉'; 
-        } 
-        else if (activePet === 'fenix') {
-            ganhoMoedas += isFed ? (4 + (petLevel - 1)) : (1 + Math.floor((petLevel - 1) * 0.2));  
-            petVisualCoins = isFed ? '🔥🍎' : '🔥';
-        }
-        else if (activePet === 'tartaruga') { 
-            ganhoXP += isFed ? (4 + (petLevel - 1)) : (1 + Math.floor((petLevel - 1) * 0.2));     
-            petVisualXP = isFed ? '🐢🍎' : '🐢'; 
-        }
-        else if (activePet === 'formiga') { 
-            ganhoMoedas += isFed ? (2 + Math.floor((petLevel - 1) * 0.5)) : 0; 
-            petVisualCoins = isFed ? '🐜🍎' : '🐜';
-        }
-        else if (activePet === 'dragao') { 
-            ganhoMoedas += isFed ? (10 + ((petLevel - 1) * 2)) : (3 + Math.floor((petLevel - 1) * 0.5));
-            ganhoXP += isFed ? (30 + ((petLevel - 1) * 5)) : (5 + (petLevel - 1));
-            petVisualCoins = isFed ? '🐉🍎' : '🐉'; petVisualXP = isFed ? '🐉🍎' : '🐉';
-        }
-        
-        if (isFed) STATS.pets.fedCharges--;
-    }
+        // 2. Sorteio de Crítico (A cada 5 acertos ou 10% sorte ou acionamento forçado)
+        const isMilestone = (sess.combo % 5 === 0);
+        const isCrit = isMilestone || Math.random() < 0.10 || type === 'crit'; 
 
-    STATS.moedas += ganhoMoedas; 
-    if (STATS.earnedXP === undefined) STATS.earnedXP = 0;
-    STATS.earnedXP += ganhoXP; 
-    
-    if (typeof saveStats === 'function') saveStats(); 
-    
-    const moedasEl = document.getElementById('hMoedas');
-    if (moedasEl) moedasEl.textContent = STATS.moedas + '🪙';
-    
-// ✨ 🎯 RASTREADOR INVISÍVEL DUPLO (Diárias e Semanais)
-    let questUpdated = false;
+        // 3. ✨ SISTEMA DE PAGAMENTO DE MOEDAS E XP
+        let baseMoedas = sess.isFreeMode ? 1 : 3; 
+        let baseXP = sess.isFreeMode ? 5 : 15; 
+        let critMoedas = sess.isFreeMode ? 2 : 5;
+        let critXP = 25;
 
-    // 1. Rastreia as Diárias
-    // 1. Rastreia as Diárias (Com Super Farejador de Bugs!)
-    const todayStr = new Date().toISOString().slice(0, 10);
-    if (STATS.quests && STATS.questsDate === todayStr) {
-        STATS.quests.forEach(q => {
-            if (q.progress >= q.target) return; 
-            
-            let match = false;
-            
-            // 🕵️ FAREJADOR DE MÚLTIPLA ESCOLHA (CORRIGIDO)
-            // Pega o modo exato ou verifica se a flag de múltipla escolha foi ativada
-            const activeMode = sess.currentAdaptiveMode || studyMode;
-            const isQuizNow = activeMode === 'choice' || sess.choiceAnswered;
-            
-            if (q.id === 'q_free' && sess.isFreeMode) match = true;
-            if (q.id === 'q_smart' && !sess.isFreeMode && !isQuizNow) match = true; 
-            if (q.id === 'q_quiz' && isQuizNow) match = true;
-            if (q.id === 'q_crit' && isCrit) match = true;
-            
-            // 🕵️ FAREJADOR DE CATEGORIA (CORRIGIDO)
-            // Pega a categoria diretamente da carta atual na fila do sistema
-            let cardCat = '';
-            const cartaAtual = sess.queue[sess.current];
-            if (cartaAtual && cartaAtual.category) {
-                cardCat = cartaAtual.category;
-            }
-            
-            if (q.id === 'q_cat' && q.reqCat && cardCat) {
-                // Transforma as duas palavras em minúsculas e remove espaços antes de comparar!
-                const c1 = cardCat.toLowerCase().trim();
-                const c2 = q.reqCat.toLowerCase().trim();
-                if (c1.includes(c2) || c2.includes(c1)) match = true;
+        // 🛑 A PUNIÇÃO E O BÔNUS DO RELÓGIO
+        if (!enableTimer) {
+            baseMoedas = sess.isFreeMode ? 0 : 1; 
+            baseXP = sess.isFreeMode ? 2 : 5;     
+            critMoedas = sess.isFreeMode ? 0 : 2; 
+            critXP = 10;
+        } else {
+            if (studySession.timerStartTime) {
+                let tempoGasto = Date.now() - studySession.timerStartTime;
+                let tempoRestante = studySession.maxTimeLimit - tempoGasto;
+                studySession.timeLeft = tempoRestante > 0 ? tempoRestante : 0;
             }
 
-            if (match) {
-                q.progress++;
-                questUpdated = true;
-                if (q.progress === q.target) {
-                    setTimeout(() => { toast(`📜 Missão Diária Concluída!`, 'gold'); if(typeof shootConfetti === 'function') shootConfetti(); }, 1200);
+            if (studySession.maxTimeLimit && studySession.maxTimeLimit > 0) {
+                let percentTimeLeft = studySession.timeLeft / studySession.maxTimeLimit;
+                
+                if (percentTimeLeft > 0.7) {
+                    baseMoedas = Math.floor(baseMoedas * 2.0);
+                    baseXP = Math.floor(baseXP * 2.0);
+                    toast('⚡ Resposta Relâmpago! 2x Ouro e XP', 'ok');
+                    type = 'crit'; // Força o som de crítico para ficar mais legal!
+                    
+                } else if (percentTimeLeft > 0.4) {
+                    baseMoedas = Math.floor(baseMoedas * 1.5);
+                    baseXP = Math.floor(baseXP * 1.5);
+                } 
+            }
+        }
+
+        let ganhoMoedas = baseMoedas; 
+        let ganhoXP = baseXP; 
+
+        if (isCrit) {
+            ganhoMoedas += critMoedas; 
+            ganhoXP += critXP; 
+        }
+
+        // 🔥 LIVE-OPS: Multiplicador do Evento Ativo
+        if (STATS.activeEvent && STATS.activeEvent.id === 'coins_double') ganhoMoedas *= 2;
+        if (STATS.activeEvent && STATS.activeEvent.id === 'coins_triple') ganhoMoedas *= 3;
+        if (STATS.activeEvent && STATS.activeEvent.id === 'xp_double') ganhoXP *= 2;
+        if (STATS.activeEvent && STATS.activeEvent.id === 'xp_triple') ganhoXP *= 3;
+
+        // 🍷 ITEM: Néctar dos Deuses
+        let nectarActive = false;
+        if (STATS.inventory && STATS.inventory.doubleCoins > 0) {
+            ganhoMoedas *= 2; STATS.inventory.doubleCoins--; nectarActive = true;
+        }
+
+        // 💧 ITEM: Água de Mnemósine
+        let aguaActive = false;
+        if (STATS.inventory && STATS.inventory.doubleXp > 0) {
+            ganhoXP *= 2; STATS.inventory.doubleXp--; aguaActive = true;
+        }
+
+        // 🐾 COMPANHEIROS MÍTICOS (Afinidade e Bônus)
+        let petVisualCoins = ''; let petVisualXP = ''; let petActiveFlag = false;
+
+        if (STATS.pets && STATS.pets.active) {
+            petActiveFlag = true;
+            const activePet = STATS.pets.active;
+            const isFed = STATS.pets.fedCharges > 0;
+            
+            if (!STATS.pets.affinity) STATS.pets.affinity = {};
+            if (STATS.pets.affinity[activePet] === undefined) STATS.pets.affinity[activePet] = 0;
+            
+            STATS.pets.affinity[activePet]++;
+            const petLevel = Math.floor(STATS.pets.affinity[activePet] / 50) + 1;
+            
+            if (activePet === 'coruja') {
+                ganhoXP += isFed ? (10 + ((petLevel - 1) * 2)) : (2 + Math.floor((petLevel - 1) * 0.5));    
+                petVisualXP = isFed ? '🦉🍎' : '🦉'; 
+            } 
+            else if (activePet === 'fenix') {
+                ganhoMoedas += isFed ? (4 + (petLevel - 1)) : (1 + Math.floor((petLevel - 1) * 0.2));  
+                petVisualCoins = isFed ? '🔥🍎' : '🔥';
+            }
+            else if (activePet === 'tartaruga') { 
+                ganhoXP += isFed ? (4 + (petLevel - 1)) : (1 + Math.floor((petLevel - 1) * 0.2));    
+                petVisualXP = isFed ? '🐢🍎' : '🐢'; 
+            }
+            else if (activePet === 'formiga') { 
+                ganhoMoedas += isFed ? (2 + Math.floor((petLevel - 1) * 0.5)) : 0; 
+                petVisualCoins = isFed ? '🐜🍎' : '🐜';
+            }
+            else if (activePet === 'dragao') { 
+                ganhoMoedas += isFed ? (10 + ((petLevel - 1) * 2)) : (3 + Math.floor((petLevel - 1) * 0.5));
+                ganhoXP += isFed ? (30 + ((petLevel - 1) * 5)) : (5 + (petLevel - 1));
+                petVisualCoins = isFed ? '🐉🍎' : '🐉'; petVisualXP = isFed ? '🐉🍎' : '🐉';
+            }
+            
+            if (isFed) STATS.pets.fedCharges--;
+        }
+
+        STATS.moedas += ganhoMoedas; 
+        if (STATS.earnedXP === undefined) STATS.earnedXP = 0;
+        STATS.earnedXP += ganhoXP; 
+        
+        if (typeof saveStats === 'function') saveStats(); 
+        
+        const moedasEl = document.getElementById('hMoedas');
+        if (moedasEl) moedasEl.textContent = STATS.moedas + '🪙';
+        
+        // ✨ 🎯 RASTREADOR INVISÍVEL DUPLO (Diárias e Semanais)
+        let questUpdated = false;
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (STATS.quests && STATS.questsDate === todayStr) {
+            STATS.quests.forEach(q => {
+                if (q.progress >= q.target) return; 
+                
+                let match = false;
+                const activeMode = sess.currentAdaptiveMode || (typeof studyMode !== 'undefined' ? studyMode : '');
+                const isQuizNow = activeMode === 'choice' || sess.choiceAnswered;
+                
+                if (q.id === 'q_free' && sess.isFreeMode) match = true;
+                if (q.id === 'q_smart' && !sess.isFreeMode && !isQuizNow) match = true; 
+                if (q.id === 'q_quiz' && isQuizNow) match = true;
+                if (q.id === 'q_crit' && isCrit) match = true;
+                
+                let cardCat = '';
+                if (sess.queue && sess.queue[sess.current]) {
+                    const cartaAtual = sess.queue[sess.current];
+                    if (cartaAtual.category) cardCat = cartaAtual.category;
                 }
-            }
-        });
+                
+                if (q.id === 'q_cat' && q.reqCat && cardCat) {
+                    const c1 = cardCat.toLowerCase().trim();
+                    const c2 = q.reqCat.toLowerCase().trim();
+                    if (c1.includes(c2) || c2.includes(c1)) match = true;
+                }
+
+                if (match) {
+                    q.progress++;
+                    questUpdated = true;
+                    if (q.progress === q.target) {
+                        setTimeout(() => { toast(`📜 Missão Diária Concluída!`, 'gold'); if(typeof shootConfetti === 'function') shootConfetti(); }, 1200);
+                    }
+                }
+            });
+        }
+
+        if (STATS.weeklyQuests) {
+            STATS.weeklyQuests.forEach(wq => {
+                if (wq.progress >= wq.target) return; 
+                let prevProgress = wq.progress;
+                
+                if (wq.id === 'wq_xp') wq.progress += ganhoXP;
+                if (wq.id === 'wq_coins') wq.progress += ganhoMoedas;
+                if (wq.id === 'wq_cards') wq.progress += 1;
+                if (wq.id === 'wq_crits' && isCrit) wq.progress += 1;
+                if (wq.id === 'wq_pet' && petActiveFlag) wq.progress += 1; 
+                
+                if (wq.progress > wq.target) wq.progress = wq.target;
+                
+                if (wq.progress > prevProgress) {
+                    questUpdated = true;
+                    if (wq.progress === wq.target && prevProgress < wq.target) {
+                        setTimeout(() => { toast(`📅 TRABALHO SEMANAL CONCLUÍDO!`, '#e024ff'); if(typeof shootConfetti === 'function') shootConfetti(); }, 1600);
+                    }
+                }
+            });
+        }
+
+        if (questUpdated && typeof saveStats === 'function') saveStats();
+        
+        // 3. ✨ RASTREIA AS CONQUISTAS DE PRESTÍGIO
+        if (STATS.achievements && STATS.achievements.list) {
+            STATS.achievements.list.forEach(ach => {
+                if (ach.progress >= ach.target) return; 
+                let prevProg = ach.progress;
+                
+                if (ach.id === 'ach_cards') ach.progress += 1;
+                if (ach.id === 'ach_crits' && isCrit) ach.progress += 1;
+                if (ach.id === 'ach_gold') ach.progress += ganhoMoedas;
+                if (ach.id === 'ach_pets' && petActiveFlag) ach.progress += 1;
+                
+                if (ach.progress > ach.target) ach.progress = ach.target;
+                
+                if (ach.progress > prevProg) {
+                    questUpdated = true;
+                    if (ach.progress === ach.target && prevProg < ach.target) {
+                        setTimeout(() => { toast(`🏆 CONQUISTA DE PRESTÍGIO DESBLOQUEADA!`, '#00f5ff'); if(typeof shootConfetti === 'function') shootConfetti(); }, 2000);
+                    }
+                }
+            });
+        }
+
+        // 4. Feedback Visual de Dopamina e GACHA!
+        if (isCrit) {
+          showFloatingText(`CRÍTICO! +${ganhoMoedas} 🪙${petVisualCoins} | +${ganhoXP} ✨${petVisualXP}`, '#e024ff'); 
+          if (typeof shootConfetti === 'function') shootConfetti();
+          if (typeof showYinYang === 'function') showYinYang(); 
+        } else {
+          const iconCoins = nectarActive ? '🍷' : '';
+          const iconXP = aguaActive ? '💧' : '';
+          const textColor = (nectarActive || aguaActive || petActiveFlag) ? '#00e5ff' : 'var(--gold)';
+          showFloatingText(`+${ganhoMoedas} 🪙${iconCoins}${petVisualCoins} | +${ganhoXP} ✨${iconXP}${petVisualXP}`, textColor); 
+        }
+
+    } finally {
+        // 🔓 DESTRANCA O CADEADO SEMPRE, MESMO SE DER ERRO!
+        checandoMissoes = false;
     }
 
-    // 2. Rastreia as Semanais (O Grind Gigante!)
-    if (STATS.weeklyQuests) {
-        STATS.weeklyQuests.forEach(wq => {
-            if (wq.progress >= wq.target) return; // Ignora se já terminou
-            
-            let prevProgress = wq.progress;
-            
-            // Aqui a mágica matemática acontece em tempo real:
-            if (wq.id === 'wq_xp') wq.progress += ganhoXP;
-            if (wq.id === 'wq_coins') wq.progress += ganhoMoedas;
-            if (wq.id === 'wq_cards') wq.progress += 1;
-            if (wq.id === 'wq_crits' && isCrit) wq.progress += 1;
-            if (wq.id === 'wq_pet' && petActiveFlag) wq.progress += 1; // 1 de Afinidade = 1 de progresso na missão
-            
-            // Trava o limite da barra para não passar do máximo (ex: 5015 / 5000 vira 5000 / 5000)
-            if (wq.progress > wq.target) wq.progress = wq.target;
-            
-            if (wq.progress > prevProgress) {
-                questUpdated = true;
-                if (wq.progress === wq.target && prevProgress < wq.target) {
-                    setTimeout(() => { toast(`📅 TRABALHO SEMANAL CONCLUÍDO!`, '#e024ff'); if(typeof shootConfetti === 'function') shootConfetti(); }, 1600);
-                }
-            }
-        });
-    }
-
-    if (questUpdated && typeof saveStats === 'function') saveStats();
-    // 3. ✨ RASTREIA AS CONQUISTAS DE PRESTÍGIO (O Foco de Longo Prazo)
-    if (STATS.achievements && STATS.achievements.list) {
-        STATS.achievements.list.forEach(ach => {
-            if (ach.progress >= ach.target) return; // Ignora se já terminou
-            
-            let prevProg = ach.progress;
-            
-            // A Matemática das Conquistas
-            if (ach.id === 'ach_cards') ach.progress += 1;
-            if (ach.id === 'ach_crits' && isCrit) ach.progress += 1;
-            if (ach.id === 'ach_gold') ach.progress += ganhoMoedas;
-            if (ach.id === 'ach_pets' && petActiveFlag) ach.progress += 1;
-            
-            if (ach.progress > ach.target) ach.progress = ach.target;
-            
-            // Verifica se a Conquista acabou de ser concluída neste clique
-            if (ach.progress > prevProg) {
-                questUpdated = true;
-                if (ach.progress === ach.target && prevProg < ach.target) {
-                    setTimeout(() => { toast(`🏆 CONQUISTA DE PRESTÍGIO DESBLOQUEADA!`, '#00f5ff'); if(typeof shootConfetti === 'function') shootConfetti(); }, 2000);
-                }
-            }
-        });
-    }
-    // 4. Feedback Visual de Dopamina e GACHA!
-    if (isCrit) {
-      showFloatingText(`CRÍTICO! +${ganhoMoedas} 🪙${petVisualCoins} | +${ganhoXP} ✨${petVisualXP}`, '#e024ff'); 
-      if (typeof shootConfetti === 'function') shootConfetti();
-      
-      // ✨ O Símbolo do Destino aparece na tela!
-      if (typeof showYinYang === 'function') showYinYang(); 
-      
-    } else {
-      const iconCoins = nectarActive ? '🍷' : '';
-      const iconXP = aguaActive ? '💧' : '';
-      const textColor = (nectarActive || aguaActive || petActiveFlag) ? '#00e5ff' : 'var(--gold)';
-      showFloatingText(`+${ganhoMoedas} 🪙${iconCoins}${petVisualCoins} | +${ganhoXP} ✨${iconXP}${petVisualXP}`, textColor); 
-    }
-    // 5. Pitch Shifting (O som vai ficando mais agudo conforme o combo sobe!)
+    // 5. Pitch Shifting (O som vai ficando mais agudo)
     const pitchShift = Math.min(sess.combo, 10) * 30; 
-    duration = isCrit ? 0.4 : 0.3;
+    duration = (type === 'crit') ? 0.4 : 0.3;
     
-    osc.type = isCrit ? 'triangle' : 'sine';
-    osc.frequency.setValueAtTime(isCrit ? 800 : (600 + pitchShift), audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(isCrit ? 1600 : (1200 + pitchShift), audioCtx.currentTime + 0.1);
+    osc.type = (type === 'crit') ? 'triangle' : 'sine';
+    osc.frequency.setValueAtTime((type === 'crit') ? 800 : (600 + pitchShift), audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime((type === 'crit') ? 1600 : (1200 + pitchShift), audioCtx.currentTime + 0.1);
     
-    gain.gain.setValueAtTime(isCrit ? 0.3 : 0.2, audioCtx.currentTime);
+    gain.gain.setValueAtTime((type === 'crit') ? 0.3 : 0.2, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
     osc.start(); osc.stop(audioCtx.currentTime + duration);
     
   } else if (type === 'fail') {
-    // ✖ ERROU: Quebra o combo e toca som grave (mas não perde moedas)
+    // ✖ ERROU: Quebra o combo e toca som grave
     sess.combo = 0; 
     duration = 0.2;
     showFloatingText('✖ Errou', 'var(--red)');
     if (typeof triggerScreenShake === 'function') triggerScreenShake();
     
-    // Som grave de erro
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(300, audioCtx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.2);
@@ -767,13 +818,12 @@ function playSfx(type) {
     osc.start(); osc.stop(audioCtx.currentTime + duration);
   }
   
-  // 6. Lixeiro da Memória (Evita travar o áudio no celular)
+  // 6. Lixeiro da Memória
   setTimeout(() => {
       osc.disconnect();
       gain.disconnect();
   }, (duration * 1000) + 50);
 }
-
 // ✨ ÁUDIO DE LEVEL UP (Toque de Vitória + Salva de Palmas)
 function playLevelUpSfx() {
   if (!audioCtx) return;
@@ -1155,11 +1205,11 @@ function buildStudyTab() {
   if (due.length > 0) {
     html += `<div class="card">
       <h3 onclick="toggleSection('sec-rev')" style="cursor:pointer;padding: 10px; display:flex; justify-content:space-between; align-items:center; user-select:none;">
-        <span>⚡ Revisão Pendente</span>
+        <div class="card-head"><span>⚡ Revisão Pendente </span><div class="card-title"></div><span class="badge due">${due.length} card${due.length > 1 ? 's' : ''}</span></div>
         <span id="sec-rev-icon" style="color:var(--stone2); font-size:14px;">▼</span>
     </h3>
     <div id="sec-rev-content">
-        <div class="card-head"><div class="card-title"></div><span class="badge due">${due.length} card${due.length > 1 ? 's' : ''}</span></div>
+        
       <div class="card-body">
         <div class="quote" style="margin-bottom:14px">"A perseverança é a virtude dos fortes." — Demóstenes</div>
         
@@ -1358,26 +1408,31 @@ function buildStudyCard() {
   const isAns = sess.typeAnswered || sess.choiceAnswered || sess.tfAnswered || sess.revChoiceAnswered || sess.scrambleAnswered || sess.spellAnswered || sess.syntaxAnswered || sess.clozeAnswered || sess.contextAnswered || sess.imgChoiceAnswered || sess.bossAnswered || sess.blindAnswered || sess.flipped;
 
   let timerHtml = '';
-  if (enableTimer && card.interval >= 3 && !sess.isFreeMode && activeMode !== 'flash') {
-     let timeLimit = card.interval >= 21 ? 12 : 25; 
-     if (activeMode === 'boss') timeLimit = 15; 
-     
-     if (!isAns) {
-        if (sess.currentCardId !== card.id) {
-           sess.currentCardId = card.id;
-           setTimeout(() => startSurvivalTimer(timeLimit), 100);
+    // Removido o bloqueio de "interval >= 3". Agora aparece para quase todas!
+    if (enableTimer && card.interval >= configJogo.timerMinInterval && activeMode !== 'flash') {
+        
+        // Define o limite de tempo (cartas velhas = menos tempo, boss = 15s, novas = 20s)
+        let timeLimit = 20; 
+        if (card.interval >= 21) timeLimit = 12; 
+        if (activeMode === 'boss') timeLimit = 15; 
+        
+        if (!isAns) {
+            if (sess.currentCardId !== card.id) {
+                sess.currentCardId = card.id;
+                // Salva o tempo máximo na sessão para calcular o bônus depois
+                sess.maxTimeLimit = timeLimit; 
+                setTimeout(() => startSurvivalTimer(timeLimit), 100);
+            }
+            timerHtml = `
+            <div style="width:100%; height:6px; background:var(--bg4); margin-bottom:10px; border-radius:4px; overflow:hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);">
+                <div id="survival-bar" style="height:100%; width:100%; background:#ffd700; transition: width 0.1s linear, background-color 0.3s;"></div>
+            </div>`;
+        } else {
+            clearTimeout(sess.timerId); 
         }
-        timerHtml = `
-        <div style="width:100%; height:4px; background:var(--bg4); margin-bottom:10px; border-radius:2px; overflow:hidden;">
-           <div id="survival-bar" style="height:100%; width:100%; background:var(--gold2);"></div>
-        </div>`;
-     } else {
-        clearTimeout(sess.timerId); 
-     }
-  } else {
-     clearTimeout(sess.timerId);
-  }
-
+    } else {
+        clearTimeout(sess.timerId);
+    }
 
   // ✨ BARRA DE ITENS MÁGICOS (AGORA INTELIGENTE)
   let toolsHtml = '';
@@ -3024,7 +3079,7 @@ function buildAddTab() {
   const cats = [...new Set([...defaultCats, ...existingCats])].sort();
   
   return `
-  <h3 onclick="toggleSection('sec-manual')" style="cursor:pointer;border-radius: 11px;border: solid 1px; display:flex; justify-content:space-around; align-items:center; user-select:none;">
+  <h3 onclick="toggleSection('sec-manual')" style="cursor:pointer;padding: 5px;border-radius: 10px; border: solid 2px #302e29;background: #1c1a16; display:flex; justify-content:space-around; align-items:center; user-select:none;">
         <span>✦ Nova Palavra (Manual)</span>
         <span id="sec-manual-icon" style="color:var(--stone2); font-size:14px;">▼</span>
     </h3>
@@ -3040,7 +3095,7 @@ function buildAddTab() {
         </div>
       </div>
     </div>
-    <h3 onclick="toggleSection('sec-magic')" style="cursor:pointer; border: solid 1px; border-radius: 11px;display:flex; justify-content:space-around; align-items:center; user-select:none; margin-top:10px;">
+    <h3 onclick="toggleSection('sec-magic')" style="cursor:pointer;padding: 5px; border: solid 2px #0b2ba5; border-radius: 10px;background: #1c1a16; display:flex; justify-content:space-around; align-items:center; user-select:none; margin-top:10px;">
         <span>✨ Importação Mágica Universal</span>
         <span id="sec-magic-icon" style="color:var(--stone2); font-size:14px;">▼</span>
     </h3>
@@ -3103,7 +3158,7 @@ eloquência | arte de falar bem | | fluência, oratória | | comunicação | �
         <div id="importPreview" style="margin-top:10px"></div>
       </div>
     </div>
-<h3 onclick="toggleSection('sec-free')" style="cursor:pointer;border-radius: 11px;border: solid 1px; display:flex; justify-content:space-around; align-items:center; user-select:none; margin-top:10px;">
+<h3 onclick="toggleSection('sec-free')" style="cursor:pointer;padding: 5px; border: solid 2px #a48f4e; border-radius: 10px;background: #1c1a16; display:flex; justify-content:space-around; align-items:center; user-select:none; margin-top:10px;">
         <span>💾 Exportar / Restaurar</span>
         <span id="sec-free-icon" style="color:var(--stone2); font-size:14px;">▼</span>
     </h3>
@@ -4503,26 +4558,40 @@ function skipCardWithoutPenalty() {
    render(); // O render vai recarregar a tela automaticamente na próxima carta
 }
 
+
 // ✨ RELÓGIO DA SOBREVIVÊNCIA
 function startSurvivalTimer(seconds) {
-  clearTimeout(studySession.timerId);
-  const bar = document.getElementById('survival-bar');
-  if(bar) {
-     bar.style.transition = 'none'; bar.style.width = '100%'; bar.style.backgroundColor = 'var(--gold2)';
-     setTimeout(() => {
-        bar.style.transition = `width ${seconds}s linear, background-color ${seconds}s linear`;
-        bar.style.width = '0%'; bar.style.backgroundColor = 'var(--red)';
-     }, 50);
-  }
-  
-  studySession.timerId = setTimeout(() => {
-      // Se a barra ainda estiver na tela quando o tempo acabar, significa que não respondeu!
-      if (document.getElementById('survival-bar')) {
-         toast('⏳ O tempo esgotou!', 'err');
-         playSfx('fail');
-         rateCard(0); // Reprova o card automaticamente!
-      }
-  }, seconds * 1000);
+    clearTimeout(studySession.timerId);
+    
+    // 🕒 REGISTRO DE TEMPO: Salva o momento exato em que a barra começou a descer
+    studySession.timerStartTime = Date.now();
+    studySession.maxTimeLimit = seconds * 1000; // Guardamos em milissegundos
+    studySession.timeLeft = studySession.maxTimeLimit; // Inicia cheio
+
+    const bar = document.getElementById('survival-bar');
+    if(bar) {
+        // Reseta a barra instantaneamente para o topo
+        bar.style.transition = 'none'; 
+        bar.style.width = '100%'; 
+        bar.style.backgroundColor = 'var(--gold2)';
+        
+        // Inicia a animação suave do CSS até ficar vermelha e zerar
+        setTimeout(() => {
+            bar.style.transition = `width ${seconds}s linear, background-color ${seconds}s linear`;
+            bar.style.width = '0%'; 
+            bar.style.backgroundColor = 'var(--red)'; // Você pode usar '#ff4444' se não tiver a variável
+        }, 50);
+    }
+    
+    studySession.timerId = setTimeout(() => {
+        // Se a barra ainda estiver na tela quando o tempo acabar, significa que não respondeu!
+        if (document.getElementById('survival-bar')) {
+            studySession.timeLeft = 0; // O tempo acabou, não tem bônus
+            toast('⏳ O tempo esgotou!', 'err');
+            playSfx('fail');
+            rateCard(0); // Reprova o card automaticamente!
+        }
+    }, seconds * 1000);
 }
 // ✨ MOTOR DE RECONHECIMENTO DE VOZ
 function startDictation(inputId, lang, btnElement) {
@@ -5467,6 +5536,64 @@ function playGachaSound(type) {
         console.log('Áudio não suportado no navegador.'); 
     }
 }
+//modal para configuraçao dentro do jogo
+// Abre o modal e carrega os valores atuais
+function abrirConfig() {
+    // Pega o valor atual para preencher a caixinha ao abrir (Se não existir, usa 0)
+    let valorAtual = configJogo.timerMinInterval !== undefined ? configJogo.timerMinInterval : 0;
+
+    let html = `
+    <h3 style="margin-bottom:8px; color:var(--gold)">⚙️ Configurações do Jogo</h3>
+    <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Ajuste as engrenagens e a dificuldade do seu treinamento.</p>
+    
+    <div style="height: 60vh; overflow-y: auto; padding-right:5px">
+        
+        <!-- SEÇÃO: PRESSÃO DE TEMPO -->
+        <div style="font-weight:bold; margin-bottom:10px; color:#ffd700; text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(255, 215, 0, 0.3); padding-bottom:4px">⏱️ Pressão e Recompensas</div>
+        
+        <div style="margin: 15px 0; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border2, #444);">
+            <label style="display:block; margin-bottom:8px; font-weight: bold; color: #fff; font-size: 14px;">
+                Ativar relógio a partir de qual intervalo? (Dias)
+            </label>
+            <input type="number" id="inputTimerInterval" min="0" max="30" value="${valorAtual}" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border2, #555); background:var(--bg3, #1a1a1a); color:white; font-size: 16px;">
+            <p style="color:var(--stone2, #aaa); margin-top:8px; font-size:11px; line-height: 1.4;">
+                Cartões com intervalo menor que este não terão a barra de tempo. Deixe <b>0</b> para pressão total em todas as cartas. 
+                <br><span style="color:#e024ff;">(Nota: Jogar em modo fácil reduzirá bônus no futuro!)</span>
+            </p>
+        </div>
+
+        <!-- Você pode adicionar mais blocos de configuração aqui embaixo depois! -->
+
+    </div>
+    
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn ghost" onclick="closeModal()">Fechar</button>
+    </div>`;
+    
+    openModal(html);
+}
+
+// Fecha o modal sem salvar
+function fecharConfig() {
+    document.getElementById('modalConfig').style.display = 'none';
+}
+
+// Salva as configurações e aplica no jogo
+function salvarConfig() {
+    // Pega o valor que você digitou no input
+    let novoIntervalo = parseInt(document.getElementById('inputTimerInterval').value);
+    
+    // Proteção: Se a pessoa digitar besteira, volta pro 0
+    if (isNaN(novoIntervalo) || novoIntervalo < 0) novoIntervalo = 0; 
+
+    // Atualiza a variável global!
+    configJogo.timerMinInterval = novoIntervalo;
+    
+    // (Futuro) Aqui você vai colocar um código para salvar isso no IndexedDB para não perder quando fechar a aba
+    
+    toast('⚙️ Configurações aplicadas!', 'ok');
+    fecharConfig();
+}
 /* ═══════════════════════════════════════
    INIT
 ═══════════════════════════════════════ */
@@ -5489,6 +5616,11 @@ document.addEventListener('change', (e) => {
   }
   if (e.target.classList.contains('custom-mode-cb')) {
     localStorage.setItem('ui_pref_cb_' + e.target.value, e.target.checked);
+  }
+  // ✨ NOVA LÓGICA: Salva as configurações numéricas (como o Relógio)
+  if (e.target.id === 'inputTimerInterval') {
+      localStorage.setItem('config_timerMinInterval', e.target.value);
+      configJogo.timerMinInterval = parseInt(e.target.value) || 0; // Já engatilha no motor do jogo!
   }
 }, true);
 
@@ -5565,7 +5697,16 @@ const uiObserver = new MutationObserver(() => {
           content.dataset.loaded = 'true'; // Evita piscar a tela infinitamente!
       }
   });
-
+// --- 3. ✨ VIGIANDO E CARREGANDO AS CONFIGURAÇÕES GLOBAIS ---
+  const inputTimer = document.getElementById('inputTimerInterval');
+  if (inputTimer && !inputTimer.dataset.loaded) {
+      const savedTimer = localStorage.getItem('config_timerMinInterval');
+      if (savedTimer !== null) {
+          inputTimer.value = savedTimer; // Atualiza o HTML
+          configJogo.timerMinInterval = parseInt(savedTimer) || 0; // Sincroniza a memória do jogo!
+      }
+      inputTimer.dataset.loaded = 'true'; // Coloca a tag de segurança para não piscar
+  }
   // Dispara as atualizações visuais finais do seu código original
   if (needsListUpdate && typeof updateWordList === 'function') updateWordList();
   if (needsImportUpdate && typeof handleImportTypeChange === 'function') handleImportTypeChange();
