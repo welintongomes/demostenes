@@ -53,7 +53,7 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Crimson
 .hstat-lbl{font-size:9px;color:var(--stone);text-transform:uppercase;letter-spacing:1px;margin-top:1px;}
 
 /* ── TABS ── */
-#tabs{display:flex;background:var(--bg3);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
+#tabs{display:flex;background:var(--bg3);align-items: center;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
 #tabs::-webkit-scrollbar{display:none;}
 .tab{flex:1;min-width:60px;padding:3px 2px;font-family:'Cinzel',serif;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--stone);cursor:pointer;text-align:center;border-bottom:2px solid transparent;transition:all .2s;user-select:none;white-space:nowrap;}
 .tab.on{color:var(--gold2);border-color:var(--gold);}
@@ -335,7 +335,7 @@ svg.ring{transform:rotate(-90deg);}
     <div class="tab on" data-tab="study" onclick="setTab('study')">📚 Estudar</div>
     <div class="tab" data-tab="words" onclick="setTab('words')">📖 Léxico</div>
     <div class="tab" data-tab="add" onclick="setTab('add')">✦ Adicionar</div>
-    <div class="tab" data-tab="stats" onclick="setTab('stats')">⚑ Progresso</div>
+    <div class="tab" data-tab="stats" onclick="setTab('stats')">⚑ Estatus</div>
     <!-- ⚙️ BOTÃO DE CONFIGURAÇÕES -->
     <button onclick="abrirConfig()" style="width: 40px; height: 40px; border-radius: 50%; background: #14121000; border: none; color: white; font-size: 20px; display: inline-flex; justify-content: center; align-items: center; cursor: pointer;" title="Configurações">⚙️</button>
   </div>
@@ -700,12 +700,22 @@ function playSfx(type) {
                 let match = false;
                 const activeMode = sess.currentAdaptiveMode || (typeof studyMode !== 'undefined' ? studyMode : '');
                 const isQuizNow = activeMode === 'choice' || sess.choiceAnswered;
-                
+
+                // ✨ NOVIDADE: Variáveis para checar se foi rápido, se tava com relógio e se tem evento!
+                const isTimerOn = (typeof enableTimer !== 'undefined' && enableTimer);
+                const isLightning = (isTimerOn && studySession.maxTimeLimit > 0 && (studySession.timeLeft / studySession.maxTimeLimit) > 0.7);
+                const isEventActive = STATS.activeEvent ? true : false;
+
                 if (q.id === 'q_free' && sess.isFreeMode) match = true;
                 if (q.id === 'q_smart' && !sess.isFreeMode && !isQuizNow) match = true; 
                 if (q.id === 'q_quiz' && isQuizNow) match = true;
                 if (q.id === 'q_crit' && isCrit) match = true;
                 
+                // ✨ NOVIDADE: As validações das novas missões!
+                if (q.id === 'q_timer' && isTimerOn) match = true;
+                if (q.id === 'q_lightning' && isLightning) match = true;
+                if (q.id === 'q_event' && isEventActive) match = true;
+
                 let cardCat = '';
                 if (sess.queue && sess.queue[sess.current]) {
                     const cartaAtual = sess.queue[sess.current];
@@ -733,6 +743,11 @@ function playSfx(type) {
                 if (wq.progress >= wq.target) return; 
                 let prevProgress = wq.progress;
                 
+                // ✨ NOVIDADE NAS SEMANAIS:
+                if (wq.id === 'wq_timer' && typeof enableTimer !== 'undefined' && enableTimer) wq.progress += 1;
+                if (wq.id === 'wq_lightning' && typeof enableTimer !== 'undefined' && enableTimer && (studySession.timeLeft / studySession.maxTimeLimit) > 0.7) wq.progress += 1;
+                if (wq.id === 'wq_event' && STATS.activeEvent) wq.progress += 1;
+
                 if (wq.id === 'wq_xp') wq.progress += ganhoXP;
                 if (wq.id === 'wq_coins') wq.progress += ganhoMoedas;
                 if (wq.id === 'wq_cards') wq.progress += 1;
@@ -758,10 +773,24 @@ function playSfx(type) {
                 if (ach.progress >= ach.target) return; 
                 let prevProg = ach.progress;
                 
+                // ✨ NOVIDADE NO PRESTÍGIO:
+                if (ach.id === 'ach_timer' && typeof enableTimer !== 'undefined' && enableTimer) ach.progress += 1;
+                if (ach.id === 'ach_lightning' && typeof enableTimer !== 'undefined' && enableTimer && (studySession.timeLeft / studySession.maxTimeLimit) > 0.7) ach.progress += 1;
+                if (ach.id === 'ach_event' && STATS.activeEvent) ach.progress += 1;
+                
                 if (ach.id === 'ach_cards') ach.progress += 1;
                 if (ach.id === 'ach_crits' && isCrit) ach.progress += 1;
                 if (ach.id === 'ach_gold') ach.progress += ganhoMoedas;
                 if (ach.id === 'ach_pets' && petActiveFlag) ach.progress += 1;
+                
+                // ✨ NOVIDADE: As novas conquistas
+                if (ach.id === 'ach_xp') ach.progress += ganhoXP;
+                if (ach.id === 'ach_free' && sess.isFreeMode) ach.progress += 1;
+                
+                // Pra saber se é Quiz, pegamos aquela variável que criamos no rastreador de diárias
+                const activeMode = sess.currentAdaptiveMode || (typeof studyMode !== 'undefined' ? studyMode : '');
+                const isQuizNow = activeMode === 'choice' || sess.choiceAnswered;
+                if (ach.id === 'ach_quiz' && isQuizNow) ach.progress += 1;
                 
                 if (ach.progress > ach.target) ach.progress = ach.target;
                 
@@ -3221,7 +3250,7 @@ function buildWordForm(word) {
         ${w.image ? (w.image.startsWith('data:image') ? '' : w.image) : '📷'}
       </div>
       <input type="hidden" id="fw_image_data" value="${w.image || ''}">
-      <input type="file" id="fw_img_upload" accept="image/*" capture="environment" style="display:none" onchange="handleImageUpload(event)">
+      <input type="file" id="fw_img_upload" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
       <input class="inp" id="fw_emoji_inp" placeholder="Ou digite um emoji..." style="text-align:center; max-width:200px; margin:0 auto" oninput="handleEmojiUpload(event)" value="${w.image && !w.image.startsWith('data:image') ? w.image : ''}">
     </div>
     
@@ -5002,88 +5031,141 @@ function importBackup(event) {
     };
     reader.readAsText(file);
 }
-// ✨ SISTEMA DE MISSÕES (Diárias e Semanais)
+// ✨ MOTOR DE DIÁRIAS (Agora com 6 missões, Adrenalina e Categorias Dinâmicas!)
 function generateDailyQuests() {
     if (!STATS) return;
     const todayStr = new Date().toISOString().slice(0, 10);
-    if (STATS.questsDate === todayStr && STATS.quests) return;
+    
+    // Trava de segurança: Se já for hoje e já tiver 6 missões, não faz nada.
+    if (STATS.questsDate === todayStr && STATS.quests && STATS.quests.length >= 6) return;
 
+    // Lógica inteligente original: Puxa as categorias reais do seu banco
     const cats = [...new Set(W.map(w => w.category).filter(c => c))];
-    const randomCat = cats.length > 0 ? cats[Math.floor(Math.random() * cats.length)] : 'Geral';
+    const randomCat1 = cats.length > 0 ? cats[Math.floor(Math.random() * cats.length)] : 'Geral';
+    // Pega uma segunda categoria diferente (se existir) para dar mais variedade
+    let randomCat2 = cats.length > 1 ? cats.find(c => c !== randomCat1) || 'Geral' : 'Geral';
 
     const possibleQuests = [
+        // 📜 As Clássicas
         { id: 'q_free', desc: 'Responda 15 cartas no Modo Livre', target: 15, rewardCoins: 30, rewardXP: 100 },
         { id: 'q_smart', desc: 'Revise 10 cartas na Revisão Inteligente', target: 10, rewardCoins: 40, rewardXP: 150 },
         { id: 'q_quiz', desc: 'Acerte 10 cartas no Múltipla Escolha', target: 10, rewardCoins: 50, rewardXP: 200 },
-        { id: 'q_cat', desc: `Estude 10 cartas da categoria: ${randomCat}`, target: 10, rewardCoins: 45, rewardXP: 120, reqCat: randomCat },
-        { id: 'q_crit', desc: 'Consiga 5 Acertos Críticos', target: 5, rewardCoins: 60, rewardXP: 250 }
+        { id: 'q_crit', desc: 'Consiga 5 Acertos Críticos 🎯', target: 5, rewardCoins: 60, rewardXP: 250 },
+        { id: 'q_cards', desc: 'Responda 30 cartas no total hoje 📚', target: 30, rewardCoins: 50, rewardXP: 100 },
+        
+        // 🏛️ As Dinâmicas de Categoria (Puxadas do seu banco)
+        { id: 'q_cat', desc: `Estude 10 cartas da categoria: ${randomCat1}`, target: 10, rewardCoins: 45, rewardXP: 120, reqCat: randomCat1 },
+        
+        // ⚡ As Novas Adrenalinas
+        { id: 'q_timer', desc: 'Responda 15 cartas com o Relógio ativado ⏳', target: 15, rewardCoins: 100, rewardXP: 150 },
+        { id: 'q_lightning', desc: 'Dê 5 Respostas Relâmpago (Muito Rápido!) ⚡', target: 5, rewardCoins: 150, rewardXP: 300 },
+        { id: 'q_event', desc: 'Responda 20 cartas durante um Evento 🎉', target: 20, rewardCoins: 120, rewardXP: 250 }
     ];
 
+    // Se você tiver mais de uma categoria no app, adiciona a segunda no bolo do sorteio!
+    if (cats.length > 1) {
+        possibleQuests.push({ id: 'q_cat', desc: `Estude 10 cartas da categoria: ${randomCat2}`, target: 10, rewardCoins: 45, rewardXP: 120, reqCat: randomCat2 });
+    }
+
+    // Embaralha todas as opções (RNG)
     possibleQuests.sort(() => 0.5 - Math.random());
+    
     STATS.questsDate = todayStr;
-    STATS.quests = possibleQuests.slice(0, 3).map(q => ({ ...q, progress: 0, claimed: false }));
+    
+    // ✨ A MÁGICA FINAL: Corta as 6 primeiras missões do bolo embaralhado!
+    STATS.quests = possibleQuests.slice(0, 6).map(q => ({ ...q, progress: 0, claimed: false }));
+    
     if (typeof saveStats === 'function') saveStats();
 }
 
+// ✨ MOTOR DE SEMANAIS (Agora sorteia 6 Gigantes!)
 function generateWeeklyQuests() {
     if (!STATS) return;
     
-    // Descobre qual foi o último Domingo para criar o "ID da Semana"
     const dateObj = new Date();
     const dayOfWeek = dateObj.getDay(); 
     const sundayDate = new Date(dateObj);
     sundayDate.setDate(dateObj.getDate() - dayOfWeek);
     const weekId = sundayDate.toISOString().slice(0, 10);
 
-    // Se já gerou as semanais desta semana, não faz nada!
-    if (STATS.weeklyQuestsDate === weekId && STATS.weeklyQuests) return;
+    if (STATS.weeklyQuestsDate === weekId && STATS.weeklyQuests && STATS.weeklyQuests.length >= 6) return;
 
-    // As missões Épicas de longo prazo
     const possibleWeekly = [
-        { id: 'wq_xp', desc: 'Acumule 5.000 XP ✨', target: 5000, rewardCoins: 300, rewardXP: 1000 },
-        { id: 'wq_coins', desc: 'Acumule 1.000 🪙', target: 1000, rewardCoins: 500, rewardXP: 1500 },
-        { id: 'wq_cards', desc: 'Acerte 200 cartas no total', target: 200, rewardCoins: 250, rewardXP: 800 },
-        { id: 'wq_crits', desc: 'Consiga 30 Acertos Críticos', target: 30, rewardCoins: 400, rewardXP: 1200 },
-        { id: 'wq_pet', desc: 'Gere 100 Pontos de Afinidade com Pets (2 Níveis)', target: 100, rewardCoins: 600, rewardXP: 2000 }
+        { id: 'wq_xp', desc: 'Acumule 15.000 XP ✨', target: 15000, rewardCoins: 800, rewardXP: 2500 },
+        { id: 'wq_coins', desc: 'Acumule 5.000 🪙', target: 5000, rewardCoins: 1200, rewardXP: 3000 },
+        { id: 'wq_cards', desc: 'Acerte 400 cartas no total', target: 400, rewardCoins: 600, rewardXP: 1500 },
+        { id: 'wq_crits', desc: 'Consiga 100 Acertos Críticos 🎯', target: 100, rewardCoins: 1000, rewardXP: 2500 },
+        { id: 'wq_pet', desc: 'Gere 300 de Afinidade com Pets 🐉', target: 300, rewardCoins: 1500, rewardXP: 4000 },
+        { id: 'wq_timer', desc: 'Sobreviva a 250 cartas com o Relógio ligado ⏳', target: 250, rewardCoins: 1200, rewardXP: 3000 },
+        { id: 'wq_lightning', desc: 'Dê 80 Respostas Relâmpago ⚡', target: 80, rewardCoins: 2000, rewardXP: 5000 },
+        { id: 'wq_event', desc: 'Aproveite Eventos: Responda 150 cartas 🎉', target: 150, rewardCoins: 1500, rewardXP: 3500 }
     ];
 
     possibleWeekly.sort(() => 0.5 - Math.random());
     STATS.weeklyQuestsDate = weekId;
-    // Sorteia 2 Semanais Gigantes
-    STATS.weeklyQuests = possibleWeekly.slice(0, 2).map(q => ({ ...q, progress: 0, claimed: false }));
+    // ✨ A MÁGICA: Sorteia 6 Semanais ao invés de 2!
+    STATS.weeklyQuests = possibleWeekly.slice(0, 6).map(q => ({ ...q, progress: 0, claimed: false }));
     if (typeof saveStats === 'function') saveStats();
 }
-
 // ✨ MOTOR DE PRESTÍGIO E CONQUISTAS (A Bolinha)
+// ✨ MOTOR DE PRESTÍGIO E CONQUISTAS (Inteligente e Auto-Atualizável)
 function manageAchievements() {
     if (!STATS) return;
     
-    // 1. Cria o banco de dados das Conquistas na primeira vez
+    // 1. A SUA LISTA MESTRE (Onde você vai adicionar dezenas de novas conquistas no futuro)
+    const masterAchievementsList = [
+        // As Clássicas
+        { id: 'ach_cards', name: 'Estudioso Feroz 📚', desc: 'Responda {X} cartas no total', target: 1000, progress: 0, claimed: false, rewardCoins: 1500, rewardXP: 5000 },
+        { id: 'ach_crits', name: 'Sorte Divina 🎲', desc: 'Dê {X} Acertos Críticos', target: 250, progress: 0, claimed: false, rewardCoins: 2000, rewardXP: 8000 },
+        { id: 'ach_gold', name: 'Toque de Midas 💰', desc: 'Acumule {X} 🪙 jogando', target: 20000, progress: 0, claimed: false, rewardCoins: 4000, rewardXP: 10000 },
+        { id: 'ach_xp', name: 'Sabedoria Suprema 🌌', desc: 'Acumule {X} XP no total', target: 50000, progress: 0, claimed: false, rewardCoins: 3000, rewardXP: 15000 },
+        
+        // Os Companheiros e Itens
+        { id: 'ach_pets', name: 'Senhor das Feras 🐉', desc: 'Gere {X} de Afinidade com Pets', target: 500, progress: 0, claimed: false, rewardCoins: 2500, rewardXP: 7000 },
+        
+        // Habilidades do Jogador (Tempo e Modos)
+        { id: 'ach_timer', name: 'Mestre do Tempo ⏳', desc: 'Responda {X} cartas com o Relógio ativo', target: 800, progress: 0, claimed: false, rewardCoins: 3000, rewardXP: 8000 },
+        { id: 'ach_lightning', name: 'Velocidade da Luz ⚡', desc: 'Dê {X} Respostas Relâmpago', target: 300, progress: 0, claimed: false, rewardCoins: 5000, rewardXP: 15000 },
+        { id: 'ach_event', name: 'Festeiro do Olimpo 🎉', desc: 'Responda {X} cartas durante Eventos', target: 600, progress: 0, claimed: false, rewardCoins: 3500, rewardXP: 9000 },
+        { id: 'ach_free', name: 'Andarilho Livre 🚶', desc: 'Treine {X} cartas no Modo Livre', target: 1000, progress: 0, claimed: false, rewardCoins: 1500, rewardXP: 4000 },
+        { id: 'ach_quiz', name: 'Mente de Aço 🧠', desc: 'Acerte {X} cartas no Múltipla Escolha', target: 1500, progress: 0, claimed: false, rewardCoins: 4000, rewardXP: 12000 }
+        
+        // ➡️ FUTURO: Quando quiser criar uma nova, é só colar aqui!
+    ];
+
+    // 2. Cria a estrutura básica se for o primeiríssimo acesso do jogador
     if (!STATS.achievements) {
         STATS.achievements = {
             currentPrestige: 1, 
-            list: [
-                { id: 'ach_cards', name: 'Estudioso Feroz 📚', desc: 'Responda {X} cartas no total', target: 1000, progress: 0, claimed: false, rewardCoins: 1500, rewardXP: 5000 },
-                { id: 'ach_crits', name: 'Sorte Divina 🎲', desc: 'Dê {X} Acertos Críticos', target: 100, progress: 0, claimed: false, rewardCoins: 2000, rewardXP: 8000 },
-                { id: 'ach_gold', name: 'Toque de Midas 💰', desc: 'Acumule {X} 🪙 jogando', target: 15000, progress: 0, claimed: false, rewardCoins: 3000, rewardXP: 10000 },
-                { id: 'ach_pets', name: 'Senhor das Feras 🐉', desc: 'Gere {X} de Afinidade com Pets', target: 500, progress: 0, claimed: false, rewardCoins: 2500, rewardXP: 7000 }
-            ]
+            list: []
         };
     }
 
-    // 2. O Olho que tudo vê (Verifica a Bolinha atual)
+    // 3. ✨ A MÁGICA DE ATUALIZAÇÃO: Mescla a lista do jogador com a Lista Mestre!
+    let updated = false;
+    masterAchievementsList.forEach(masterQuest => {
+        // Tenta achar essa conquista na lista salva do jogador
+        const existingQuest = STATS.achievements.list.find(q => q.id === masterQuest.id);
+        
+        if (!existingQuest) {
+            // Opa! O jogador não tem essa conquista nova. Adiciona pra ele agora!
+            STATS.achievements.list.push({ ...masterQuest });
+            updated = true;
+        }
+    });
+
+    if (updated && typeof saveStats === 'function') saveStats();
+
+    // 4. O RESET ÉPICO (Dobrar dificuldade ao subir a Bolinha)
     const currentTitleInfo = typeof getUserTitle === 'function' ? getUserTitle() : { prestige: 1 };
     const realPrestige = currentTitleInfo.prestige;
 
-    // 3. O RESET ÉPICO: Se a bolinha subiu de nível!
     if (realPrestige > STATS.achievements.currentPrestige) {
         STATS.achievements.list.forEach(ach => {
-            // Só reseta e dobra a dificuldade se a conquista já foi concluída E resgatada!
             if (ach.claimed) {
                 ach.claimed = false;
                 ach.progress = 0; 
-                ach.target = ach.target * 2; // O dobro da dificuldade!
-                // O prêmio aumenta em 50% para valer a pena o sofrimento
+                ach.target = ach.target * 2; 
                 ach.rewardCoins = Math.floor(ach.rewardCoins * 1.5); 
                 ach.rewardXP = Math.floor(ach.rewardXP * 1.5);
             }
@@ -5093,13 +5175,27 @@ function manageAchievements() {
         if (typeof saveStats === 'function') saveStats();
     }
 }
-
 // ✨ INTERFACE: O Mural Triplo (Diárias, Semanais e Conquistas)
+// ✨ FUNÇÃO AUXILIAR: Abre e fecha as gavetas dentro do Modal
+window.toggleQuestBox = function(id, btnId) {
+    const box = document.getElementById(id);
+    const icon = document.getElementById(btnId);
+    if (box.style.display === 'none') {
+        box.style.display = 'block';
+        icon.textContent = '▼';
+    } else {
+        box.style.display = 'none';
+        icon.textContent = '▶';
+    }
+};
+
+// ✨ INTERFACE: O Mural Triplo Otimizado (Gavetas e Scroll Interno)
 function openQuestsModal() {
     generateDailyQuests(); 
     generateWeeklyQuests(); 
-    manageAchievements(); // Checa se a bolinha subiu antes de abrir!
+    manageAchievements(); 
     
+    // A sua função que desenha a cartinha (MANTIDA INTACTA, só removi a margem inútil de baixo)
     function buildQuestCard(q, index, type) {
         const isDone = q.progress >= q.target;
         const pct = Math.min(100, Math.floor((q.progress / q.target) * 100));
@@ -5121,8 +5217,8 @@ function openQuestsModal() {
         if (isDone) barColor = 'var(--gold)'; // Concluído
         
         return `
-        <div class="card" style="border-color:${isDone && !q.claimed ? 'var(--gold)' : 'var(--stone)'}; background:rgba(0,0,0,0.2); margin-bottom:10px">
-            <div class="card-body">
+        <div class="card" style="border-color:${isDone && !q.claimed ? 'var(--gold)' : 'var(--stone)'}; background:rgba(0,0,0,0.2); margin-bottom:8px">
+            <div class="card-body" style="padding:10px;">
                 ${q.name ? `<div style="font-size:11px; font-weight:bold; color:${barColor}; margin-bottom:2px">${q.name}</div>` : ''}
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
                     <div style="font-weight:bold; font-size:13px; color:${isDone && !q.claimed ? 'var(--gold)' : 'white'}; width:70%">${formattedDesc}</div>
@@ -5139,29 +5235,53 @@ function openQuestsModal() {
         </div>`;
     }
     
+    // O HEADER E AS GAVETAS COM SCROLL
     let html = `
-    <h3 style="margin-bottom:8px; color:var(--gold)">📜 Os Trabalhos de Atena</h3>
+    <h3 style="margin-bottom:4px; color:var(--gold)">📜 Os Trabalhos de Atena</h3>
     <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Cumpra os objetivos para a Glória do Olimpo!</p>
     
-    <div style="height: 65vh; overflow-y: auto; padding-right:5px">
-        <div style="font-weight:bold; margin-bottom:10px; color:#00e5ff; text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(0, 229, 255, 0.3); padding-bottom:4px">⏳ Diárias</div>
-        ${STATS.quests.map((q, i) => buildQuestCard(q, i, 'daily')).join('')}
+    <div style="max-height: 65vh; overflow-y: scroll; display: flex; flex-direction: column; gap: 10px;">
         
-        <div style="font-weight:bold; margin-top:15px; margin-bottom:10px; color:#e024ff; text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(224, 36, 255, 0.3); padding-bottom:4px">📅 Semanais</div>
-        ${STATS.weeklyQuests.map((q, i) => buildQuestCard(q, i, 'weekly')).join('')}
+        <!-- 1. GAVETA DIÁRIAS -->
+        <div>
+            <div onclick="toggleQuestBox('box-daily', 'icon-daily')" style="cursor:pointer; background:rgba(0, 229, 255, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#00e5ff; text-transform:uppercase; font-size:12px; border-left:4px solid #00e5ff; display:flex; justify-content:space-between; align-items:center;">
+                <span>⏳ Diárias</span> <span id="icon-daily">▼</span>
+            </div>
+            <!-- O Scroll interno acontece aqui! max-height 290px mostra aprox 3 cartas -->
+            <div id="box-daily" style="max-height:290px; overflow-y:auto; padding-right:5px; margin-top:8px; display:block;">
+                ${STATS.quests.map((q, i) => buildQuestCard(q, i, 'daily')).join('')}
+            </div>
+        </div>
 
-        <div style="font-weight:bold; margin-top:15px; margin-bottom:10px; color:#00f5ff; text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(0, 245, 255, 0.3); padding-bottom:4px">🏆 Conquistas de Prestígio (Nv. ${STATS.achievements.currentPrestige})</div>
-        <p style="font-size:10px; color:var(--stone2); margin-top:-6px; margin-bottom:10px">Conquistas resgatadas dobram de dificuldade quando sua Bolinha subir de nível!</p>
-        ${STATS.achievements.list.map((q, i) => buildQuestCard(q, i, 'achievement')).join('')}
+        <!-- 2. GAVETA SEMANAIS -->
+        <div>
+            <div onclick="toggleQuestBox('box-weekly', 'icon-weekly')" style="cursor:pointer; background:rgba(224, 36, 255, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#e024ff; text-transform:uppercase; font-size:12px; border-left:4px solid #e024ff; display:flex; justify-content:space-between; align-items:center;">
+                <span>📅 Semanais</span> <span id="icon-weekly">▼</span>
+            </div>
+            <div id="box-weekly" style="max-height:290px; overflow-y:auto; padding-right:5px; margin-top:8px; display:block;">
+                ${STATS.weeklyQuests.map((q, i) => buildQuestCard(q, i, 'weekly')).join('')}
+            </div>
+        </div>
+
+        <!-- 3. GAVETA PRESTÍGIO -->
+        <div>
+            <div onclick="toggleQuestBox('box-achiev', 'icon-achiev')" style="cursor:pointer; background:rgba(0, 245, 255, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#00f5ff; text-transform:uppercase; font-size:12px; border-left:4px solid #00f5ff; display:flex; justify-content:space-between; align-items:center;">
+                <span>🏆 Conquistas de Prestígio (Nv. ${STATS.achievements.currentPrestige})</span> <span id="icon-achiev">▼</span>
+            </div>
+            <div id="box-achiev" style="max-height:290px; overflow-y:auto; padding-right:5px; margin-top:8px; display:block;">
+                <p style="font-size:10px; color:var(--stone2); margin-top:0px; margin-bottom:8px">As recompensas resgatadas dobram de dificuldade quando sua Bolinha subir de nível!</p>
+                ${STATS.achievements.list.map((q, i) => buildQuestCard(q, i, 'achievement')).join('')}
+            </div>
+        </div>
+
     </div>
     
-    <div class="btn-row" style="margin-top:14px">
+    <div class="btn-row" style="margin-top:16px">
       <button class="btn ghost" onclick="closeModal()">Fechar Mural</button>
     </div>`;
     
     openModal(html);
 }
-
 // ✨ MOTOR DE PAGAMENTO DAS CONQUISTAS
 function claimAchievement(index) {
     const q = STATS.achievements.list[index];
