@@ -794,6 +794,10 @@ function playSfx(type) {
                 const isQuizNow = activeMode === 'choice' || sess.choiceAnswered;
                 if (ach.id === 'ach_quiz' && isQuizNow) ach.progress += 1;
                 
+                // ✨ AS DUAS ÚLTIMAS NOVIDADES (Revisão e Retórica) ENTRARAM AQUI:
+                if (ach.id === 'ach_smart' && !sess.isFreeMode && !isQuizNow) ach.progress += 1;
+                if (ach.id === 'ach_syn_ant' && typeof card !== 'undefined' && (card.cardType === 'sinônimo' || card.cardType === 'antônimo')) ach.progress += 1;
+                
                 if (ach.progress > ach.target) ach.progress = ach.target;
                 
                 if (ach.progress > prevProg) {
@@ -5166,7 +5170,10 @@ function manageAchievements() {
         { id: 'ach_event', name: 'Festeiro do Olimpo 🎉', desc: 'Responda {X} cartas durante Eventos', target: 600, progress: 0, claimed: false, rewardCoins: 3500, rewardXP: 9000 },
         { id: 'ach_free', name: 'Andarilho Livre 🚶', desc: 'Treine {X} cartas no Modo Livre', target: 1000, progress: 0, claimed: false, rewardCoins: 1500, rewardXP: 4000 },
         { id: 'ach_quiz', name: 'Mente de Aço 🧠', desc: 'Acerte {X} cartas no Múltipla Escolha', target: 1500, progress: 0, claimed: false, rewardCoins: 4000, rewardXP: 12000 },
-        { id: 'ach_add_words', name: 'Criador de Mundos 🌍', desc: 'Adicione {X} novas palavras ao seu grimório', target: 500, progress: 0, claimed: false, rewardCoins: 3000, rewardXP: 10000 }
+        { id: 'ach_add_words', name: 'Criador de Mundos 🌍', desc: 'Adicione {X} novas palavras ao seu grimório', target: 500, progress: 0, claimed: false, rewardCoins: 3000, rewardXP: 10000 },
+        { id: 'ach_quests', name: 'Herói de Atena 📜', desc: 'Resgate {X} missões diárias ou semanais', target: 50, progress: 0, claimed: false, rewardCoins: 3000, rewardXP: 8000 },
+        { id: 'ach_smart', name: 'Revisor Implacável 🔄', desc: 'Revise {X} cartas na Revisão Inteligente', target: 800, progress: 0, claimed: false, rewardCoins: 2500, rewardXP: 7000 },
+        { id: 'ach_syn_ant', name: 'Mestre da Retórica 🗣️', desc: 'Acerte {X} cartas de Sinônimo ou Antônimo', target: 300, progress: 0, claimed: false, rewardCoins: 2000, rewardXP: 6000 }
         // ➡️ FUTURO: Quando quiser criar uma nova, é só colar aqui!
     ];
 
@@ -5356,6 +5363,18 @@ function claimQuest(index, type = 'daily') {
         if (moedasEl) moedasEl.textContent = STATS.moedas + '🪙';
         if (typeof updateHeader === 'function') updateHeader(); 
         
+        // ✨ RASTREADOR DA CONQUISTA: Herói de Atena (Conta +1 ao resgatar qualquer missão)
+        if (STATS.achievements && STATS.achievements.list) {
+            const achHero = STATS.achievements.list.find(a => a.id === 'ach_quests');
+            if (achHero && achHero.progress < achHero.target) {
+                achHero.progress += 1;
+                // Aviso se ele completou a conquista de Prestígio AGORA!
+                if (achHero.progress === achHero.target) {
+                    setTimeout(() => toast(`🏆 CONQUISTA DESBLOQUEADA: ${achHero.name}!`, '#00f5ff'), 800);
+                }
+            }
+        }
+        if (typeof saveStats === 'function') saveStats();
         openQuestsModal(); 
     }
 }
