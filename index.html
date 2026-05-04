@@ -3473,7 +3473,6 @@ async function importWords() {
   const txt = document.getElementById('importTA').value;
   if (!txt.trim()) { toast('Cole o texto primeiro!', 'err'); return; }
   
-  // ✨ CAPTURA OS VALORES DOS MENUS PARA USAR COMO PADRÃO (FALLBACK)
   const defaultLangWord = gv('importLangWord') || 'pt-BR';
   const defaultLangDef = gv('importLangDef') || 'pt-BR';
   const defaultCategory = gv('importCat') || 'geral';
@@ -3481,7 +3480,6 @@ async function importWords() {
   const lines = txt.split('\n').filter(l => l.trim().length > 0);
   let added = 0;
   
-  // ✨ FUNÇÃO MÁGICA: Lê a Tag (~en). Se não tiver, usa o Default do Menu!
   const parseLangTag = (str, fallbackLang) => {
     if (!str) return { text: '', lang: fallbackLang };
     let s = str.trim();
@@ -3490,23 +3488,21 @@ async function importWords() {
       const codeMap = { pt:'pt-BR', en:'en-US', es:'es-ES', fr:'fr-FR', de:'de-DE', it:'it-IT' };
       const lang = codeMap[match[1].toLowerCase()];
       const text = s.substring(match[0].length).trim();
-      return { text, lang }; // Usou a tag
+      return { text, lang }; 
     }
-    return { text: s, lang: fallbackLang }; // Não usou tag, usa o idioma do menu
+    return { text: s, lang: fallbackLang }; 
   };
   
   for (let line of lines) {
      const parts = line.split('|').map(s => s.trim());
      if (parts.length < 2) continue; 
      
-     // Aplica as regras de idioma para cada pedacinho!
      const wP = parseLangTag(parts[0], defaultLangWord);
      const dP = parseLangTag(parts[1], defaultLangDef);
      const eP = parseLangTag(parts[2], defaultLangDef);
      const sP = parseLangTag(parts[3], defaultLangDef);
      const aP = parseLangTag(parts[4], defaultLangDef);
      
-     // Se a linha não tiver categoria, ele puxa a Categoria Padrão que você digitou no menu
      const cat = parts[5] ? parts[5].trim() : defaultCategory;
      const emoji = parts[6] ? parts[6].trim() : '';
      
@@ -3514,7 +3510,6 @@ async function importWords() {
      if(cat.toLowerCase().includes('técnica')) cType = 'técnica';
      if(cat.toLowerCase().includes('falácia')) cType = 'falácia';
      
-     // 1. Cria a Carta Mãe
      W.push(mkCard({ 
        word: wP.text, definition: dP.text, example: eP.text, synonyms: sP.text, antonyms: aP.text,
        category: cat, image: emoji, cardType: cType, 
@@ -3522,7 +3517,6 @@ async function importWords() {
      }));
      added++;
      
-     // 2. Cria a Carta de Sinônimo
      if (sP.text) {
        W.push(mkCard({ 
          word: wP.text, definition: sP.text, example: eP.text, category: cat, image: emoji, cardType: 'sinônimo',
@@ -3531,7 +3525,6 @@ async function importWords() {
        added++;
      }
      
-     // 3. Cria a Carta de Antônimo
      if (aP.text) {
        W.push(mkCard({ 
          word: wP.text, definition: aP.text, example: eP.text, category: cat, image: emoji, cardType: 'antônimo',
@@ -3541,12 +3534,27 @@ async function importWords() {
      }
   }
   
+  // ✨ RASTREADOR DA CONQUISTA (Atualiza o montante todo de uma vez!)
+  if (typeof STATS !== 'undefined' && STATS.achievements && STATS.achievements.list) {
+      const achMaker = STATS.achievements.list.find(a => a.id === 'ach_add_words');
+      if (achMaker && achMaker.progress < achMaker.target) {
+          achMaker.progress += added;
+          if (achMaker.progress >= achMaker.target) {
+              achMaker.progress = achMaker.target; 
+              setTimeout(() => { 
+                  if (typeof toast === 'function') toast(`🏆 CONQUISTA DESBLOQUEADA: ${achMaker.name}!`, '#00f5ff'); 
+                  if (typeof shootConfetti === 'function') shootConfetti(); 
+              }, 500);
+          }
+          if (typeof saveStats === 'function') saveStats();
+      }
+  }
+
   await save();
   toast(`✨ Importação Mágica concluída! ${added} cartas criadas.`, 'gold');
   document.getElementById('importTA').value = '';
   render(); 
 }
-
 function previewImport() {
   const raw = document.getElementById('importTA')?.value || '';
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
@@ -4299,27 +4307,44 @@ async function saveNewWord() {
   const ex = gv('fw_ex'), syn = gv('fw_syn'), ant = gv('fw_ant');
   const ph = gv('fw_ph'), cat = gv('fw_cat'), wc = gv('fw_class');
   
-  // ✨ CAPTURANDO CADA BANDEIRINHA INDIVIDUAL
   const tags = gv('fw_tags'), img = gv('fw_image_data');
   const lw = gv('fw_lang_word'), ld = gv('fw_lang_def'), lex = gv('fw_lang_ex');
   const lsyn = gv('fw_lang_syn'), lant = gv('fw_lang_ant');
 
+  // ✨ PUXAMOS O CONTADOR PARA O TOPO
+  let added = 0; 
+
   if (type === 'universal') {
-    let added = 0;
     W.push(mkCard({ word, definition: def, example: ex, synonyms: syn, antonyms: ant, phonetic: ph, category: cat, wordClass: wc, tags, langWord: lw, langDef: ld, langEx: lex, langSyn: lsyn, langAnt: lant, image: img, cardType: 'normal' }));
     added++;
     
-    // A carta de sinônimo herda o idioma da bandeirinha de sinônimo!
     if (syn) { W.push(mkCard({ word, definition: syn, example: ex, category: cat, langWord: lw, langDef: lsyn, langEx: lex, cardType: 'sinônimo', image: img })); added++; }
-    
-    // A carta de antônimo herda o idioma da bandeirinha de antônimo!
     if (ant) { W.push(mkCard({ word, definition: ant, example: ex, category: cat, langWord: lw, langDef: lant, langEx: lex, cardType: 'antônimo', image: img })); added++; }
     
-    await save(); toast(`✨ Mágica! ${added} cartas geradas para "${word}"!`, 'gold');
+    toast(`✨ Mágica! ${added} cartas geradas para "${word}"!`, 'gold');
   } else {
     W.push(mkCard({ word, definition: def, example: ex, synonyms: syn, antonyms: ant, phonetic: ph, category: cat, wordClass: wc, tags, langWord: lw, langDef: ld, langEx: lex, langSyn: lsyn, langAnt: lant, image: img, cardType: type }));
-    await save(); toast(`"${word}" adicionada ao léxico!`, 'gold');
+    added = 1; // Se for normal, adiciona 1 na conta!
+    toast(`"${word}" adicionada ao léxico!`, 'gold');
   }
+
+  // ✨ RASTREADOR DA CONQUISTA (Usa a variável 'added')
+  if (typeof STATS !== 'undefined' && STATS.achievements && STATS.achievements.list) {
+      const achMaker = STATS.achievements.list.find(a => a.id === 'ach_add_words');
+      if (achMaker && achMaker.progress < achMaker.target) {
+          achMaker.progress += added;
+          if (achMaker.progress >= achMaker.target) {
+              achMaker.progress = achMaker.target; // Trava no limite máximo
+              setTimeout(() => { 
+                  if (typeof toast === 'function') toast(`🏆 CONQUISTA DESBLOQUEADA: ${achMaker.name}!`, '#00f5ff'); 
+                  if (typeof shootConfetti === 'function') shootConfetti(); 
+              }, 500);
+          }
+          if (typeof saveStats === 'function') saveStats();
+      }
+  }
+
+  await save(); 
   document.getElementById('addForm').innerHTML = buildWordForm();
   render();
 }
@@ -5140,8 +5165,8 @@ function manageAchievements() {
         { id: 'ach_lightning', name: 'Velocidade da Luz ⚡', desc: 'Dê {X} Respostas Relâmpago', target: 300, progress: 0, claimed: false, rewardCoins: 5000, rewardXP: 15000 },
         { id: 'ach_event', name: 'Festeiro do Olimpo 🎉', desc: 'Responda {X} cartas durante Eventos', target: 600, progress: 0, claimed: false, rewardCoins: 3500, rewardXP: 9000 },
         { id: 'ach_free', name: 'Andarilho Livre 🚶', desc: 'Treine {X} cartas no Modo Livre', target: 1000, progress: 0, claimed: false, rewardCoins: 1500, rewardXP: 4000 },
-        { id: 'ach_quiz', name: 'Mente de Aço 🧠', desc: 'Acerte {X} cartas no Múltipla Escolha', target: 1500, progress: 0, claimed: false, rewardCoins: 4000, rewardXP: 12000 }
-        
+        { id: 'ach_quiz', name: 'Mente de Aço 🧠', desc: 'Acerte {X} cartas no Múltipla Escolha', target: 1500, progress: 0, claimed: false, rewardCoins: 4000, rewardXP: 12000 },
+        { id: 'ach_add_words', name: 'Criador de Mundos 🌍', desc: 'Adicione {X} novas palavras ao seu grimório', target: 500, progress: 0, claimed: false, rewardCoins: 3000, rewardXP: 10000 }
         // ➡️ FUTURO: Quando quiser criar uma nova, é só colar aqui!
     ];
 
