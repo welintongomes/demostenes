@@ -331,7 +331,11 @@ svg.ring{transform:rotate(-90deg);}
   </div>
 
   <div id="tabs">
-    <button onclick="openQuestsModal()" style="background:none; border:none;margin-left:10px; font-size:20px; cursor:pointer" title="Trabalhos Diários">📜</button>
+    <!-- Botão de Missões com Notificação -->
+<button onclick="openQuestsModal()" style="position:relative; background:none; border:none; margin-left:10px; font-size:20px; cursor:pointer" title="Trabalhos Diários">
+    📜
+    <div id="quest-badge" style="display:none; position:absolute; top:-2px; right:-3px; background:#ff245e; width:12px; height:12px; border-radius:50%; border:2px solid var(--bg); box-shadow: 0 0 5px rgba(255, 36, 94, 0.5);"></div>
+</button>
     <div class="tab on" data-tab="study" onclick="setTab('study')">📚 Estudar</div>
     <div class="tab" data-tab="words" onclick="setTab('words')">📖 Léxico</div>
     <div class="tab" data-tab="add" onclick="setTab('add')">✦ Adicionar</div>
@@ -856,12 +860,36 @@ function playSfx(type) {
     gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
     osc.start(); osc.stop(audioCtx.currentTime + duration);
   }
-  
+  checkQuestNotifications();
   // 6. Lixeiro da Memória
   setTimeout(() => {
       osc.disconnect();
       gain.disconnect();
   }, (duration * 1000) + 50);
+
+}
+  // ✨ RADAR DE NOTIFICAÇÕES (Acende a bolinha se tiver prêmio!)
+function checkQuestNotifications() {
+    if (!STATS) return false;
+    
+    let hasReward = false;
+    
+    // Procura recompensas nas Diárias
+    if (STATS.quests && STATS.quests.some(q => q.progress >= q.target && !q.claimed)) hasReward = true;
+    
+    // Procura recompensas nas Semanais
+    if (STATS.weeklyQuests && STATS.weeklyQuests.some(q => q.progress >= q.target && !q.claimed)) hasReward = true;
+    
+    // Procura recompensas no Prestígio
+    if (STATS.achievements && STATS.achievements.list && STATS.achievements.list.some(q => q.progress >= q.target && !q.claimed)) hasReward = true;
+    
+    // Acende ou apaga a bolinha no botão
+    const badge = document.getElementById('quest-badge');
+    if (badge) {
+        badge.style.display = hasReward ? 'block' : 'none';
+    }
+    
+    return hasReward;
 }
 // ✨ ÁUDIO DE LEVEL UP (Toque de Vitória + Salva de Palmas)
 function playLevelUpSfx() {
@@ -1191,6 +1219,7 @@ function updateHeader() {
   checkLevelUp(rank);
   // ✨ Ativa o Relógio Mestre dos Eventos Especiais
   runEventManager();
+  if (typeof checkQuestNotifications === 'function') checkQuestNotifications();
 }
 
 // ✨ O FISCAL DE LEVEL UP (Imune a fraudes!)
@@ -5308,7 +5337,27 @@ function openQuestsModal() {
             </div>
         </div>`;
     }
-    
+
+    // ✨ RENDERIZADOR LIMPO: Só mostra o que não foi resgatado, mas preserva a ID verdadeira!
+    function renderQuestList(list, type) {
+        let htmlGerado = '';
+        let contadorAtivas = 0;
+        
+        list.forEach((q, i) => {
+            if (!q.claimed) {
+                htmlGerado += buildQuestCard(q, i, type);
+                contadorAtivas++;
+            }
+        });
+        
+        // Se resgatou tudo, mostra uma mensagem bacana!
+        if (contadorAtivas === 0) {
+            return `<div style="text-align:center; padding:15px; color:var(--stone2); font-size:12px; font-style:italic; background:rgba(0,0,0,0.1); border-radius:8px;">Tudo limpo por aqui! Bom trabalho. ✨</div>`;
+        }
+        
+        return htmlGerado;
+    }
+
     // O HEADER E AS GAVETAS COM SCROLL
     let html = `
     <h3 style="margin-bottom:4px; color:var(--gold)">📜 Os Trabalhos de Atena</h3>
@@ -5321,9 +5370,8 @@ function openQuestsModal() {
             <div onclick="toggleQuestBox('box-daily', 'icon-daily')" style="cursor:pointer; background:rgba(0, 229, 255, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#00e5ff; text-transform:uppercase; font-size:12px; border-left:4px solid #00e5ff; display:flex; justify-content:space-between; align-items:center;">
                 <span>⏳ Diárias</span> <span id="icon-daily">▼</span>
             </div>
-            <!-- O Scroll interno acontece aqui! max-height 290px mostra aprox 3 cartas -->
             <div id="box-daily" style="max-height:290px; overflow-y:auto; padding-right:5px; margin-top:8px; display:block;">
-                ${STATS.quests.map((q, i) => buildQuestCard(q, i, 'daily')).join('')}
+                ${renderQuestList(STATS.quests, 'daily')}
             </div>
         </div>
 
@@ -5333,7 +5381,7 @@ function openQuestsModal() {
                 <span>📅 Semanais</span> <span id="icon-weekly">▼</span>
             </div>
             <div id="box-weekly" style="max-height:290px; overflow-y:auto; padding-right:5px; margin-top:8px; display:block;">
-                ${STATS.weeklyQuests.map((q, i) => buildQuestCard(q, i, 'weekly')).join('')}
+                ${renderQuestList(STATS.weeklyQuests, 'weekly')}
             </div>
         </div>
 
@@ -5344,7 +5392,7 @@ function openQuestsModal() {
             </div>
             <div id="box-achiev" style="max-height:290px; overflow-y:auto; padding-right:5px; margin-top:8px; display:block;">
                 <p style="font-size:10px; color:var(--stone2); margin-top:0px; margin-bottom:8px">As recompensas resgatadas dobram de dificuldade quando sua Bolinha subir de nível!</p>
-                ${STATS.achievements.list.map((q, i) => buildQuestCard(q, i, 'achievement')).join('')}
+                ${renderQuestList(STATS.achievements.list, 'achievement')}
             </div>
         </div>
 
