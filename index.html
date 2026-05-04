@@ -647,7 +647,8 @@ function playSfx(type) {
         if (STATS.pets && STATS.pets.active) {
             petActiveFlag = true;
             const activePet = STATS.pets.active;
-            const isFed = STATS.pets.fedCharges > 0;
+            // ✨ A MÁGICA: O Pet só ativa o estado "Alimentado" se TIVER comida E NÃO for o Modo Livre!
+            const isFed = STATS.pets.fedCharges > 0 && !sess.isFreeMode;
             
             if (!STATS.pets.affinity) STATS.pets.affinity = {};
             if (STATS.pets.affinity[activePet] === undefined) STATS.pets.affinity[activePet] = 0;
