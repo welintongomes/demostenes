@@ -788,6 +788,48 @@ function playSfx(type) {
                 if (ach.id === 'ach_lightning' && typeof enableTimer !== 'undefined' && enableTimer && (studySession.timeLeft / studySession.maxTimeLimit) > 0.7) ach.progress += 1;
                 if (ach.id === 'ach_event' && STATS.activeEvent) ach.progress += 1;
                 
+                // 🔄 1. REVISOR IMPLACÁVEL (Versão 100% Precisa)
+                if (ach.id === 'ach_smart') {
+                    const sess = (typeof studySession !== 'undefined') ? studySession : null;
+                    
+                    if (sess) {
+                        // REGRA DE OURO: Para ser Revisão Inteligente:
+                        // 1. NÃO pode ser Modo Livre (sess.isFreeMode)
+                        // 2. NÃO pode ser um modo fixo escolhido por checkbox (sess.isFixedMode ou sess.customMode)
+                        // 3. NÃO pode ser modo de escolha/quiz (sess.choiceAnswered)
+                        
+                        const isFree = sess.isFreeMode === true;
+                        const isQuiz = sess.choiceAnswered === true;
+                        
+                        // Verifique qual dessas variáveis você usa para quando escolhe modos manualmente:
+                        // Se você usa algo como 'studyMode' ou 'sess.mode', adicione aqui.
+                        const isFixed = sess.mode && sess.mode !== 'smart'; 
+
+                        if (!isFree && !isQuiz && !isFixed && (type === 'ok' || type === 'correct')) {
+                            ach.progress += 1;
+                        }
+                    }
+                }
+
+                // 🗣️ 2. MESTRE DA RETÓRICA (Versão Auto-Detect)
+                if (ach.id === 'ach_syn_ant') {
+                    // 1. Localizamos a sessão e a fila
+                    const sess = (typeof studySession !== 'undefined') ? studySession : null;
+                    
+                    if (sess && sess.queue && sess.queue[sess.current]) {
+                        // 2. Pegamos a carta que está sendo exibida agora no motor do jogo
+                        const currentCard = sess.queue[sess.current];
+                        
+                        // 3. Verificamos o tipo dela (e garantimos que o jogador ACERTOU o som é 'ok')
+                        const isSynAnt = currentCard.cardType === 'sinônimo' || currentCard.cardType === 'antônimo';
+                        const isCorrectSound = (type === 'ok' || type === 'correct'); // Só conta se acertar
+
+                        if (isSynAnt && isCorrectSound) {
+                            ach.progress += 1;
+                        }
+                    }
+                }
+
                 if (ach.id === 'ach_cards') ach.progress += 1;
                 if (ach.id === 'ach_crits' && isCrit) ach.progress += 1;
                 if (ach.id === 'ach_gold') ach.progress += ganhoMoedas;
@@ -801,10 +843,6 @@ function playSfx(type) {
                 const activeMode = sess.currentAdaptiveMode || (typeof studyMode !== 'undefined' ? studyMode : '');
                 const isQuizNow = activeMode === 'choice' || sess.choiceAnswered;
                 if (ach.id === 'ach_quiz' && isQuizNow) ach.progress += 1;
-                
-                // ✨ AS DUAS ÚLTIMAS NOVIDADES (Revisão e Retórica) ENTRARAM AQUI:
-                if (ach.id === 'ach_smart' && !sess.isFreeMode && !isQuizNow) ach.progress += 1;
-                if (ach.id === 'ach_syn_ant' && typeof card !== 'undefined' && (card.cardType === 'sinônimo' || card.cardType === 'antônimo')) ach.progress += 1;
                 
                 if (ach.progress > ach.target) ach.progress = ach.target;
                 
