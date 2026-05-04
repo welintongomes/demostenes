@@ -711,6 +711,7 @@ function playSfx(type) {
                 if (q.id === 'q_smart' && !sess.isFreeMode && !isQuizNow) match = true; 
                 if (q.id === 'q_quiz' && isQuizNow) match = true;
                 if (q.id === 'q_crit' && isCrit) match = true;
+                if (q.id === 'q_syn_ant' && typeof card !== 'undefined' && (card.cardType === 'sinônimo' || card.cardType === 'antônimo')) match = true;
                 
                 // ✨ NOVIDADE: As validações das novas missões!
                 if (q.id === 'q_timer' && isTimerOn) match = true;
@@ -755,6 +756,9 @@ function playSfx(type) {
                 if (wq.id === 'wq_cards') wq.progress += 1;
                 if (wq.id === 'wq_crits' && isCrit) wq.progress += 1;
                 if (wq.id === 'wq_pet' && petActiveFlag) wq.progress += 1; 
+                // Novidades Semanais no PlaySfx
+                if (wq.id === 'wq_smart_rev' && !sess.isFreeMode && !isQuizNow) wq.progress += 1;
+                if (wq.id === 'wq_syn_ant' && typeof card !== 'undefined' && (card.cardType === 'sinônimo' || card.cardType === 'antônimo')) wq.progress += 1;
                 
                 if (wq.progress > wq.target) wq.progress = wq.target;
                 
@@ -3553,7 +3557,17 @@ async function importWords() {
           if (typeof saveStats === 'function') saveStats();
       }
   }
-
+  // ✨ RASTREADOR DE DIÁRIAS/SEMANAIS PARA ADIÇÃO DE PALAVRAS
+  if (typeof STATS !== 'undefined') {
+      if (STATS.quests) {
+          let qAdd = STATS.quests.find(q => q.id === 'q_add_words');
+          if (qAdd && qAdd.progress < qAdd.target) qAdd.progress += added;
+      }
+      if (STATS.weeklyQuests) {
+          let wqAdd = STATS.weeklyQuests.find(wq => wq.id === 'wq_add_words');
+          if (wqAdd && wqAdd.progress < wqAdd.target) wqAdd.progress += added;
+      }
+  }
   await save();
   toast(`✨ Importação Mágica concluída! ${added} cartas criadas.`, 'gold');
   document.getElementById('importTA').value = '';
@@ -4347,7 +4361,17 @@ async function saveNewWord() {
           if (typeof saveStats === 'function') saveStats();
       }
   }
-
+  // ✨ RASTREADOR DE DIÁRIAS/SEMANAIS PARA ADIÇÃO DE PALAVRAS
+  if (typeof STATS !== 'undefined') {
+      if (STATS.quests) {
+          let qAdd = STATS.quests.find(q => q.id === 'q_add_words');
+          if (qAdd && qAdd.progress < qAdd.target) qAdd.progress += added;
+      }
+      if (STATS.weeklyQuests) {
+          let wqAdd = STATS.weeklyQuests.find(wq => wq.id === 'wq_add_words');
+          if (wqAdd && wqAdd.progress < wqAdd.target) wqAdd.progress += added;
+      }
+  }
   await save(); 
   document.getElementById('addForm').innerHTML = buildWordForm();
   render();
@@ -5093,7 +5117,9 @@ function generateDailyQuests() {
         { id: 'q_quiz', desc: 'Acerte 10 cartas no Múltipla Escolha', target: 10, rewardCoins: 50, rewardXP: 200 },
         { id: 'q_crit', desc: 'Consiga 5 Acertos Críticos 🎯', target: 5, rewardCoins: 60, rewardXP: 250 },
         { id: 'q_cards', desc: 'Responda 30 cartas no total hoje 📚', target: 30, rewardCoins: 50, rewardXP: 100 },
-        
+        // Novidades Diárias:
+        { id: 'q_add_words', desc: 'Adicione 5 novas palavras ao grimório 🌍', target: 5, rewardCoins: 80, rewardXP: 150 },
+        { id: 'q_syn_ant', desc: 'Acerte 10 cartas de Sinônimo/Antônimo 🗣️', target: 10, rewardCoins: 100, rewardXP: 200 },
         // 🏛️ As Dinâmicas de Categoria (Puxadas do seu banco)
         { id: 'q_cat', desc: `Estude 10 cartas da categoria: ${randomCat1}`, target: 10, rewardCoins: 45, rewardXP: 120, reqCat: randomCat1 },
         
@@ -5139,7 +5165,11 @@ function generateWeeklyQuests() {
         { id: 'wq_pet', desc: 'Gere 300 de Afinidade com Pets 🐉', target: 300, rewardCoins: 1500, rewardXP: 4000 },
         { id: 'wq_timer', desc: 'Sobreviva a 250 cartas com o Relógio ligado ⏳', target: 250, rewardCoins: 1200, rewardXP: 3000 },
         { id: 'wq_lightning', desc: 'Dê 80 Respostas Relâmpago ⚡', target: 80, rewardCoins: 2000, rewardXP: 5000 },
-        { id: 'wq_event', desc: 'Aproveite Eventos: Responda 150 cartas 🎉', target: 150, rewardCoins: 1500, rewardXP: 3500 }
+        { id: 'wq_event', desc: 'Aproveite Eventos: Responda 150 cartas 🎉', target: 150, rewardCoins: 1500, rewardXP: 3500 },
+        // Novidades Semanais:
+        { id: 'wq_add_words', desc: 'Adicione 30 novas palavras esta semana 🌍', target: 30, rewardCoins: 800, rewardXP: 2000 },
+        { id: 'wq_smart_rev', desc: 'Revise 150 cartas na Revisão Inteligente 🔄', target: 150, rewardCoins: 1000, rewardXP: 2500 },
+        { id: 'wq_syn_ant', desc: 'Acerte 50 cartas de Sinônimo/Antônimo 🗣️', target: 50, rewardCoins: 1200, rewardXP: 3000 },
     ];
 
     possibleWeekly.sort(() => 0.5 - Math.random());
