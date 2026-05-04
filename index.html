@@ -5725,29 +5725,39 @@ function salvarConfig() {
     fecharConfig();
 }
 //capturar da camera ou da galeria
-// ✨ MODAL DE ESCOLHA DE IMAGEM
+// ✨ MODAL DE ESCOLHA DE IMAGEM (Versão Segura - Não fecha o Modal de Edição!)
 function abrirModalEscolhaImagem() {
-    let html = `
-    <h3 style="margin-bottom:15px; color:var(--gold); text-align:center;">📷 Adicionar Imagem</h3>
-    <p style="font-size:13px; color:var(--stone2); text-align:center; margin-bottom:20px;">De onde você quer pegar a imagem para esta carta?</p>
-    
-    <div style="display:flex; flex-direction:column; gap:12px; padding: 0 10px;">
-        <!-- Botão da Câmera -->
-        <button onclick="document.getElementById('fw_img_upload_camera').click(); closeModal();" style="padding:16px; font-size:16px; font-weight:bold; background:var(--bg3, #222); border:1px solid var(--gold, #ffd700); color:white; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px;">
-            📸 Tirar Foto Agora
-        </button>
-        
-        <!-- Botão da Galeria -->
-        <button onclick="document.getElementById('fw_img_upload_galeria').click(); closeModal();" style="padding:16px; font-size:16px; font-weight:bold; background:var(--bg3, #222); border:1px solid #00e5ff; color:white; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px;">
-            🖼️ Escolher da Galeria
-        </button>
-    </div>
-    
-    <div class="btn-row" style="margin-top:24px;">
-        <button class="btn ghost" onclick="closeModal()">Cancelar</button>
+    // 1. Cria um fundo escuro exclusivo para este modal, por cima de tudo (z-index 10000)
+    const bg = document.createElement('div');
+    bg.id = 'modal-imagem-escolha';
+    bg.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; display:flex; justify-content:center; align-items:center;';
+
+    // 2. Cria a caixinha com os botões. 
+    // Repare que no onclick ele acha o input e depois usa .remove() para destruir APENAS este sub-modal!
+    bg.innerHTML = `
+    <div style="background:var(--bg2, #2a2a2a); padding:25px; border-radius:12px; width:90%; max-width:350px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+        <h3 style="margin-bottom:15px; margin-top:0; color:var(--gold); text-align:center; font-size:18px;">📷 Adicionar Imagem</h3>
+        <p style="font-size:13px; color:var(--stone2); text-align:center; margin-bottom:20px;">De onde você quer pegar a imagem para esta carta?</p>
+
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            <!-- Botão da Câmera -->
+            <button onclick="document.getElementById('fw_img_upload_camera').click(); document.getElementById('modal-imagem-escolha').remove();" style="padding:16px; font-size:16px; font-weight:bold; background:var(--bg3, #222); border:1px solid var(--gold, #ffd700); color:white; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px;">
+                📸 Tirar Foto Agora
+            </button>
+
+            <!-- Botão da Galeria -->
+            <button onclick="document.getElementById('fw_img_upload_galeria').click(); document.getElementById('modal-imagem-escolha').remove();" style="padding:16px; font-size:16px; font-weight:bold; background:var(--bg3, #222); border:1px solid #00e5ff; color:white; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px;">
+                🖼️ Escolher da Galeria
+            </button>
+        </div>
+
+        <div class="btn-row" style="margin-top:24px;">
+            <button class="btn ghost" onclick="document.getElementById('modal-imagem-escolha').remove();">Cancelar</button>
+        </div>
     </div>`;
-    
-    openModal(html);
+
+    // 3. Adiciona na tela preservando tudo o que já existe (Edição ou Criação)
+    document.body.appendChild(bg);
 }
 /* ═══════════════════════════════════════
    INIT
