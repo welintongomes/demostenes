@@ -715,6 +715,7 @@ function playSfx(type) {
                 if (q.id === 'q_timer' && isTimerOn) match = true;
                 if (q.id === 'q_lightning' && isLightning) match = true;
                 if (q.id === 'q_event' && isEventActive) match = true;
+                if (q.id === 'q_cards') match = true;
 
                 let cardCat = '';
                 if (sess.queue && sess.queue[sess.current]) {
