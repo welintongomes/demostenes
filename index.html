@@ -3937,60 +3937,70 @@ function openStoreModal() {
             🐾 Companheiros Míticos
         </div>
 
+        <!-- 1. Pet Básico: Tartaruga -->
         <div class="card" style="border-color:#27ae60; margin-bottom:0">
           <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
              <div style="text-align:left; flex:1; padding-right:8px">
                 <div style="font-weight:bold; font-size:14px">🐢 Tartaruga de Esopo <span style="font-size:10px; background:#27ae60; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlTartaruga}</span></div>
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#27ae60; font-weight:bold">+${powTartaruga} ✨</span> extras.</div>
-             </div>
+                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextTartaruga} acertos para Nv. ${lvlTartaruga + 1}</div>
+                </div>
              ${STATS.pets.owned.includes('tartaruga')
                 ? (STATS.pets.active === 'tartaruga' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#27ae60; color:#27ae60">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#27ae60; color:#27ae60" onclick="equipPet('tartaruga')">Equipar</button>`)
                 : `${getPetBtn('tartaruga', 500, 0, '#27ae60')}`}
           </div>
         </div>
 
+        <!-- 2. Pet Básico: Formiga -->
         <div class="card" style="border-color:#d35400; margin-bottom:0">
           <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
              <div style="text-align:left; flex:1; padding-right:8px">
                 <div style="font-weight:bold; font-size:14px">🐜 Formiga Mirmidão <span style="font-size:10px; background:#d35400; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlFormiga}</span></div>
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#d35400; font-weight:bold">+${powFormiga} 🪙</span> extras.</div>
-             </div>
+                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextFormiga} acertos para Nv. ${lvlFormiga + 1}</div>
+              </div>
              ${STATS.pets.owned.includes('formiga')
                 ? (STATS.pets.active === 'formiga' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#d35400; color:#d35400">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#d35400; color:#d35400" onclick="equipPet('formiga')">Equipar</button>`)
                 : `${getPetBtn('formiga', 750, 8, '#d35400')}`}
           </div>
         </div>
 
+                <!-- 3. Pet Intermediário: Coruja -->
         <div class="card" style="border-color:#b4a7d6; margin-bottom:0">
           <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
              <div style="text-align:left; flex:1; padding-right:8px">
                 <div style="font-weight:bold; font-size:14px">🦉 Coruja de Atena <span style="font-size:10px; background:#b4a7d6; color:#000; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlCoruja}</span></div>
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#b4a7d6; font-weight:bold">+${powCoruja} ✨</span> extras.</div>
-             </div>
+                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextCoruja} acertos para Nv. ${lvlCoruja + 1}</div>
+            </div>
              ${STATS.pets.owned.includes('coruja')
                 ? (STATS.pets.active === 'coruja' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#b4a7d6; color:#b4a7d6">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#b4a7d6; color:#b4a7d6" onclick="equipPet('coruja')">Equipar</button>`)
                 : `${getPetBtn('coruja', 1500, 15, '#b4a7d6')}`}
           </div>
         </div>
 
+        <!-- 4. Pet Intermediário: Fênix -->
         <div class="card" style="border-color:#ff5e00; margin-bottom:0">
           <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
              <div style="text-align:left; flex:1; padding-right:8px">
                 <div style="font-weight:bold; font-size:14px">🔥 Fênix de Apolo <span style="font-size:10px; background:#ff5e00; color:#000; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlFenix}</span></div>
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#ff5e00; font-weight:bold">+${powFenix} 🪙</span> extras.</div>
-             </div>
+                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextFenix} acertos para Nv. ${lvlFenix + 1}</div>
+                </div>
              ${STATS.pets.owned.includes('fenix')
                 ? (STATS.pets.active === 'fenix' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#ff5e00; color:#ff5e00">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#ff5e00; color:#ff5e00" onclick="equipPet('fenix')">Equipar</button>`)
                 : `${getPetBtn('fenix', 2500, 25, '#ff5e00')}`}
           </div>
         </div>
 
+                <!-- 5. O META SUPREMO: Dragão de Ladão -->
         <div class="card" style="border: 2px solid #e024ff; box-shadow: 0 0 15px rgba(224, 36, 255, 0.2); margin-bottom:0">
           <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
              <div style="text-align:left; flex:1; padding-right:8px">
                 <div style="font-weight:bold; font-size:14px; color:#e024ff; text-transform:uppercase; text-shadow: 0 0 5px rgba(224,36,255,0.5)">🐉 Dragão de Ladão <span style="font-size:10px; background:#e024ff; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px; text-shadow:none">Nv. ${lvlDragao}</span></div>
                 <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A Besta Mítica. Alimentada dá Absurdos: <span style="color:#e024ff; font-weight:bold">+${powDragaoGold} 🪙</span> e <span style="color:#00e5ff; font-weight:bold">+${powDragaoXP} ✨</span> extras.</div>
-             </div>
+                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextDragao} acertos para Nv. ${lvlDragao + 1}</div>
+                </div>
              ${STATS.pets.owned.includes('dragao')
                 ? (STATS.pets.active === 'dragao' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#e024ff; color:#e024ff">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#e024ff; color:#e024ff" onclick="equipPet('dragao')">Equipar</button>`)
                 : `${getPetBtn('dragao', 10000, 45, '#e024ff')}`}
