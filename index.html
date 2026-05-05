@@ -528,13 +528,15 @@ let confirmCallback = null;
 let autoPlayAudio = false;
 let enableTimer = false;
 //botão de configuraçoes tudo ficará aqui para ser configurado em game
-// ⚙️ Variáveis Globais de Configuração
+// ⚙️ Variáveis Globais de Configuração Futuramente você vai adicionar outras aqui:
 let configJogo = {
-    timerMinInterval: 0 // Valor padrão que você está usando agora
-    // Futuramente você vai adicionar outras aqui:
-    // tempoBoss: 15,
-    // mostrarDica: false, etc...
+    timerMinInterval: 0, // Valor padrão que você está usando agora
+    dicasInfinitas: false,   // Punição: -50% Ouro e XP
+    vidasInfinitas: false,   // Punição: -30% Ouro e XP
+    escudosInfinitos: false,  // Punição: -20% Ouro e XP
+    pularInfinito: false // Punição: -40% Ouro e XP
 };
+
 // ✨ DETECTOR DE RARIDADE DAS CARTAS (Risco Zero)
 function getCardRarity(card) {
   if (card.isLeech) return { cls: 'rarity-ferro', txtCls: '', label: 'Sanguessuga' };
@@ -577,8 +579,14 @@ function playSfx(type) {
         sess.combo++;
         
         // ✨ NOVIDADE: Verifica o Evento de Crítico (+35%)
-        let chanceCritico = 0.10;
+// ✨ VERIFICA A CHANCE DE CRÍTICO
+        let chanceCritico = 0.10; 
         if (STATS.activeEvent && STATS.activeEvent.id === 'ev_crit') chanceCritico += 0.35;
+        
+        // Se o HACK de crítico estiver ativo, ele SOMA a porcentagem!
+        if (configJogo.criticoCustom > 0) {
+            chanceCritico += (configJogo.criticoCustom / 100); 
+        }
         
         const isMilestone = (sess.combo % 5 === 0);
         const isCrit = isMilestone || Math.random() < chanceCritico || type === 'crit'; 
@@ -682,6 +690,33 @@ function playSfx(type) {
             
             // ✨ NOVIDADE: Só consome a carga se não for o evento de Barriga Cheia!
             if (isFed && !hasFreeFood) STATS.pets.fedCharges--;
+        }
+
+        // 👹 A CONTA DO MODO DEUS (PUNIÇÕES)
+        let multiplicadorPunicao = 1.0;
+
+        if (configJogo.dicasInfinitas) multiplicadorPunicao -= 0.50; // Perde metade
+        if (configJogo.pularInfinito) multiplicadorPunicao -= 0.40; // ✨ Perde 40% (NOVO!)
+        if (configJogo.vidasInfinitas) multiplicadorPunicao -= 0.30; // Perde 30%
+        if (configJogo.escudosInfinitos) multiplicadorPunicao -= 0.20; // Perde 20%
+
+        // ✨ NOVA PUNIÇÃO DO CRÍTICO: 10% de hack = 10% de punição
+        if (configJogo.criticoCustom > 0) {
+            multiplicadorPunicao -= (configJogo.criticoCustom / 100);
+        }
+        
+        // Se ele ligar tudo junto, não deixa o multiplicador ficar abaixo de 10% (senão ele ganha 0)
+        if (multiplicadorPunicao < 0.1) multiplicadorPunicao = 0.1;
+
+        // Aplica o corte (Apenas se o multiplicador for menor que 1.0)
+        if (multiplicadorPunicao < 1.0) {
+            ganhoMoedas = Math.floor(ganhoMoedas * multiplicadorPunicao);
+            ganhoXP = Math.floor(ganhoXP * multiplicadorPunicao);
+            
+            // Mensagem visual para ele lembrar do pecado kkk
+            if (isCrit || type === 'ok') {
+                setTimeout(() => toast('⚠️ Ganhos reduzidos por Hacks ativos!', 'var(--red)'), 500);
+            }
         }
 
         STATS.moedas += ganhoMoedas; 
@@ -1303,7 +1338,7 @@ function buildStudyTab() {
         </div>` : `<input type="hidden" id="studyCatFilter" value="">`}
         
         <div class="btn-row" style="flex-wrap:nowrap;gap:8px">
-          <button class="btn gold" onclick="startSession('adaptive', document.getElementById('studyCatFilter')?.value, null, false)" style="flex:1;font-size:14px;padding:14px;letter-spacing:1px">🧠 Revisão Inteligente</button>
+          <button class="btn gold" onclick="startSession('adaptive', document.getElementById('studyCatFilter')?.value, null, false)" style="flex:1;font-size:14px;padding:14px;letter-spacing:1px">🧠 Inteligente</button>
           <button class="btn" onclick="openCustomModal(false)" style="flex:1;font-size:14px;padding:14px;letter-spacing:1px;border-color:var(--border2);color:var(--gold2)">🎛️ Seleções</button>
         </div>
       </div>
@@ -1343,9 +1378,9 @@ function buildStudyTab() {
           </select>
         </div>
         <div class="btn-row" style="flex-wrap:nowrap;gap:8px">
-          <button class="btn" onclick="startSession('adaptive', document.getElementById('freeStudyFilter')?.value, null, true)" style="flex:1;border-color:var(--blue2);color:var(--blue2)">♾️ Iniciar Treino Livre</button>
+          <button class="btn" onclick="startSession('adaptive', document.getElementById('freeStudyFilter')?.value, null, true)" style="flex:1;border-color:var(--blue2);color:var(--blue2)">♾️ Treino Livre</button>
           <!-- ✨ O BOTÃO VOLTOU PARA ABRIR O SEU MODAL LIMPINHO -->
-          <button class="btn" onclick="openCustomModal(true)" style="flex:1;border-color:var(--border2)">🎛️ Modos Específicos</button>
+          <button class="btn" onclick="openCustomModal(true)" style="flex:1;border-color:var(--border2)">🎛️ Específicos</button>
         </div>
       </div>
     </div>
@@ -1520,29 +1555,45 @@ function buildStudyCard() {
         clearTimeout(sess.timerId);
     }
 
-  // ✨ BARRA DE ITENS MÁGICOS (AGORA INTELIGENTE)
+  // ✨ BARRA DE ITENS MÁGICOS (AGORA COM MODO DEUS)
   let toolsHtml = '';
-  // Modos que não exigem digitação/montagem não devem mostrar dicas!
   const noHintModes = ['flash', 'choice', 'tf', 'revchoice', 'imgchoice', 'blind', 'boss'];
   const canHint = !noHintModes.includes(activeMode);
 
   if (!isAns) {
       if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0 };
       const inv = STATS.inventory;
+      
+      // ✨ Checa se o Modo Deus está ativo
+      const dicasHacked = configJogo.dicasInfinitas;
+      const escudosHacked = configJogo.escudosInfinitos;
+      const pularHacked = configJogo.pularInfinito;
+      // Monta os textos e bloqueios
+      // Monta o botão dicas
+      const dicaLabel = dicasHacked ? '✨ Dica (∞)' : `✨ Dica (${inv.magicHints || 0})`;
+      const dicaDisabled = (!dicasHacked && inv.magicHints <= 0) ? 'disabled style="opacity:0.3"' : '';
+      // ✨ Monta o botão de mini escudo
+      const escudoLabel = escudosHacked ? '🛡️ Bloqueio (∞)' : `🛡️ Bloqueio (${inv.miniShields || 0})`;
+      const escudoDisabled = (!escudosHacked && inv.miniShields <= 0 && !sess.miniShieldActive) ? 'disabled style="opacity:0.3"' : '';
+      // ✨ Monta o botão de Pular
+      const pularLabel = pularHacked ? '⏭️ Pular (∞)' : `⏭️ Pular (${inv.skips || 0})`;
+      const pularDisabled = (!pularHacked && inv.skips <= 0) ? 'disabled style="opacity:0.3"' : '';
       toolsHtml = `
       <div style="display:flex; gap:6px; justify-content:center; margin-bottom:12px; margin-top:4px; flex-wrap:wrap">
          ${canHint ? `
-         <button id="btnMagicHint" class="btn ghost sm" onclick="useMagicHint()" ${inv.magicHints > 0 ? '' : 'disabled style="opacity:0.3"'} style="border-color:var(--gold2); color:var(--gold2); flex:1; padding:6px 2px; font-size:11px">
-             ✨ Dica (${inv.magicHints || 0})
+         <button id="btnMagicHint" class="btn ghost sm" onclick="useMagicHint()" ${dicaDisabled} style="border-color:${dicasHacked ? 'var(--red)' : 'var(--gold2)'}; color:${dicasHacked ? 'var(--red)' : 'var(--gold2)'}; flex:1; padding:6px 2px; font-size:11px">
+             ${dicaLabel}
          </button>` : ''}
-         <button id="btnMiniShield" class="btn ghost sm" onclick="useMiniShield()" ${inv.miniShields > 0 && !sess.miniShieldActive ? '' : 'disabled style="opacity:0.3"'} style="border-color:var(--stone); color:var(--stone); flex:1; padding:6px 2px; font-size:11px">
-             🛡️ Bloqueio (${inv.miniShields || 0})
+         <button id="btnMiniShield" class="btn ghost sm" onclick="useMiniShield()" ${escudoDisabled} style="border-color:${escudosHacked ? 'var(--red)' : 'var(--stone)'}; color:${escudosHacked ? 'var(--red)' : 'var(--stone)'}; flex:1; padding:6px 2px; font-size:11px">
+             ${escudoLabel}
          </button>
-         <button class="btn ghost sm" onclick="useSkipItem()" ${inv.skips > 0 ? '' : 'disabled style="opacity:0.3"'} style="border-color:var(--green); color:var(--green); flex:1; padding:6px 2px; font-size:11px">
-             ⏭️ Pular (${inv.skips || 0})
-         </button>
+          <button class="btn ghost sm" onclick="useSkipItem()" ${pularDisabled} style="border-color:${pularHacked ? 'var(--red)' : 'var(--green)'}; color:${pularHacked ? 'var(--red)' : 'var(--green)'}; flex:1; padding:6px 2px; font-size:11px">
+             ${pularLabel}
+          </button>
       </div>`;
   }
+
+  
 
   const rarity = getCardRarity(card); // Calcula o brilho da carta atual
 
@@ -2630,7 +2681,9 @@ if (!sess.isFreeMode) {
         sess.queue.push(card);
     } 
     else if (quality === 0 && STATS.vidas > 0) {
-        STATS.vidas--; // Consome a vida normal
+        if (!configJogo.vidasInfinitas) {
+        STATS.vidas--;// Consome a vida normal
+        } 
         toast('❤️ Vida consumida! O card foi protegido.', 'gold');
         sess.queue.push(card);
         if (typeof saveStats === 'function') saveStats();
@@ -3165,7 +3218,7 @@ function buildAddTab() {
   const cats = [...new Set([...defaultCats, ...existingCats])].sort();
   
   return `
-  <h3 onclick="toggleSection('sec-manual')" style="cursor:pointer;padding: 5px;border-radius: 10px; border: solid 2px #302e29;background: #1c1a16; display:flex; justify-content:space-around; align-items:center; user-select:none;">
+  <h3 onclick="toggleSection('sec-manual')" style="cursor:pointer;padding: 5px;border-radius: 10px; border: solid 2px #302e29;background: #1c1a16; display:flex; justify-content: space-between; align-items:center; user-select:none;">
         <span>✦ Nova Palavra (Manual)</span>
         <span id="sec-manual-icon" style="color:var(--stone2); font-size:14px;">▼</span>
     </h3>
@@ -3181,7 +3234,7 @@ function buildAddTab() {
         </div>
       </div>
     </div>
-    <h3 onclick="toggleSection('sec-magic')" style="cursor:pointer;padding: 5px; border: solid 2px #0b2ba5; border-radius: 10px;background: #1c1a16; display:flex; justify-content:space-around; align-items:center; user-select:none; margin-top:10px;">
+    <h3 onclick="toggleSection('sec-magic')" style="cursor:pointer;padding: 5px; border: solid 2px #0b2ba5; border-radius: 10px;background: #1c1a16; display:flex; justify-content: space-between; align-items:center; user-select:none; margin-top:10px;">
         <span>✨ Importação Mágica Universal</span>
         <span id="sec-magic-icon" style="color:var(--stone2); font-size:14px;">▼</span>
     </h3>
@@ -3244,7 +3297,7 @@ eloquência | arte de falar bem | | fluência, oratória | | comunicação | �
         <div id="importPreview" style="margin-top:10px"></div>
       </div>
     </div>
-<h3 onclick="toggleSection('sec-free')" style="cursor:pointer;padding: 5px; border: solid 2px #a48f4e; border-radius: 10px;background: #1c1a16; display:flex; justify-content:space-around; align-items:center; user-select:none; margin-top:10px;">
+<h3 onclick="toggleSection('sec-free')" style="cursor:pointer;padding: 5px; border: solid 2px #a48f4e; border-radius: 10px;background: #1c1a16; display:flex; justify-content: space-between; align-items:center; user-select:none; margin-top:10px;">
         <span>💾 Exportar / Restaurar</span>
         <span id="sec-free-icon" style="color:var(--stone2); font-size:14px;">▼</span>
     </h3>
@@ -4158,13 +4211,18 @@ function useMagicHint() {
       }
   }
 
-  if (!STATS.inventory || STATS.inventory.magicHints <= 0) {
+  // ✨ O SEGREDO AQUI: Só barra se NÃO tiver hack E não tiver estoque
+  if (!configJogo.dicasInfinitas && (!STATS.inventory || STATS.inventory.magicHints <= 0)) {
       toast('Você não tem Dicas de Atena!', 'err');
       if (typeof triggerScreenShake === 'function') triggerScreenShake();
       return;
   }
   
-  STATS.inventory.magicHints--;
+  // Só desconta se NÃO for infinito
+  if (!configJogo.dicasInfinitas) {
+      STATS.inventory.magicHints--;
+  }
+  
   if (typeof saveStats === 'function') saveStats();
   
   sess.magicHintUsed = true; 
@@ -4172,10 +4230,16 @@ function useMagicHint() {
   sess.magicHintsActive = (sess.magicHintsActive || 0) + 1; // Acumula o número de letras compradas
   
   updateDynamicHint();
-  toast('✨ -1 Dica Gasta', 'gold');
+  
+  // ✨ Mensagem personalizada se for Hack
+  if (configJogo.dicasInfinitas) {
+      toast('✨ Dica do Modo Deus!', 'var(--red)');
+  } else {
+      toast('✨ -1 Dica Gasta', 'gold');
+  }
+  
   render(); 
 }
-
 // ✨ FUNÇÃO QUE ROUBA A DICA ASSIM QUE O JOGADOR CLICAR!
 function hideMagicHint() {
    const sess = studySession;
@@ -4201,12 +4265,18 @@ function useHint() {
 function useSkipItem() {
   const sess = studySession;
   if (!sess) return;
-  if (!STATS.inventory || STATS.inventory.skips <= 0) {
+  
+  // ✨ Só barra se NÃO tiver hack E não tiver estoque
+  if (!configJogo.pularInfinito && (!STATS.inventory || STATS.inventory.skips <= 0)) {
       toast('Você não tem Saltos de Cronos!', 'err');
       return;
   }
   
-  STATS.inventory.skips--;
+  // Só desconta do estoque se NÃO for infinito
+  if (!configJogo.pularInfinito) {
+      STATS.inventory.skips--;
+  }
+  
   if (typeof saveStats === 'function') saveStats();
   
   sess.queue.splice(sess.current, 1);
@@ -4215,18 +4285,30 @@ function useSkipItem() {
   sess.hintUsed = false;
   sess.magicHintUsed = false;
   
-  toast('⏭️ Salto Temporal! Card pulado sem punição.', 'ok');
+  // Mensagem personalizada para o Hacker
+  if (configJogo.pularInfinito) {
+      toast('⏭️ Salto do Modo Deus!', 'var(--red)');
+  } else {
+      toast('⏭️ Salto Temporal! Card pulado sem punição.', 'ok');
+  }
+  
   render();
 }
 function useMiniShield() {
   const sess = studySession;
   if (!sess || sess.miniShieldActive) return;
-  if (!STATS.inventory || STATS.inventory.miniShields <= 0) {
+  
+  // ✨ O SEGREDO AQUI: Só barra se NÃO tiver hack E não tiver estoque
+  if (!configJogo.escudosInfinitos && (!STATS.inventory || STATS.inventory.miniShields <= 0)) {
       toast('Você não tem a Égide Menor! Compre no Mercado.', 'err');
       return;
   }
   
-  STATS.inventory.miniShields--;
+  // Só desconta se NÃO for infinito
+  if (!configJogo.escudosInfinitos) {
+      STATS.inventory.miniShields--;
+  }
+  
   if (typeof saveStats === 'function') saveStats();
   sess.miniShieldActive = true;
   
@@ -4235,11 +4317,12 @@ function useMiniShield() {
       btn.innerHTML = '🛡️ Ativado!';
       btn.disabled = true;
       btn.style.opacity = '0.5';
-      btn.style.borderColor = 'var(--gold)';
-      btn.style.color = 'var(--gold)';
+      btn.style.borderColor = configJogo.escudosInfinitos ? 'var(--red)' : 'var(--gold)';
+      btn.style.color = configJogo.escudosInfinitos ? 'var(--red)' : 'var(--gold)';
   }
-  toast('🛡️ Égide Ativada! Seu erro nesta carta será perdoado.', 'gold');
+  toast(configJogo.escudosInfinitos ? '🛡️ Égide do Modo Deus ativada!' : '🛡️ Égide Ativada! Seu erro nesta carta será perdoado.', 'gold');
 }
+
 /* ═══════════════════════════════════════
    MODAIS
 ═══════════════════════════════════════ */
@@ -5793,8 +5876,8 @@ function playGachaSound(type) {
 }
 //modal para configuraçao dentro do jogo
 // Abre o modal e carrega os valores atuais
+// ✨ O MENU DE CONFIGURAÇÕES COM O MODO DEUS
 function abrirConfig() {
-    // Pega o valor atual para preencher a caixinha ao abrir (Se não existir, usa 0)
     let valorAtual = configJogo.timerMinInterval !== undefined ? configJogo.timerMinInterval : 0;
 
     let html = `
@@ -5813,11 +5896,65 @@ function abrirConfig() {
             <input type="number" id="inputTimerInterval" min="0" max="30" value="${valorAtual}" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border2, #555); background:var(--bg3, #1a1a1a); color:white; font-size: 16px;">
             <p style="color:var(--stone2, #aaa); margin-top:8px; font-size:11px; line-height: 1.4;">
                 Cartões com intervalo menor que este não terão a barra de tempo. Deixe <b>0</b> para pressão total em todas as cartas. 
-                <br><span style="color:#e024ff;">(Nota: Jogar em modo fácil reduzirá bônus no futuro!)</span>
             </p>
         </div>
 
-        <!-- Você pode adicionar mais blocos de configuração aqui embaixo depois! -->
+        <!-- 🔥 SEÇÃO: MODO DEUS (HACKS) 🔥 -->
+        <div style="font-weight:bold; margin-top:20px; margin-bottom:10px; color:var(--red); text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(255, 0, 0, 0.3); padding-bottom:4px">🔥 Modo Deus (Hacks)</div>
+        
+        <div style="margin: 15px 0; background: rgba(255,0,0,0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,0,0,0.3);">
+            <p style="font-size:11px; color:var(--stone2); margin-top:0; margin-bottom:15px; line-height:1.4">Ativar estas opções facilita o jogo, mas aplica <b style="color:var(--red)">severas penalidades</b> nos seus ganhos finais por resposta!</p>
+            
+            <!-- Dicas Infinitas -->
+            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
+                <div>
+                    <div>✨ Dicas de Atena Infinitas</div>
+                    <div style="font-size:10px; color:var(--red); margin-top:2px">Penalidade: -50% Ouro e XP</div>
+                </div>
+                <input type="checkbox" id="dicasInfinitas" class="config-cb" ${configJogo.dicasInfinitas ? 'checked' : ''} style="transform:scale(1.3); accent-color:var(--gold)">
+            </label>
+            
+            <!-- Vidas Infinitas -->
+            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
+                <div>
+                    <div>❤️ Vidas Infinitas (Imortal)</div>
+                    <div style="font-size:10px; color:var(--red); margin-top:2px">Penalidade: -30% Ouro e XP</div>
+                </div>
+                <input type="checkbox" id="vidasInfinitas" class="config-cb" ${configJogo.vidasInfinitas ? 'checked' : ''} style="transform:scale(1.3); accent-color:var(--red)">
+            </label>
+            
+            <!-- Escudos Infinitos -->
+            <label style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#fff; cursor:pointer">
+                <div>
+                    <div>🛡️ Escudos Menores Infinitos</div>
+                    <div style="font-size:10px; color:var(--red); margin-top:2px">Penalidade: -20% Ouro e XP</div>
+                </div>
+                <input type="checkbox" id="escudosInfinitos" class="config-cb" ${configJogo.escudosInfinitos ? 'checked' : ''} style="transform:scale(1.3); accent-color:var(--blue)">
+            </label>
+            <!-- Saltos Infinitos -->
+            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;margin-top: 10px; font-size:13px; color:#fff; cursor:pointer">
+                <div>
+                    <div>⏭️ Saltos Infinitos (Pular)</div>
+                    <div style="font-size:10px; color:var(--red); margin-top:2px">Penalidade: -40% Ouro e XP</div>
+                </div>
+                <input type="checkbox" id="pularInfinito" class="config-cb" ${configJogo.pularInfinito ? 'checked' : ''} style="transform:scale(1.3); accent-color:var(--green)">
+            </label>
+            <!-- ✨ Controlador de Crítico Customizado -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:13px; color:#fff;">
+                <div>
+                    <div>🎲 Forçar Críticos (0 a 100%)</div>
+                    <div id="critHackPen" style="font-size:10px; color:var(--red); margin-top:2px">
+                        ${configJogo.criticoCustom > 0 ? `Penalidade: -${configJogo.criticoCustom}% Ouro e XP` : 'Sem penalidade extra'}
+                    </div>
+                </div>
+                <!-- Botões de + e - -->
+                <div style="display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:6px; border:1px solid var(--border2)">
+                    <button class="btn ghost sm" style="padding:2px 8px; border-color:var(--stone); color:white" onclick="changeCritHack(-10)">-</button>
+                    <span id="critHackValue" style="font-weight:bold; color:#ff8c00; width:30px; text-align:center">${configJogo.criticoCustom || 0}%</span>
+                    <button class="btn ghost sm" style="padding:2px 8px; border-color:var(--stone); color:white" onclick="changeCritHack(10)">+</button>
+                </div>
+            </div>
+        </div>
 
     </div>
     
@@ -5827,7 +5964,6 @@ function abrirConfig() {
     
     openModal(html);
 }
-
 // Fecha o modal sem salvar
 function fecharConfig() {
     document.getElementById('modalConfig').style.display = 'none';
@@ -5848,6 +5984,25 @@ function salvarConfig() {
     
     toast('⚙️ Configurações aplicadas!', 'ok');
     fecharConfig();
+}
+// Carrega o valor salvo no navegador assim que o jogo abre
+const savedCrit = localStorage.getItem('config_criticoCustom');
+if (savedCrit !== null) configJogo.criticoCustom = parseInt(savedCrit);
+
+// ✨ FUNÇÃO QUE CONTROLA O + E O -
+function changeCritHack(amount) {
+    let val = (configJogo.criticoCustom || 0) + amount;
+    if (val < 0) val = 0; // Não deixa ser menor que zero
+    if (val > 100) val = 100; // Não deixa ser maior que 100%
+    
+    configJogo.criticoCustom = val;
+    localStorage.setItem('config_criticoCustom', val);
+
+    // Atualiza os números na tela na mesma hora
+    const span = document.getElementById('critHackValue');
+    const pen = document.getElementById('critHackPen');
+    if (span) span.innerText = val + '%';
+    if (pen) pen.innerText = val > 0 ? `Penalidade: -${val}% Ouro e XP` : `Sem penalidade extra`;
 }
 //capturar da camera ou da galeria
 // ✨ MODAL DE ESCOLHA DE IMAGEM (Versão Segura - Não fecha o Modal de Edição!)
@@ -5901,6 +6056,7 @@ const ignoreList = ['fw_type', 'fw_lang_word', 'fw_lang_def', 'fw_class'];
 
 // O EventListener original (Intacto!)
 document.addEventListener('change', (e) => {
+  
   if (e.target.tagName === 'SELECT' && e.target.id && !ignoreList.includes(e.target.id)) {
     localStorage.setItem('ui_pref_' + e.target.id, e.target.value);
   }
@@ -5911,6 +6067,10 @@ document.addEventListener('change', (e) => {
   if (e.target.id === 'inputTimerInterval') {
       localStorage.setItem('config_timerMinInterval', e.target.value);
       configJogo.timerMinInterval = parseInt(e.target.value) || 0; // Já engatilha no motor do jogo!
+  }
+  if (e.target.classList.contains('config-cb')) {
+      localStorage.setItem('config_' + e.target.id, e.target.checked);
+      configJogo[e.target.id] = e.target.checked; // Salva direto na memória global
   }
 }, true);
 
@@ -5938,6 +6098,18 @@ const uiObserver = new MutationObserver(() => {
   let needsListUpdate = false;
   let needsImportUpdate = false;
 
+  // ✨ LENDO A MEMÓRIA DOS HACKS
+  document.querySelectorAll('.config-cb').forEach(cb => {
+      if (!cb.dataset.loaded) {
+          const saved = localStorage.getItem('config_' + cb.id);
+          if (saved !== null) {
+              const isChecked = (saved === 'true');
+              cb.checked = isChecked;
+              configJogo[cb.id] = isChecked; // Carrega na memória global
+          }
+          cb.dataset.loaded = 'true';
+      }
+  });
   // --- 1. A SUA LÓGICA ORIGINAL (Selects e Checkboxes) ---
   document.querySelectorAll('select[id]').forEach(sel => {
     if (ignoreList.includes(sel.id)) return; 
