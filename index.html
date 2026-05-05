@@ -65,7 +65,7 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Crimson
 /* ── CARDS ── */
 .card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);overflow:clip;margin-bottom:12px;position:relative;}
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.4),transparent);}
-.card-head{padding:0px 0px;display:flex;align-items:baseline;gap: 31px;justify-content:space-between;}
+.card-head{margin: 5px;padding:0px 0px;display:flex;align-items:baseline;gap: 31px;justify-content:space-between;}
 .card-title{font-family:'Cinzel',serif;font-size:13px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--stone3);}
 .card-body{padding:14px;}
 
@@ -79,7 +79,7 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Crimson
 .btn.sm{padding:7px 12px;font-size:10px;width:auto;}
 .btn.ghost{border-color:var(--border);color:var(--stone2);}
 .btn:disabled{opacity:.3;cursor:default;}
-.btn-row{display:flex;gap:8px;}
+.btn-row{padding: 0px 4px 0px 4px;display:flex;gap:8px;}
 
 /* ── INPUTS ── */
 .inp,.ta,select.inp{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;color:var(--ink);font-family:'Crimson Pro',serif;font-size:15px;outline:none;transition:border-color .2s;appearance:none;}
@@ -662,7 +662,19 @@ function playSfx(type) {
             
             // ✨ NOVIDADE: Evento Festa dos Pets multiplica afinidade por 3
             let ganhoAfin = (STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_aff') ? 3 : 1;
-            STATS.pets.affinity[activePet] += ganhoAfin;
+            
+            // ✨ A TRAVA DO NÍVEL DO PET NO PLAYSFX
+            if (isPetCapped(activePet)) {
+                // Removi os 15%! Agora tem 50% de chance e avisa quase SEMPRE que o pet tentar ganhar XP e não puder!
+                if (Math.random() < 0.50) toast(`⚠️ Seu ${activePet.toUpperCase()} estagnou! Evolua-o na Loja!`, 'var(--red)');
+            } else {
+                STATS.pets.affinity[activePet] += ganhoAfin;
+                
+                // Segurança máxima: Se esse ganho de XP ultrapassar o 499, nós cravamos no 499 exato!
+                if (STATS.pets.affinity[activePet] > getPetMaxXP(activePet)) {
+                    STATS.pets.affinity[activePet] = getPetMaxXP(activePet);
+                }
+            }
             
             const petLevel = Math.floor(STATS.pets.affinity[activePet] / 50) + 1;
             
@@ -1237,24 +1249,28 @@ function updateHeader() {
   const progEl = document.getElementById('hProg');
   if(progEl) progEl.style.width = pct + '%';
 
-  // ✨ A BOLINHA DE PRESTÍGIO NA TELA
+// ✨ A BOLINHA DE PRESTÍGIO NA TELA (Agora Clicável!)
   const rank = getUserTitle();
   const subtitleEl = document.querySelector('.app-subtitle');
   if (subtitleEl) {
-     subtitleEl.innerHTML = `
-        <div style="display:inline-flex; flex-direction:column; align-items:center; gap:2px;">
-            <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.05); padding:1px 2px; border-radius:12px; border: 1px solid ${rank.color}">
-                <span style="background:${rank.color}; color:#000; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold">${rank.prestige}</span>
-                <span style="color:${rank.color}; font-weight:bold; letter-spacing:1px; font-size:10px;margin-right: 3px; text-shadow: 0 0 5px ${rank.color}40">${rank.icon} ${rank.title}</span>
-            </div>
-            <div style="font-size:10px; font-weight:bold; color:var(--stone2); letter-spacing:1px">XP: ${rank.currentXP} / ${rank.nextXP} ✨</div>
-        </div>
-        
-        <div style="display:inline-flex; align-items:center; margin-left:0px; margin-top:16px">
-            <button id="btnTimer" onclick="toggleTimer()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${enableTimer?'1':'0.4'}" title="Relógio">${enableTimer?'⏳':'⏸️'}</button>
-            <button id="btnAudio" onclick="toggleAudio()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${autoPlayAudio?'1':'0.4'}; margin-left:4px" title="Áudio">${autoPlayAudio?'🔊':'🔈'}</button>
-        </div>
-     `;
+      subtitleEl.innerHTML = `
+         <!-- Envolvi tudo num botão para poder clicar -->
+         <div onclick="openPlayerAscensionModal()" style="cursor:pointer; transition: transform 0.2s" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+             <div style="display:inline-flex; flex-direction:column; align-items:center; gap:2px;">
+                 <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.05); padding:1px 2px; border-radius:12px; border: 1px solid ${rank.color}">
+                     <span style="background:${rank.color}; color:#000; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold">${rank.prestige}</span>
+                     <span style="color:${rank.color}; font-weight:bold; letter-spacing:1px; font-size:10px;margin-right: 3px; text-shadow: 0 0 5px ${rank.color}40">${rank.icon} ${rank.title}</span>
+                 </div>
+                 <div style="font-size:10px; font-weight:bold; color:var(--stone2); letter-spacing:1px">XP: ${rank.currentXP.toLocaleString()} / ${rank.nextXP.toLocaleString()} ✨</div>
+             </div>
+         </div>
+         
+         <!-- Botões de Áudio/Tempo continuam iguais... -->
+         <div style="display:inline-flex; align-items:center; margin-left:0px; margin-top:16px">
+             <button id="btnTimer" onclick="toggleTimer()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${enableTimer?'1':'0.4'}" title="Relógio">${enableTimer?'⏳':'⏸️'}</button>
+             <button id="btnAudio" onclick="toggleAudio()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${autoPlayAudio?'1':'0.4'}; margin-left:4px" title="Áudio">${autoPlayAudio?'🔊':'🔈'}</button>
+         </div>
+      `;
   }
   
   // Executa o Fiscal do Level Up
@@ -3754,16 +3770,16 @@ function confirmClearAll() {
     W = []; save(); toast('Léxico limpo.'); render();
   });
 }
-// ✨ LOJA: MERCADO DE ATENAS E ITENS (AGORA COM CONSUMIVEIS, VIDAS, MINI ESCUDOS, LOOT BOXES, PETS)
-// ✨ LOJA: MERCADO DE ATENAS E ITENS
+// ✨ LOJA: MERCADO DE ATENAS E ITENS (AGORA COM CONSUMIVEIS, VIDAS, MINI ESCUDOS, LOOT BOXES, PETS AGORA EM GAVETAS COM MEMÓRIA)
 function openStoreModal() {
-  if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, doubleXp: 0 };
+  if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, doubleXp: 0,petCrystals: 0, playerSparks: 0 };
+  if (!STATS.pets.evoLevel) STATS.pets.evoLevel = {}; // Memória para saber quantas vezes o pet evoluiu!
   if (!STATS.pets) STATS.pets = { owned: [], active: null, fedCharges: 0 };
   if (!STATS.pets.affinity) STATS.pets.affinity = {};
 
   const currentLevel = getUserTitle().level;
 
-  // ✨ IDENTIFICADORES DE EVENTOS GRÁTIS (Apenas para Caixas Gacha agora)
+  // ✨ IDENTIFICADORES DE EVENTOS GRÁTIS
   const evId = STATS.activeEvent ? STATS.activeEvent.id : null;
   const freeBronze = evId === 'ev_box_bronze';
   const freePrata = evId === 'ev_box_pandora';
@@ -3780,7 +3796,6 @@ function openStoreModal() {
 
   function getItemBtn(action, price, reqLvl, colorHex, isFree = false) {
       if (currentLevel < reqLvl) return `<button class="btn sm ghost" disabled style="padding:8px; border-color:var(--stone); color:var(--stone)">🔒 Nv. ${reqLvl}</button>`;
-      
       if (isFree) {
           return `<button class="btn sm success" style="padding:8px; background:${colorHex}; color:#000; border:none; font-weight:bold; box-shadow: 0 0 12px ${colorHex};" onclick="${action}">🎁 GRÁTIS!</button>`;
       }
@@ -3797,6 +3812,12 @@ function openStoreModal() {
   const lvlDragao = getLvl('dragao'), nextDragao = getNext('dragao');
   const powDragaoGold = 10 + ((lvlDragao - 1) * 2), powDragaoXP = 30 + ((lvlDragao - 1) * 5); 
   
+// Verifica se a trava está ativa e qual o nível máximo atual
+  const capTartaruga = isPetCapped('tartaruga'), maxTartaruga = getPetMaxLevel('tartaruga');
+  const capFormiga = isPetCapped('formiga'), maxFormiga = getPetMaxLevel('formiga');
+  const capCoruja = isPetCapped('coruja'), maxCoruja = getPetMaxLevel('coruja');
+  const capFenix = isPetCapped('fenix'), maxFenix = getPetMaxLevel('fenix');
+  const capDragao = isPetCapped('dragao'), maxDragao = getPetMaxLevel('dragao');
   openModal(`
     <h3 style="margin-bottom:8px">🛒 Mercado de Atenas</h3>
     <div style="text-align:center; margin-bottom:15px;">
@@ -3804,247 +3825,276 @@ function openStoreModal() {
        <div style="font-size:12px; color:var(--stone2)">Seu saldo atual</div>
     </div>
     
-    <div style="max-height: 50vh; overflow-y: auto; padding-right:4px; display:flex; flex-direction:column; gap:8px">
+    <div style="max-height: 55vh; overflow-y: auto; padding-right:5px; display:flex; flex-direction:column; gap:2px">
         
-        <div style="margin-top:20px; margin-bottom:4px; font-weight:bold; color:#e024ff; border-bottom:1px solid rgba(224,36,255,0.5); padding-bottom:4px; font-size:14px; text-transform:uppercase; letter-spacing:1px">
-            🎲 Baús da Fortuna (Gacha)
-        </div>
-        <p style="font-size:10px; color:var(--stone2); margin-top:-2px; margin-bottom:10px; line-height:1.2">Arrisque suas moedas. Você pode tirar a sorte grande... ou sair no prejuízo.</p>
-
-        <!-- Caixa 1: Bronze -->
-        <div class="card" style="border-color:${freeBronze ? '#cd7f32' : 'var(--stone)'}; margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">📦 Ânfora de Bronze</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Chance de ganhar <span style="color:#00e5ff">Água de Mnemósine</span> ou <span style="color:var(--gold)">Néctar</span>.</div>
-             </div>
-             ${getItemBtn(`buyGachaBox('bronze', ${freeBronze ? 0 : 150})`, 150, 5, '#cd7f32', freeBronze)}
-          </div>
-        </div>
-
-        <!-- Caixa 2: Prata/Pandora -->
-        <div class="card" style="border-color:${freePrata ? '#c0c0c0' : 'var(--stone)'}; margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">📦 Caixa de Pandora</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Chance de ganhar até <span style="color:#e024ff; font-weight:bold">1.500 XP</span> de uma vez!</div>
-             </div>
-             ${getItemBtn(`buyGachaBox('prata', ${freePrata ? 0 : 400})`, 400, 10, '#c0c0c0', freePrata)}
-          </div>
-        </div>
-
-        <!-- Caixa 3: Olimpo -->
-        <div class="card" style="border-color:#ffcc00; box-shadow: ${freeOuro ? '0 0 15px rgba(255,204,0,0.6)' : '0 0 10px rgba(255,204,0,0.2)'}; margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px; color:#ffcc00">🎁 Baú do Olimpo</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alto risco. O Jackpot supremo paga <span style="color:#ff245e; font-weight:bold">3.000 🪙 e 5.000 XP!</span></div>
-             </div>
-             ${getItemBtn(`buyGachaBox('ouro', ${freeOuro ? 0 : 1200})`, 1200, 20, '#ffcc00', freeOuro)}
-          </div>
-        </div>
-        
-        <div class="card" style="border-color:var(--gold2); margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">✨ Dica de Atena</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Revela a 1ª sílaba sem punição no SM-2.</div>
-                <div style="font-size:11px; margin-top:4px; color:var(--gold2);">Estoque: ${STATS.inventory.magicHints || 0}</div>
-             </div>
-             <button class="btn gold sm" style="padding:8px" onclick="buyItem('magicHints', 100)">100 🪙</button>
-          </div>
-        </div>
-
-        <div class="card" style="border-color:var(--green); margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">⏭️ Salto de Cronos</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Pule uma carta difícil sem ser penalizado.</div>
-                <div style="font-size:11px; margin-top:4px; color:var(--green);">Estoque: ${STATS.inventory.skips || 0}</div>
-             </div>
-             <button class="btn success sm" style="padding:8px" onclick="buyItem('skips', 100)">100 🪙</button>
-          </div>
-        </div>
-
-        <div class="card" style="border-color:var(--stone); margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">🛡️ Égide Menor</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Protege você de UM erro durante o jogo. Bloqueia a perda de Vida e a punição.</div>
-                <div style="font-size:11px; margin-top:4px; color:var(--stone);">Estoque: ${STATS.inventory.miniShields || 0}</div>
-             </div>
-             <button class="btn ghost sm" style="padding:8px; border-color:var(--stone); color:var(--stone)" onclick="buyItem('miniShields', 100)">100 🪙</button>
-          </div>
-        </div>
-
-        <div class="card" style="border-color:var(--red); margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">❤️ Poção de Vida</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Recupera 1 Vida no seu contador.</div>
-                <div style="font-size:11px; margin-top:4px; color:var(--red);">Vidas atuais: ${STATS.vidas}</div>
-             </div>
-             <button class="btn danger sm" style="padding:8px" onclick="buyLife()">100 🪙</button>
-          </div>
-        </div>
-
-        <div class="card" style="border-color:var(--blue2); margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">🏺 Escudo de Esparta</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Se você faltar 1 dia, salva sua ofensiva 🔥.</div>
-                <div style="font-size:11px; margin-top:4px; color:var(--blue2);">Equipados: ${STATS.inventory.shields || 0}/2</div>
-             </div>
-             <button class="btn sm" style="padding:8px; border-color:var(--blue2); color:var(--blue2)" onclick="buyShield()" ${STATS.inventory.shields >= 2 ? 'disabled' : ''}>250 🪙</button>
-          </div>
-        </div>
-
-        <div class="card" style="border-color:#00e5ff; margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">💧 Água de Mnemósine</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">As próximas 20 respostas dão o DOBRO de XP.</div>
-                <div style="font-size:11px; margin-top:4px; color:#00e5ff;">Cargas ativas: ${STATS.inventory.doubleXp || 0}</div>
-             </div>
-             ${getItemBtn(`buyItem('doubleXp', 250, 20)`, 250, 5, '#00e5ff')}
-          </div>
-        </div>
-
-        <div class="card" style="border-color:#e024ff; margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">🍷 Néctar dos Deuses</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">As próximas 20 respostas dão o DOBRO de moedas.</div>
-                <div style="font-size:11px; margin-top:4px; color:#e024ff;">Cargas ativas: ${STATS.inventory.doubleCoins || 0}</div>
-             </div>
-             <button class="btn sm" style="padding:8px; border-color:#e024ff; color:#e024ff" onclick="buyItem('doubleCoins', 250, 20)">250 🪙</button>
-          </div>
-        </div>
-        
-        <div class="card" style="border-color:var(--red); margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">🌫️ Névoa de Lete</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Purifica todo o léxico. Remove o status de 🩸 Sanguessuga.</div>
-                <div style="font-size:11px; margin-top:4px; color:var(--red);">Consumo Imediato</div>
-             </div>
-             <button class="btn danger sm" style="padding:8px" onclick="buyMist()">1000 🪙</button>
-          </div>
-        </div>
-
-        <!-- ✨ SEÇÃO: COMPANHEIROS MÍTICOS -->
-        <div style="margin-top:16px; margin-bottom:4px; font-weight:bold; color:var(--gold); border-bottom:1px solid var(--gold2); padding-bottom:4px; font-size:14px; text-transform:uppercase; letter-spacing:1px">
-            🐾 Companheiros Míticos
-        </div>
-
-        <!-- 1. Pet Básico: Tartaruga -->
-        <div class="card" style="border-color:#27ae60; margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">🐢 Tartaruga de Esopo <span style="font-size:10px; background:#27ae60; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlTartaruga}</span></div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#27ae60; font-weight:bold">+${powTartaruga} ✨</span> extras.</div>
-                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextTartaruga} acertos para Nv. ${lvlTartaruga + 1}</div>
-                </div>
-             ${STATS.pets.owned.includes('tartaruga')
-                ? (STATS.pets.active === 'tartaruga' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#27ae60; color:#27ae60">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#27ae60; color:#27ae60" onclick="equipPet('tartaruga')">Equipar</button>`)
-                : `${getPetBtn('tartaruga', 500, 0, '#27ae60')}`}
-          </div>
-        </div>
-
-        <!-- 2. Pet Básico: Formiga -->
-        <div class="card" style="border-color:#d35400; margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">🐜 Formiga Mirmidão <span style="font-size:10px; background:#d35400; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlFormiga}</span></div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#d35400; font-weight:bold">+${powFormiga} 🪙</span> extras.</div>
-                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextFormiga} acertos para Nv. ${lvlFormiga + 1}</div>
-              </div>
-             ${STATS.pets.owned.includes('formiga')
-                ? (STATS.pets.active === 'formiga' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#d35400; color:#d35400">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#d35400; color:#d35400" onclick="equipPet('formiga')">Equipar</button>`)
-                : `${getPetBtn('formiga', 750, 8, '#d35400')}`}
-          </div>
-        </div>
-
-                <!-- 3. Pet Intermediário: Coruja -->
-        <div class="card" style="border-color:#b4a7d6; margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">🦉 Coruja de Atena <span style="font-size:10px; background:#b4a7d6; color:#000; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlCoruja}</span></div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#b4a7d6; font-weight:bold">+${powCoruja} ✨</span> extras.</div>
-                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextCoruja} acertos para Nv. ${lvlCoruja + 1}</div>
+        <!-- ================== GAVETA: GACHA ================== -->
+        <div>
+            <div onclick="toggleSection('sec-store-gacha')" style="cursor:pointer; background:rgba(224, 36, 255, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#e024ff; text-transform:uppercase; font-size:12px; border-left:4px solid #e024ff; display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                <span>🎲 Baús da Fortuna (Gacha)</span> <span id="sec-store-gacha-icon">▼</span>
             </div>
-             ${STATS.pets.owned.includes('coruja')
-                ? (STATS.pets.active === 'coruja' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#b4a7d6; color:#b4a7d6">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#b4a7d6; color:#b4a7d6" onclick="equipPet('coruja')">Equipar</button>`)
-                : `${getPetBtn('coruja', 1500, 15, '#b4a7d6')}`}
-          </div>
-        </div>
-
-        <!-- 4. Pet Intermediário: Fênix -->
-        <div class="card" style="border-color:#ff5e00; margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">🔥 Fênix de Apolo <span style="font-size:10px; background:#ff5e00; color:#000; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlFenix}</span></div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#ff5e00; font-weight:bold">+${powFenix} 🪙</span> extras.</div>
-                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextFenix} acertos para Nv. ${lvlFenix + 1}</div>
+            <div id="sec-store-gacha-content" style="display:block; padding-top:8px; display:flex; flex-direction:column; gap:8px">
+                <p style="font-size:10px; color:var(--stone2); margin-top:-2px; margin-bottom:4px; line-height:1.2">Arrisque suas moedas. Você pode tirar a sorte grande... ou sair no prejuízo.</p>
+                <div class="card" style="border-color:${freeBronze ? '#cd7f32' : 'var(--stone)'}; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">📦 Ânfora de Bronze</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Chance de ganhar <span style="color:#00e5ff">Água de Mnemósine</span> ou <span style="color:var(--gold)">Néctar</span>.</div>
+                     </div>
+                     ${getItemBtn(`buyGachaBox('bronze', ${freeBronze ? 0 : 150})`, 150, 5, '#cd7f32', freeBronze)}
+                  </div>
                 </div>
-             ${STATS.pets.owned.includes('fenix')
-                ? (STATS.pets.active === 'fenix' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#ff5e00; color:#ff5e00">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#ff5e00; color:#ff5e00" onclick="equipPet('fenix')">Equipar</button>`)
-                : `${getPetBtn('fenix', 2500, 25, '#ff5e00')}`}
-          </div>
-        </div>
-
-                <!-- 5. O META SUPREMO: Dragão de Ladão -->
-        <div class="card" style="border: 2px solid #e024ff; box-shadow: 0 0 15px rgba(224, 36, 255, 0.2); margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px; color:#e024ff; text-transform:uppercase; text-shadow: 0 0 5px rgba(224,36,255,0.5)">🐉 Dragão de Ladão <span style="font-size:10px; background:#e024ff; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px; text-shadow:none">Nv. ${lvlDragao}</span></div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A Besta Mítica. Alimentada dá Absurdos: <span style="color:#e024ff; font-weight:bold">+${powDragaoGold} 🪙</span> e <span style="color:#00e5ff; font-weight:bold">+${powDragaoXP} ✨</span> extras.</div>
-                <div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextDragao} acertos para Nv. ${lvlDragao + 1}</div>
+                <div class="card" style="border-color:${freePrata ? '#c0c0c0' : 'var(--stone)'}; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">📦 Caixa de Pandora</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Chance de ganhar até <span style="color:#e024ff; font-weight:bold">1.500 XP</span> de uma vez!</div>
+                     </div>
+                     ${getItemBtn(`buyGachaBox('prata', ${freePrata ? 0 : 400})`, 400, 10, '#c0c0c0', freePrata)}
+                  </div>
                 </div>
-             ${STATS.pets.owned.includes('dragao')
-                ? (STATS.pets.active === 'dragao' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#e024ff; color:#e024ff">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#e024ff; color:#e024ff" onclick="equipPet('dragao')">Equipar</button>`)
-                : `${getPetBtn('dragao', 10000, 45, '#e024ff')}`}
-          </div>
+                <div class="card" style="border-color:#ffcc00; box-shadow: ${freeOuro ? '0 0 15px rgba(255,204,0,0.6)' : '0 0 10px rgba(255,204,0,0.2)'}; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px; color:#ffcc00">🎁 Baú do Olimpo</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alto risco. O Jackpot supremo paga <span style="color:#ff245e; font-weight:bold">3.000 🪙 e 5.000 XP!</span></div>
+                     </div>
+                     ${getItemBtn(`buyGachaBox('ouro', ${freeOuro ? 0 : 1200})`, 1200, 20, '#ffcc00', freeOuro)}
+                  </div>
+                </div>
+            </div>
         </div>
 
-        <!-- ✨ SEÇÃO DE ALIMENTAÇÃO MÍTICA (PREÇOS NORMAIS) -->
-        <div style="margin-top:16px; margin-bottom:4px; font-weight:bold; color:#ffcc00; border-bottom:1px solid #ffcc00; padding-bottom:4px; font-size:14px; text-transform:uppercase; letter-spacing:1px; display:flex; justify-content:space-between; align-items:flex-end">
-            <span>🍽️ Rações Míticas</span>
-            <span style="font-size:10px; color:var(--stone2); text-transform:none; font-weight:normal">Cargas na Barriga: <span style="color:#ffcc00; font-weight:bold; font-size:12px">${STATS.pets.fedCharges || 0}</span></span>
+        <!-- ================== GAVETA: ITENS ================== -->
+        <div>
+            <div onclick="toggleSection('sec-store-items')" style="cursor:pointer; background:rgba(0, 229, 255, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#00e5ff; text-transform:uppercase; font-size:12px; border-left:4px solid #00e5ff; display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                <span>🎒 Itens e Consumíveis</span> <span id="sec-store-items-icon">▼</span>
+            </div>
+            <div id="sec-store-items-content" style="display:block; padding-top:8px; display:flex; flex-direction:column; gap:8px">
+                <div class="card" style="border-color:var(--gold2); margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">✨ Dica de Atena</div>
+                        <div style="font-size:11px; margin-top:4px; color:var(--gold2);">Estoque: ${STATS.inventory.magicHints || 0}</div>
+                     </div>
+                     <button class="btn gold sm" style="padding:8px" onclick="buyItem('magicHints', 100)">100 🪙</button>
+                  </div>
+                </div>
+                <div class="card" style="border-color:var(--green); margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">⏭️ Salto de Cronos</div>
+                        <div style="font-size:11px; margin-top:4px; color:var(--green);">Estoque: ${STATS.inventory.skips || 0}</div>
+                     </div>
+                     <button class="btn success sm" style="padding:8px" onclick="buyItem('skips', 100)">100 🪙</button>
+                  </div>
+                </div>
+                <div class="card" style="border-color:var(--stone); margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🛡️ Égide Menor</div>
+                        <div style="font-size:11px; margin-top:4px; color:var(--stone);">Estoque: ${STATS.inventory.miniShields || 0}</div>
+                     </div>
+                     <button class="btn ghost sm" style="padding:8px; border-color:var(--stone); color:var(--stone)" onclick="buyItem('miniShields', 100)">100 🪙</button>
+                  </div>
+                </div>
+                <div class="card" style="border-color:var(--red); margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">❤️ Poção de Vida</div>
+                        <div style="font-size:11px; margin-top:4px; color:var(--red);">Vidas atuais: ${STATS.vidas}</div>
+                     </div>
+                     <button class="btn danger sm" style="padding:8px" onclick="buyLife()">100 🪙</button>
+                  </div>
+                </div>
+                <div class="card" style="border-color:var(--blue2); margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🏺 Escudo de Esparta</div>
+                        <div style="font-size:11px; margin-top:4px; color:var(--blue2);">Equipados: ${STATS.inventory.shields || 0}/2</div>
+                     </div>
+                     <button class="btn sm" style="padding:8px; border-color:var(--blue2); color:var(--blue2)" onclick="buyShield()" ${STATS.inventory.shields >= 2 ? 'disabled' : ''}>250 🪙</button>
+                  </div>
+                </div>
+                <div class="card" style="border-color:#00e5ff; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">💧 Água de Mnemósine</div>
+                        <div style="font-size:11px; margin-top:4px; color:#00e5ff;">Cargas ativas: ${STATS.inventory.doubleXp || 0}</div>
+                     </div>
+                     ${getItemBtn(`buyItem('doubleXp', 250, 20)`, 250, 5, '#00e5ff')}
+                  </div>
+                </div>
+                <div class="card" style="border-color:#e024ff; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🍷 Néctar dos Deuses</div>
+                        <div style="font-size:11px; margin-top:4px; color:#e024ff;">Cargas ativas: ${STATS.inventory.doubleCoins || 0}</div>
+                     </div>
+                     <button class="btn sm" style="padding:8px; border-color:#e024ff; color:#e024ff" onclick="buyItem('doubleCoins', 250, 20)">250 🪙</button>
+                  </div>
+                </div>
+                <div class="card" style="border-color:var(--red); margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🌫️ Névoa de Lete</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Purifica todo o léxico.</div>
+                     </div>
+                     <button class="btn danger sm" style="padding:8px" onclick="buyMist()">1000 🪙</button>
+                  </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Comida 1: Sementes -->
-        <div class="card" style="border-color:#8e44ad; margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">🌱 Sementes de Romã</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Petisco do Submundo. Sacia seu mascote por apenas <span style="color:#8e44ad; font-weight:bold">5 cartas</span>.</div>
-             </div>
-             ${getItemBtn(`feedPet(40, 5)`, 40, 0, '#8e44ad')}
-          </div>
+<!-- ================== GAVETA: PETS ================== -->
+        <div>
+            <div onclick="toggleSection('sec-store-pets')" style="cursor:pointer; background:rgba(255, 215, 0, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:var(--gold); text-transform:uppercase; font-size:12px; border-left:4px solid var(--gold); display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                <span>🐾 Companheiros Míticos</span> <span id="sec-store-pets-icon">▼</span>
+            </div>
+            <div id="sec-store-pets-content" style="display:block; padding-top:8px; display:flex; flex-direction:column; gap:8px">
+                
+                <div class="card" style="border-color:#27ae60; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🐢 Tartaruga de Esopo <span style="font-size:10px; background:#27ae60; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlTartaruga}</span></div>
+                        ${capTartaruga 
+                            ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('tartaruga', '🐢 Tartaruga')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxTartaruga})</button></div>`
+                            : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextTartaruga} acertos</div>`
+                        }
+                     </div>
+                     ${STATS.pets.owned.includes('tartaruga') ? (STATS.pets.active === 'tartaruga' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#27ae60; color:#27ae60">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#27ae60; color:#27ae60" onclick="equipPet('tartaruga')">Equipar</button>`) : `${getPetBtn('tartaruga', 500, 0, '#27ae60')}`}
+                  </div>
+                </div>
+
+                <div class="card" style="border-color:#d35400; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🐜 Formiga Mirmidão <span style="font-size:10px; background:#d35400; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlFormiga}</span></div>
+                        ${capFormiga 
+                            ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('formiga', '🐜 Formiga')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxFormiga})</button></div>`
+                            : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextFormiga} acertos</div>`
+                        }
+                     </div>
+                     ${STATS.pets.owned.includes('formiga') ? (STATS.pets.active === 'formiga' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#d35400; color:#d35400">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#d35400; color:#d35400" onclick="equipPet('formiga')">Equipar</button>`) : `${getPetBtn('formiga', 750, 8, '#d35400')}`}
+                  </div>
+                </div>
+
+                <div class="card" style="border-color:#b4a7d6; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🦉 Coruja de Atena <span style="font-size:10px; background:#b4a7d6; color:#000; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlCoruja}</span></div>
+                        ${capCoruja 
+                            ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('coruja', '🦉 Coruja')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxCoruja})</button></div>`
+                            : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextCoruja} acertos</div>`
+                        }
+                     </div>
+                     ${STATS.pets.owned.includes('coruja') ? (STATS.pets.active === 'coruja' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#b4a7d6; color:#b4a7d6">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#b4a7d6; color:#b4a7d6" onclick="equipPet('coruja')">Equipar</button>`) : `${getPetBtn('coruja', 1500, 15, '#b4a7d6')}`}
+                  </div>
+                </div>
+
+                <div class="card" style="border-color:#ff5e00; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🔥 Fênix de Apolo <span style="font-size:10px; background:#ff5e00; color:#000; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlFenix}</span></div>
+                        ${capFenix 
+                            ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('fenix', '🔥 Fênix')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxFenix})</button></div>`
+                            : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextFenix} acertos</div>`
+                        }
+                     </div>
+                     ${STATS.pets.owned.includes('fenix') ? (STATS.pets.active === 'fenix' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#ff5e00; color:#ff5e00">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#ff5e00; color:#ff5e00" onclick="equipPet('fenix')">Equipar</button>`) : `${getPetBtn('fenix', 2500, 25, '#ff5e00')}`}
+                  </div>
+                </div>
+
+                <div class="card" style="border: 2px solid #e024ff; box-shadow: 0 0 15px rgba(224, 36, 255, 0.2); margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px; color:#e024ff; text-shadow: 0 0 5px rgba(224,36,255,0.5)">🐉 Dragão de Ladão <span style="font-size:10px; background:#e024ff; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px; text-shadow:none">Nv. ${lvlDragao}</span></div>
+                        ${capDragao 
+                            ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('dragao', '🐉 Dragão')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxDragao})</button></div>`
+                            : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextDragao} acertos</div>`
+                        }
+                     </div>
+                     ${STATS.pets.owned.includes('dragao') ? (STATS.pets.active === 'dragao' ? `<button class="btn sm ghost" disabled style="padding:8px; border-color:#e024ff; color:#e024ff">Equipado</button>` : `<button class="btn sm" style="padding:8px; border-color:#e024ff; color:#e024ff" onclick="equipPet('dragao')">Equipar</button>`) : `${getPetBtn('dragao', 10000, 45, '#e024ff')}`}
+                  </div>
+                </div>
+
+            </div>
         </div>
 
-        <!-- Comida 2: Uvas -->
-        <div class="card" style="border-color:#9b59b6; margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">🍇 Uvas de Dionísio</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Lanche suculento. Sacia seu mascote por <span style="color:#9b59b6; font-weight:bold">10 cartas</span>.</div>
-             </div>
-             ${getItemBtn(`feedPet(80, 10)`, 80, 10, '#9b59b6')}
-          </div>
+        <!-- ================== GAVETA: RAÇÕES ================== -->
+        <div>
+            <div onclick="toggleSection('sec-store-food')" style="cursor:pointer; background:rgba(255, 51, 51, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#ff3333; text-transform:uppercase; font-size:12px; border-left:4px solid #ff3333; display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                <span>🍽️ Rações Míticas</span> <span id="sec-store-food-icon">▼</span>
+            </div>
+            <div id="sec-store-food-content" style="display:block; padding-top:8px; display:flex; flex-direction:column; gap:8px">
+                <div style="font-size:12px; color:var(--stone2); text-align:right; margin-bottom:4px">Cargas na Barriga: <span style="color:#ffcc00; font-weight:bold">${STATS.pets.fedCharges || 0}</span></div>
+                <div class="card" style="border-color:#8e44ad; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🌱 Sementes de Romã</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Sacia seu mascote por <span style="color:#8e44ad; font-weight:bold">5 cartas</span>.</div>
+                     </div>
+                     ${getItemBtn(`feedPet(40, 5)`, 40, 0, '#8e44ad')}
+                  </div>
+                </div>
+                <div class="card" style="border-color:#9b59b6; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🍇 Uvas de Dionísio</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Sacia seu mascote por <span style="color:#9b59b6; font-weight:bold">10 cartas</span>.</div>
+                     </div>
+                     ${getItemBtn(`feedPet(80, 10)`, 80, 10, '#9b59b6')}
+                  </div>
+                </div>
+                <div class="card" style="border-color:#ffcc00; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🍎 Maçã das Hespérides</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Sacia seu mascote por <span style="color:#ffcc00; font-weight:bold">20 cartas</span>.</div>
+                     </div>
+                     ${getItemBtn(`feedPet(150, 20)`, 150, 20, '#ffcc00')}
+                  </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Comida 3: Maçã de Ouro -->
-        <div class="card" style="border-color:#ffcc00; margin-bottom:0">
-          <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-             <div style="text-align:left; flex:1; padding-right:8px">
-                <div style="font-weight:bold; font-size:14px">🍎 Maçã das Hespérides</div>
-                <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimento Mítico completo. Sacia seu mascote por <span style="color:#ffcc00; font-weight:bold">20 cartas</span>.</div>
-             </div>
-             ${getItemBtn(`feedPet(150, 20)`, 150, 20, '#ffcc00')}
-          </div>
+        <!-- ================== GAVETA: UPGRADES & EVOLUÇÃO ================== -->
+        <div>
+            <div onclick="toggleSection('sec-store-upgrades')" style="cursor:pointer; background:rgba(46, 204, 113, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#2ecc71; text-transform:uppercase; font-size:12px; border-left:4px solid #2ecc71; display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                <span>⬆️ Oficina de Hefesto (Evolução)</span> <span id="sec-store-upgrades-icon">▼</span>
+            </div>
+            <div id="sec-store-upgrades-content" style="display:block; padding-top:8px; display:flex; flex-direction:column; gap:8px">
+                
+                <p style="font-size:10px; color:var(--stone2); margin-top:-2px; margin-bottom:4px; line-height:1.2">Compre materiais raros para quebrar o limite de nível dos seus Pets e da sua Bolinha (Personagem).</p>
+
+                <!-- Item 1: Cristal de Evolução de Pet -->
+                <div class="card" style="border-color:#2ecc71; box-shadow: 0 0 10px rgba(46, 204, 113, 0.2); margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px; color:#2ecc71">💎 Cristal de Quíron</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Material necessário para evoluir Pets travados nos Níveis 10, 20, 30...</div>
+                        <div style="font-size:11px; margin-top:4px; color:#2ecc71;">Estoque: ${STATS.inventory.petCrystals || 0}</div>
+                     </div>
+                     <!-- Custa 5.000 moedas, exige nível 10 para comprar -->
+                     ${getItemBtn(`buyItem('petCrystals', 5000)`, 5000, 10, '#2ecc71')}
+                  </div>
+                </div>
+
+                <!-- Item 2: Centelha da Bolinha (Prestígio do Personagem) -->
+                <div class="card" style="border-color:#00f5ff; box-shadow: 0 0 10px rgba(0, 245, 255, 0.2); margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px; color:#00f5ff">⚡ Centelha do Olimpo</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Material supremo. Necessário para a Bolinha principal subir de Prestígio.</div>
+                        <div style="font-size:11px; margin-top:4px; color:#00f5ff;">Estoque: ${STATS.inventory.playerSparks || 0}</div>
+                     </div>
+                     <!-- Custa 15.000 moedas, exige nível 20 para comprar -->
+                     ${getItemBtn(`buyItem('playerSparks', 15000)`, 15000, 20, '#00f5ff')}
+                  </div>
+                </div>
+
+            </div>
         </div>
+
     </div>
     
     <div class="btn-row" style="margin-top:14px">
@@ -4739,7 +4789,7 @@ function getUserTitle() {
   '#66ffff',
   '#ccffff'  // 50 ápice (Demóstenes 👑)
    ];
-// ✨ A CORREÇÃO: Agora a cor acompanha o Nível exato do título, e não o Prestígio!
+  // ✨ A CORREÇÃO: Agora a cor acompanha o Nível exato do título, e não o Prestígio!
   const color = prestigeColors[titleIndex]; 
   
   return {
@@ -4751,6 +4801,22 @@ function getUserTitle() {
       currentXP: currentLevelXP,
       nextXP: xpPerLevel
   };
+}
+// ✨ SISTEMA DE LIMIT BREAK (ASCENSÃO)
+function getPetMaxLevel(petId) {
+    if (!STATS.pets.evoLevel) STATS.pets.evoLevel = {};
+    const evo = STATS.pets.evoLevel[petId] || 0;
+    return (evo + 1) * 10; // Evolução 0 = Nv. 10. Evolução 1 = Nv. 20, etc.
+}
+
+// O Teto Exato de XP (Ex: Nível 10 * 50 - 1 = 499 de XP)
+function getPetMaxXP(petId) {
+    return (getPetMaxLevel(petId) * 50) - 1; 
+}
+
+function isPetCapped(petId) {
+    const xpAtual = STATS.pets.affinity[petId] || 0;
+    return xpAtual >= getPetMaxXP(petId);
 }
 // ✨ CONTROLE DO RELÓGIO DE SOBREVIVÊNCIA
 function toggleTimer() {
@@ -5392,13 +5458,13 @@ window.toggleQuestBox = function(id, btnId) {
     }
 };
 
-// ✨ INTERFACE: O Mural Triplo Otimizado (Gavetas e Scroll Interno)
+// ✨ INTERFACE: O Mural Triplo Otimizado (Com Raio-X do Detetive 🕵️‍♂️)
+// ✨ INTERFACE: O Mural Triplo Otimizado (Integrado ao Observer Global)
 function openQuestsModal() {
     generateDailyQuests(); 
     generateWeeklyQuests(); 
     manageAchievements(); 
     
-    // A sua função que desenha a cartinha (MANTIDA INTACTA, só removi a margem inútil de baixo)
     function buildQuestCard(q, index, type) {
         const isDone = q.progress >= q.target;
         const pct = Math.min(100, Math.floor((q.progress / q.target) * 100));
@@ -5438,11 +5504,9 @@ function openQuestsModal() {
         </div>`;
     }
 
-    // ✨ RENDERIZADOR LIMPO: Só mostra o que não foi resgatado, mas preserva a ID verdadeira!
     function renderQuestList(list, type) {
         let htmlGerado = '';
         let contadorAtivas = 0;
-        
         list.forEach((q, i) => {
             if (!q.claimed) {
                 htmlGerado += buildQuestCard(q, i, type);
@@ -5450,15 +5514,13 @@ function openQuestsModal() {
             }
         });
         
-        // Se resgatou tudo, mostra uma mensagem bacana!
         if (contadorAtivas === 0) {
             return `<div style="text-align:center; padding:15px; color:var(--stone2); font-size:12px; font-style:italic; background:rgba(0,0,0,0.1); border-radius:8px;">Tudo limpo por aqui! Bom trabalho. ✨</div>`;
         }
-        
         return htmlGerado;
     }
 
-    // O HEADER E AS GAVETAS COM SCROLL
+    // ✨ HTML CONECTADO AO 'toggleSection' (IGUALZINHO A LOJA)
     let html = `
     <h3 style="margin-bottom:4px; color:var(--gold)">📜 Os Trabalhos de Atena</h3>
     <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Cumpra os objetivos para a Glória do Olimpo!</p>
@@ -5467,30 +5529,30 @@ function openQuestsModal() {
         
         <!-- 1. GAVETA DIÁRIAS -->
         <div>
-            <div onclick="toggleQuestBox('box-daily', 'icon-daily')" style="cursor:pointer; background:rgba(0, 229, 255, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#00e5ff; text-transform:uppercase; font-size:12px; border-left:4px solid #00e5ff; display:flex; justify-content:space-between; align-items:center;">
-                <span>⏳ Diárias</span> <span id="icon-daily">▼</span>
+            <div onclick="toggleSection('sec-quest-daily')" style="cursor:pointer; background:rgba(0, 229, 255, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#00e5ff; text-transform:uppercase; font-size:12px; border-left:4px solid #00e5ff; display:flex; justify-content:space-between; align-items:center;">
+                <span>⏳ Diárias</span> <span id="sec-quest-daily-icon">▼</span>
             </div>
-            <div id="box-daily" style="max-height:290px; overflow-y:auto; padding-right:5px; margin-top:8px; display:block;">
+            <div id="sec-quest-daily-content" style="max-height:290px; overflow-y:auto; padding-right:5px; margin-top:8px; display:block;">
                 ${renderQuestList(STATS.quests, 'daily')}
             </div>
         </div>
 
         <!-- 2. GAVETA SEMANAIS -->
         <div>
-            <div onclick="toggleQuestBox('box-weekly', 'icon-weekly')" style="cursor:pointer; background:rgba(224, 36, 255, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#e024ff; text-transform:uppercase; font-size:12px; border-left:4px solid #e024ff; display:flex; justify-content:space-between; align-items:center;">
-                <span>📅 Semanais</span> <span id="icon-weekly">▼</span>
+            <div onclick="toggleSection('sec-quest-weekly')" style="cursor:pointer; background:rgba(224, 36, 255, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#e024ff; text-transform:uppercase; font-size:12px; border-left:4px solid #e024ff; display:flex; justify-content:space-between; align-items:center;">
+                <span>📅 Semanais</span> <span id="sec-quest-weekly-icon">▼</span>
             </div>
-            <div id="box-weekly" style="max-height:290px; overflow-y:auto; padding-right:5px; margin-top:8px; display:block;">
+            <div id="sec-quest-weekly-content" style="max-height:290px; overflow-y:auto; padding-right:5px; margin-top:8px; display:block;">
                 ${renderQuestList(STATS.weeklyQuests, 'weekly')}
             </div>
         </div>
 
         <!-- 3. GAVETA PRESTÍGIO -->
         <div>
-            <div onclick="toggleQuestBox('box-achiev', 'icon-achiev')" style="cursor:pointer; background:rgba(0, 245, 255, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#00f5ff; text-transform:uppercase; font-size:12px; border-left:4px solid #00f5ff; display:flex; justify-content:space-between; align-items:center;">
-                <span>🏆 Conquistas de Prestígio (Nv. ${STATS.achievements.currentPrestige})</span> <span id="icon-achiev">▼</span>
+            <div onclick="toggleSection('sec-quest-achiev')" style="cursor:pointer; background:rgba(0, 245, 255, 0.1); padding:10px; border-radius:6px; font-weight:bold; color:#00f5ff; text-transform:uppercase; font-size:12px; border-left:4px solid #00f5ff; display:flex; justify-content:space-between; align-items:center;">
+                <span>🏆 Conquistas de Prestígio (Nv. ${STATS.achievements.currentPrestige})</span> <span id="sec-quest-achiev-icon">▼</span>
             </div>
-            <div id="box-achiev" style="max-height:290px; overflow-y:auto; padding-right:5px; margin-top:8px; display:block;">
+            <div id="sec-quest-achiev-content" style="max-height:290px; overflow-y:auto; padding-right:5px; margin-top:8px; display:block;">
                 <p style="font-size:10px; color:var(--stone2); margin-top:0px; margin-bottom:8px">As recompensas resgatadas dobram de dificuldade quando sua Bolinha subir de nível!</p>
                 ${renderQuestList(STATS.achievements.list, 'achievement')}
             </div>
@@ -5504,6 +5566,7 @@ function openQuestsModal() {
     
     openModal(html);
 }
+
 // ✨ MOTOR DE PAGAMENTO DAS CONQUISTAS
 function claimAchievement(index) {
     const q = STATS.achievements.list[index];
@@ -6059,6 +6122,121 @@ function abrirModalEscolhaImagem() {
   document.getElementById('app').style.display = 'flex';
   render();
 })();
+// ✨ O MODAL DE EVOLUÇÃO (LIMIT BREAK) DOS PETS
+function openPetEvolutionModal(petId, petName) {
+    if (!STATS.pets.evoLevel) STATS.pets.evoLevel = {};
+    const evoAtual = STATS.pets.evoLevel[petId] || 0;
+    
+    // A MATEMÁTICA DA DOR (Fica mais caro a cada evolução)
+    const custoMoedas = 15000 * (evoAtual + 1);
+    const custoCristal = 1 * (evoAtual + 1);
+    
+    const hasMoedas = STATS.moedas >= custoMoedas;
+    const hasCristal = STATS.inventory.petCrystals >= custoCristal;
+    const canEvolve = hasMoedas && hasCristal;
+
+    let html = `
+    <h3 style="color:var(--red); text-transform:uppercase; font-weight:bold; text-shadow:0 0 10px rgba(255,0,0,0.4)">🔥 Quebra de Limites</h3>
+    <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">O mascote <b>${petName}</b> atingiu seu potencial máximo atual. Pague o tributo para ascender ao próximo patamar.</p>
+    
+    <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:8px; padding:15px; margin-bottom:15px">
+        <div style="font-weight:bold; color:var(--gold); margin-bottom:10px; font-size:14px">Requisitos de Ascensão:</div>
+        
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px">
+            <span>🪙 Moedas Exigidas:</span>
+            <span style="color:${hasMoedas ? 'var(--green)' : 'var(--red)'}; font-weight:bold">${STATS.moedas.toLocaleString()} / ${custoMoedas.toLocaleString()}</span>
+        </div>
+        
+        <div style="display:flex; justify-content:space-between; font-size:13px">
+            <span>💎 Cristais de Quíron:</span>
+            <span style="color:${hasCristal ? 'var(--green)' : 'var(--red)'}; font-weight:bold">${(STATS.inventory.petCrystals || 0)} / ${custoCristal}</span>
+        </div>
+    </div>
+    
+    <div class="btn-row">
+        <button class="btn ghost" onclick="openStoreModal()">Voltar</button>
+        <button class="btn danger" ${canEvolve ? '' : 'disabled style="opacity:0.4"'} onclick="confirmPetEvolution('${petId}', ${custoMoedas}, ${custoCristal})">
+            ${canEvolve ? '⬆️ ASCENDER MASCOTE' : '🔒 FALTAM RECURSOS'}
+        </button>
+    </div>`;
+    
+    openModal(html);
+}
+
+function confirmPetEvolution(petId, moedas, cristais) {
+    STATS.moedas -= moedas;
+    STATS.inventory.petCrystals -= cristais;
+    STATS.pets.evoLevel[petId] = (STATS.pets.evoLevel[petId] || 0) + 1;
+    
+    if (typeof saveStats === 'function') saveStats();
+    if (typeof triggerScreenShake === 'function') triggerScreenShake();
+    
+    toast('🎇 LIMIT BREAK! Seu mascote ascendeu e pode subir de nível novamente!', 'var(--gold)');
+    openStoreModal(); // Volta pra loja e mostra que desativou a trava
+}
+// ✨ MODAL DE ASCENSÃO DO JOGADOR
+function openPlayerAscensionModal() {
+    const rank = getUserTitle();
+    
+    // Supondo que a variável de prestígio fique salva na sua STATS
+    if (STATS.achievements.currentPrestige === undefined) STATS.achievements.currentPrestige = 1;
+    const currentPrestige = STATS.achievements.currentPrestige;
+    
+    // Exigências para a Bolinha subir
+    const reqMoedas = 50000 * currentPrestige;
+    const reqCentelhas = 1 * currentPrestige; // Aquele item 'playerSparks' que colocamos na loja
+    
+    // Regra: Só pode evoluir a bolinha se a XP estiver cheia!
+    const isXpMaxed = rank.currentXP >= rank.nextXP;
+    
+    const hasMoedas = STATS.moedas >= reqMoedas;
+    const hasCentelhas = (STATS.inventory.playerSparks || 0) >= reqCentelhas;
+    const canAscend = isXpMaxed && hasMoedas && hasCentelhas;
+
+    let html = `
+    <h3 style="color:#00f5ff; text-transform:uppercase; font-weight:bold; text-shadow:0 0 10px rgba(0,245,255,0.4)">⚡ Ascensão do Herói</h3>
+    <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Evolua sua Bolinha para o Prestígio <b>${currentPrestige + 1}</b>! Isso demonstrará seu domínio absoluto sobre o idioma.</p>
+    
+    <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:8px; padding:15px; margin-bottom:15px">
+        <div style="font-weight:bold; color:var(--gold); margin-bottom:10px; font-size:14px">Requisitos de Prestígio:</div>
+        
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px">
+            <span>✨ Nível Máximo Atingido:</span>
+            <span style="color:${isXpMaxed ? 'var(--green)' : 'var(--red)'}; font-weight:bold">${isXpMaxed ? 'Sim' : 'Não'}</span>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px">
+            <span>🪙 Tributo em Ouro:</span>
+            <span style="color:${hasMoedas ? 'var(--green)' : 'var(--red)'}; font-weight:bold">${STATS.moedas.toLocaleString()} / ${reqMoedas.toLocaleString()}</span>
+        </div>
+        
+        <div style="display:flex; justify-content:space-between; font-size:13px">
+            <span>⚡ Centelhas Divinas:</span>
+            <span style="color:${hasCentelhas ? 'var(--green)' : 'var(--red)'}; font-weight:bold">${(STATS.inventory.playerSparks || 0)} / ${reqCentelhas}</span>
+        </div>
+    </div>
+    
+    <div class="btn-row">
+        <button class="btn ghost" onclick="closeModal()">Mais Tarde</button>
+        <button class="btn success" style="background:#00f5ff; color:#000; font-weight:bold" ${canAscend ? '' : 'disabled style="opacity:0.4"'} onclick="confirmPlayerAscension(${reqMoedas}, ${reqCentelhas})">
+            ${canAscend ? '⬆️ SUBIR PARA PRESTÍGIO ' + (currentPrestige + 1) : '🔒 REQUISITOS NÃO ATINGIDOS'}
+        </button>
+    </div>`;
+    
+    openModal(html);
+}
+
+function confirmPlayerAscension(moedas, centelhas) {
+    STATS.moedas -= moedas;
+    STATS.inventory.playerSparks -= centelhas;
+    STATS.achievements.currentPrestige++; // Sobe a bolinha!
+    
+    if (typeof saveStats === 'function') saveStats();
+    
+    toast(`⚡ ASCENSÃO SUPREMA! Você agora é Prestígio ${STATS.achievements.currentPrestige}!`, 'var(--blue)');
+    closeModal();
+    updateHeader(); // Atualiza a bolinha na hora
+}
 /* ═══════════════════════════════════════
    🧠 MOTOR DE MEMÓRIA DE INTERFACE E GAVETAS (INTELIGENTE)
 ═══════════════════════════════════════ */
@@ -6147,8 +6325,12 @@ const uiObserver = new MutationObserver(() => {
     }
   });
 
-  // --- 2. ✨ A NOVA LÓGICA (Vigiando as Gavetas) ---
-  const sections = ['sec-manual', 'sec-magic', 'sec-rev', 'sec-free'];
+// --- 2. ✨ A NOVA LÓGICA (Vigiando as Gavetas do App, Loja E Missões!) ---
+  const sections = [
+      'sec-manual', 'sec-magic', 'sec-rev', 'sec-free', // Originais
+      'sec-store-gacha', 'sec-store-items', 'sec-store-pets', 'sec-store-food', 'sec-store-upgrades', // Da loja
+      'sec-quest-daily', 'sec-quest-weekly', 'sec-quest-achiev' // ✨ AS NOVAS DAS MISSÕES!
+  ];
   
   sections.forEach(sec => {
       const content = document.getElementById(sec + '-content');
@@ -6186,6 +6368,7 @@ const uiObserver = new MutationObserver(() => {
 
 // Liga o observador unificado!
 uiObserver.observe(document.body, { childList: true, subtree: true });
+
 </script>
 </body>
 </html>
