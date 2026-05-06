@@ -554,6 +554,12 @@ const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 let checandoMissoes = false;
 
 function playSfx(type) {
+  if (!STATS.totalAcertos) STATS.totalAcertos = 0; // Cria o contador na memória se não existir
+    
+    // ✨ CONTA OS ACERTOS EM SEGUNDO PLANO
+    if (type === 'ok' || type === 'crit') {
+        STATS.totalAcertos++;
+    }
   if (!studySession) return;
   const sess = studySession;
 
@@ -663,16 +669,14 @@ function playSfx(type) {
             // ✨ NOVIDADE: Evento Festa dos Pets multiplica afinidade por 3
             let ganhoAfin = (STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_aff') ? 3 : 1;
             
-            // ✨ A TRAVA DO NÍVEL DO PET NO PLAYSFX
+            // ✨ GANHO DE XP DO PET (Sempre ganha, vai direto pra poupança!)
+            STATS.pets.affinity[activePet] += ganhoAfin; 
+
+            // Se estiver acima do limite, o poder dele não sobe, então avisamos o jogador!
             if (isPetCapped(activePet)) {
-                // Removi os 15%! Agora tem 50% de chance e avisa quase SEMPRE que o pet tentar ganhar XP e não puder!
-                if (Math.random() < 0.50) toast(`⚠️ Seu ${activePet.toUpperCase()} estagnou! Evolua-o na Loja!`, 'var(--red)');
-            } else {
-                STATS.pets.affinity[activePet] += ganhoAfin;
-                
-                // Segurança máxima: Se esse ganho de XP ultrapassar o 499, nós cravamos no 499 exato!
-                if (STATS.pets.affinity[activePet] > getPetMaxXP(activePet)) {
-                    STATS.pets.affinity[activePet] = getPetMaxXP(activePet);
+                // Coloquei 15% de chance de novo para não irritar o jogador a cada resposta
+                if (Math.random() < 0.15) {
+                    toast(`⚠️ Poder do ${activePet.toUpperCase()} estagnou! XP salvo em 2º plano. Evolua-o!`, 'var(--red)');
                 }
             }
             
@@ -1230,7 +1234,7 @@ function render() {
   else if (currentTab === 'stats') body.innerHTML = buildStatsTab();
   attachListeners();
 }
-
+// ✨ O CABEÇALHO DO JOGO (COM A BOLINHA CLICÁVEL)
 function updateHeader() {
   const due = dueCards();
   document.getElementById('hDue').textContent = due.length;
@@ -1249,23 +1253,26 @@ function updateHeader() {
   const progEl = document.getElementById('hProg');
   if(progEl) progEl.style.width = pct + '%';
 
-// ✨ A BOLINHA DE PRESTÍGIO NA TELA (Agora Clicável!)
+  // ✨ A BOLINHA DE PRESTÍGIO NA TELA (Agora Clicável!)
   const rank = getUserTitle();
   const subtitleEl = document.querySelector('.app-subtitle');
+  
   if (subtitleEl) {
+      // Se estiver travado, faz o botão piscar e ficar vermelho!
+      const xpStyle = rank.isMaxed ? 'color:#ff2424; text-shadow:0 0 8px rgba(255,0,0,0.8); animation: pulse 1.5s infinite;' : 'color:var(--stone2);';
+      const xpText = rank.isMaxed ? '⚡ LIMITE! CLIQUE PARA ASCENDER' : `XP: ${rank.currentXP.toLocaleString()} / ${rank.nextXP.toLocaleString()} ✨`;
+
       subtitleEl.innerHTML = `
-         <!-- Envolvi tudo num botão para poder clicar -->
          <div onclick="openPlayerAscensionModal()" style="cursor:pointer; transition: transform 0.2s" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
              <div style="display:inline-flex; flex-direction:column; align-items:center; gap:2px;">
                  <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.05); padding:1px 2px; border-radius:12px; border: 1px solid ${rank.color}">
                      <span style="background:${rank.color}; color:#000; border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold">${rank.prestige}</span>
                      <span style="color:${rank.color}; font-weight:bold; letter-spacing:1px; font-size:10px;margin-right: 3px; text-shadow: 0 0 5px ${rank.color}40">${rank.icon} ${rank.title}</span>
                  </div>
-                 <div style="font-size:10px; font-weight:bold; color:var(--stone2); letter-spacing:1px">XP: ${rank.currentXP.toLocaleString()} / ${rank.nextXP.toLocaleString()} ✨</div>
+                 <div style="font-size:10px; font-weight:bold; letter-spacing:1px; ${xpStyle}">${xpText}</div>
              </div>
          </div>
          
-         <!-- Botões de Áudio/Tempo continuam iguais... -->
          <div style="display:inline-flex; align-items:center; margin-left:0px; margin-top:16px">
              <button id="btnTimer" onclick="toggleTimer()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${enableTimer?'1':'0.4'}" title="Relógio">${enableTimer?'⏳':'⏸️'}</button>
              <button id="btnAudio" onclick="toggleAudio()" style="background:none;border:none;font-size:14px;cursor:pointer;opacity:${autoPlayAudio?'1':'0.4'}; margin-left:4px" title="Áudio">${autoPlayAudio?'🔊':'🔈'}</button>
@@ -1274,37 +1281,33 @@ function updateHeader() {
   }
   
   // Executa o Fiscal do Level Up
-  checkLevelUp(rank);
+  if (typeof checkLevelUp === 'function') checkLevelUp(rank);
   // ✨ Ativa o Relógio Mestre dos Eventos Especiais
-  runEventManager();
+  if (typeof runEventManager === 'function') runEventManager();
   if (typeof checkQuestNotifications === 'function') checkQuestNotifications();
 }
 
-// ✨ O FISCAL DE LEVEL UP (Imune a fraudes!)
+  // ✨ O FISCAL DE LEVEL UP (Imune a fraudes!)
 function checkLevelUp(rank) {
-   // Registra o nível máximo que o jogador já chegou (Impede de ganhar vida apagando e recriando cartas)
    if (STATS.highestLevelEver === undefined) {
        STATS.highestLevelEver = rank.level;
-       return; // Sai silenciosamente na primeira vez que o app abre
+       return; 
    }
    
-   if (rank.level > STATS.highestLevelEver) {
-       STATS.highestLevelEver = rank.level; // Atualiza o recorde
+   // Só ganha a vida e bate palma se NÃO estiver travado pelo Prestígio
+   if (rank.level > STATS.highestLevelEver && !rank.isMaxed) {
+       STATS.highestLevelEver = rank.level; 
        
-       // PRÊMIO: +1 Vida ❤️
        if (STATS.vidas === undefined) STATS.vidas = 3;
        STATS.vidas++; 
        if (typeof saveStats === 'function') saveStats();
        
-       // CELEBRAÇÃO 1: Confetes explodem Imediatamente!
        if (typeof shootConfetti === 'function') shootConfetti();
        
-       // CELEBRAÇÃO 2: Espera 1 segundo para as Palmas, a Notificação de Vida e a atualização do menu!
        setTimeout(() => {
            playLevelUpSfx();
            showFloatingText(`👑 LEVEL UP! +1 ❤️`, rank.color);
            
-           // Atualiza o contador de vida na tela agora que você já ouviu o som
            const vidasEl = document.getElementById('hVidas');
            if (vidasEl) vidasEl.textContent = STATS.vidas + '❤️';
        }, 1000); 
@@ -3802,8 +3805,11 @@ function openStoreModal() {
       return `<button class="btn sm" style="padding:8px; border-color:${colorHex}; color:${colorHex}" onclick="${action}">${price} 🪙</button>`;
   }
 
-  const getLvl = (id) => Math.floor((STATS.pets.affinity[id] || 0) / 50) + 1;
-  const getNext = (id) => 50 - ((STATS.pets.affinity[id] || 0) % 50);
+// Agora a Loja usa o nível travado para calcular os bônus que aparecem na tela
+  const getLvl = (id) => getPetCappedLevel(id);
+  
+  // Se o pet travou, diz que falta "0 acertos" pro limite atual. 
+  const getNext = (id) => isPetCapped(id) ? 0 : 50 - ((STATS.pets.affinity[id] || 0) % 50);
 
   const lvlCoruja = getLvl('coruja'), nextCoruja = getNext('coruja'), powCoruja = 10 + ((lvlCoruja - 1) * 2);
   const lvlFenix = getLvl('fenix'), nextFenix = getNext('fenix'), powFenix = 4 + (lvlFenix - 1);
@@ -4660,136 +4666,70 @@ function loadStarter() {
 /* ═══════════════════════════════════════
    UTILS
 ═══════════════════════════════════════ */
-// ✨ SISTEMA HÍBRIDO DE PRESTÍGIO E XP INFINITO
+// ✨ SISTEMA HÍBRIDO DE PRESTÍGIO E XP INFINITO (Com Trava de Ascensão)
 function getUserTitle() {
   if (!STATS.earnedXP) STATS.earnedXP = 0;
+  
+  // O PRESTÍGIO agora é uma variável controlada pelo Modal da Loja!
+  // Se não existir, nasce como 1.
+  if (STATS.achievements === undefined) STATS.achievements = {};
+  if (STATS.achievements.currentPrestige === undefined) STATS.achievements.currentPrestige = 1;
+  
+  const prestige = STATS.achievements.currentPrestige; 
   
   // 1 Carta = 50 XP Base. Somado ao XP que você ganha jogando!
   const baseXP = W.length * 50; 
   const totalXP = baseXP + STATS.earnedXP;
   
-  const xpPerLevel = 1000; // A cada 1000 XP, você sobe de nível e ganha vida!
-  const level = Math.floor(totalXP / xpPerLevel);
-  const currentLevelXP = totalXP % xpPerLevel; // O XP que sobra para mostrar na barrinha
+  const xpPerLevel = 1000; 
+  let level = Math.floor(totalXP / xpPerLevel);
+  let currentLevelXP = totalXP % xpPerLevel; 
   
   const titles = [
-    { t: 'Plebeu', icon: '⛺' },
-    { t: 'Noviço', icon: '🪶' },
-    { t: 'Iniciado', icon: '📘' },
-    { t: 'Aprendiz', icon: '📖' },
-    { t: 'Discípulo', icon: '📚' },
-    { t: 'Leitor', icon: '👀' },
-    { t: 'Copista', icon: '✍️' },
-    { t: 'Escriba', icon: '🖋️' },
-    { t: 'Redator', icon: '📝' },
-    { t: 'Orador', icon: '🗣️' },
-    { t: 'Vocal', icon: '🎙️' },
-    { t: 'Locutor', icon: '📢' },
-    { t: 'Artífice', icon: '🛠️' },
-    { t: 'Lógico', icon: '🧠' },
-    { t: 'Analista', icon: '🔍' },
-    { t: 'Dialético', icon: '🔄' },
-    { t: 'Debatedor', icon: '⚔️' },
-    { t: 'Retórico', icon: '📜' },
-    { t: 'Persuasor', icon: '🎯' },
-    { t: 'Convincente', icon: '💬' },
-    { t: 'Influente', icon: '🌐' },
-    { t: 'Filósofo', icon: '🏛️' },
-    { t: 'Sofista', icon: '🎓' },
-    { t: 'Sábio', icon: '🦉' },
-    { t: 'Erudito', icon: '📚✨' },
-    { t: 'Mentor', icon: '🧑‍🏫' },
-    { t: 'Mestre', icon: '🎓' },
-    { t: 'Tribuno', icon: '🦁' },
-    { t: 'Magistrado', icon: '⚖️' },
-    { t: 'Preceptor', icon: '📘' },
-    { t: 'Senador', icon: '📜' },
-    { t: 'Cônsul', icon: '🦅' },
-    { t: 'Oráculo', icon: '🔮' },
-    { t: 'Arconte', icon: '👑' },
-    { t: 'Estratégico', icon: '♟️' },
-    { t: 'Dominante', icon: '💪' },
-    { t: 'Ascendente', icon: '⬆️' },
-    { t: 'Ilustre', icon: '✨' },
-    { t: 'Exímio', icon: '💎' },
-    { t: 'Magnífico', icon: '🌟' },
-    { t: 'Supremo', icon: '🔥' },
-    { t: 'Lendário', icon: '⚡' },
-    { t: 'Imortal', icon: '♾️' },
-    { t: 'Retor', icon: '🏆' },
-    { t: 'Eminente', icon: '👑✨' },
-    { t: 'Ícone', icon: '🌠' },
-    { t: 'Mítico', icon: '🐉' },
-    { t: 'Apogeu', icon: '🌅' },
-    { t: 'Ápice', icon: '🚀' },
-    { t: 'Demóstenes', icon: '👑🔥' }
+    { t: 'Plebeu', icon: '⛺' }, { t: 'Noviço', icon: '🪶' }, { t: 'Iniciado', icon: '📘' },
+    { t: 'Aprendiz', icon: '📖' }, { t: 'Discípulo', icon: '📚' }, { t: 'Leitor', icon: '👀' },
+    { t: 'Copista', icon: '✍️' }, { t: 'Escriba', icon: '🖋️' }, { t: 'Redator', icon: '📝' },
+    { t: 'Orador', icon: '🗣️' }, { t: 'Vocal', icon: '🎙️' }, { t: 'Locutor', icon: '📢' },
+    { t: 'Artífice', icon: '🛠️' }, { t: 'Lógico', icon: '🧠' }, { t: 'Analista', icon: '🔍' },
+    { t: 'Dialético', icon: '🔄' }, { t: 'Debatedor', icon: '⚔️' }, { t: 'Retórico', icon: '📜' },
+    { t: 'Persuasor', icon: '🎯' }, { t: 'Convincente', icon: '💬' }, { t: 'Influente', icon: '🌐' },
+    { t: 'Filósofo', icon: '🏛️' }, { t: 'Sofista', icon: '🎓' }, { t: 'Sábio', icon: '🦉' },
+    { t: 'Erudito', icon: '📚✨' }, { t: 'Mentor', icon: '🧑‍🏫' }, { t: 'Mestre', icon: '🎓' },
+    { t: 'Tribuno', icon: '🦁' }, { t: 'Magistrado', icon: '⚖️' }, { t: 'Preceptor', icon: '📘' },
+    { t: 'Senador', icon: '📜' }, { t: 'Cônsul', icon: '🦅' }, { t: 'Oráculo', icon: '🔮' },
+    { t: 'Arconte', icon: '👑' }, { t: 'Estratégico', icon: '♟️' }, { t: 'Dominante', icon: '💪' },
+    { t: 'Ascendente', icon: '⬆️' }, { t: 'Ilustre', icon: '✨' }, { t: 'Exímio', icon: '💎' },
+    { t: 'Magnífico', icon: '🌟' }, { t: 'Supremo', icon: '🔥' }, { t: 'Lendário', icon: '⚡' },
+    { t: 'Imortal', icon: '♾️' }, { t: 'Retor', icon: '🏆' }, { t: 'Eminente', icon: '👑✨' },
+    { t: 'Ícone', icon: '🌠' }, { t: 'Mítico', icon: '🐉' }, { t: 'Apogeu', icon: '🌅' },
+    { t: 'Ápice', icon: '🚀' }, { t: 'Demóstenes', icon: '👑🔥' }
   ];
   
-  const prestige = Math.floor(level / titles.length) + 1;
+  // ✨ A SUPER TRAVA DE SEGURANÇA (Se o XP for maior que o limite do Prestígio atual)
+  const maxLevelForPrestige = prestige * titles.length; // Ex: Prestígio 1 trava no nível 50.
+  
+  let isMaxed = false;
+  if (level >= maxLevelForPrestige) {
+      level = maxLevelForPrestige - 1; // Trava no último título (Demóstenes)
+      currentLevelXP = xpPerLevel; // A barra fica no visual "1000 / 1000" cheia!
+      isMaxed = true; // Flag para piscar o botão vermelho depois
+  }
+  
   const titleIndex = level % titles.length; 
   
   const prestigeColors = [
-  '#5a5a5a', // 1 ferro bruto
-  '#616161',
-  '#696969',
-  '#707070',
-  '#787878',
+  '#5a5a5a', '#616161', '#696969', '#707070', '#787878',
+  '#808080', '#888888', '#909090', '#989898', '#a0a0a0',
+  '#7a5c2e', '#8a6a35', '#9a783c', '#aa8643', '#ba944a',
+  '#c0c0c0', '#c8c8c8', '#d0d0d0', '#d8d8d8', '#e0e0e0',
+  '#d4af37', '#ddb93f', '#e6c347', '#efcd4f', '#f8d757',
+  '#ff6b6b', '#ff5252', '#ff3b3b', '#ff2424', '#ff0d0d',
+  '#c77dff', '#b266ff', '#9d4edd', '#8936c9', '#741fb5',
+  '#5a189a', '#4a148c', '#3c096c', '#2d00f7', '#240046',
+  '#4361ee', '#3a0ca3', '#3f37c9', '#4895ef', '#4cc9f0',
+  '#00e5ff', '#00f5ff', '#00ffff', '#66ffff', '#ccffff'
+  ];
 
-  '#808080', // 6 aço
-  '#888888',
-  '#909090',
-  '#989898',
-  '#a0a0a0',
-
-  '#7a5c2e', // 11 bronze
-  '#8a6a35',
-  '#9a783c',
-  '#aa8643',
-  '#ba944a',
-
-  '#c0c0c0', // 16 prata
-  '#c8c8c8',
-  '#d0d0d0',
-  '#d8d8d8',
-  '#e0e0e0',
-
-  '#d4af37', // 21 ouro
-  '#ddb93f',
-  '#e6c347',
-  '#efcd4f',
-  '#f8d757',
-
-  '#ff6b6b', // 26 rubi
-  '#ff5252',
-  '#ff3b3b',
-  '#ff2424',
-  '#ff0d0d',
-
-  '#c77dff', // 31 ametista
-  '#b266ff',
-  '#9d4edd',
-  '#8936c9',
-  '#741fb5',
-
-  '#5a189a', // 36 roxo profundo
-  '#4a148c',
-  '#3c096c',
-  '#2d00f7',
-  '#240046',
-
-  '#4361ee', // 41 energia azul
-  '#3a0ca3',
-  '#3f37c9',
-  '#4895ef',
-  '#4cc9f0',
-
-  '#00e5ff', // 46 ciano lendário
-  '#00f5ff',
-  '#00ffff',
-  '#66ffff',
-  '#ccffff'  // 50 ápice (Demóstenes 👑)
-   ];
-  // ✨ A CORREÇÃO: Agora a cor acompanha o Nível exato do título, e não o Prestígio!
   const color = prestigeColors[titleIndex]; 
   
   return {
@@ -4799,25 +4739,33 @@ function getUserTitle() {
       prestige: prestige,
       level: level,
       currentXP: currentLevelXP,
-      nextXP: xpPerLevel
+      nextXP: xpPerLevel,
+      isMaxed: isMaxed // Diz para a tela se o limite foi batido
   };
 }
-// ✨ SISTEMA DE LIMIT BREAK (ASCENSÃO)
+
+// ✨ SISTEMA DE LIMIT BREAK (XP acumulando em Segundo Plano)
 function getPetMaxLevel(petId) {
     if (!STATS.pets.evoLevel) STATS.pets.evoLevel = {};
     const evo = STATS.pets.evoLevel[petId] || 0;
-    return (evo + 1) * 10; // Evolução 0 = Nv. 10. Evolução 1 = Nv. 20, etc.
+    return (evo + 1) * 10; // Evolução 0 = Trava no 10. Evolução 1 = 20...
 }
 
-// O Teto Exato de XP (Ex: Nível 10 * 50 - 1 = 499 de XP)
-function getPetMaxXP(petId) {
-    return (getPetMaxLevel(petId) * 50) - 1; 
+function getPetRealLevel(petId) {
+    const xpAtual = STATS.pets.affinity[petId] || 0;
+    return Math.floor(xpAtual / 50) + 1; // O nível "Invisível" que acumula infinitamente
+}
+
+function getPetCappedLevel(petId) {
+    // O nível que realmente dá poder ao pet (Fica preso no teto até você pagar)
+    return Math.min(getPetRealLevel(petId), getPetMaxLevel(petId));
 }
 
 function isPetCapped(petId) {
-    const xpAtual = STATS.pets.affinity[petId] || 0;
-    return xpAtual >= getPetMaxXP(petId);
+    // Se o nível invisível for igual ou maior que o limite, acende o botão da Loja!
+    return getPetRealLevel(petId) >= getPetMaxLevel(petId);
 }
+
 // ✨ CONTROLE DO RELÓGIO DE SOBREVIVÊNCIA
 function toggleTimer() {
   enableTimer = !enableTimer;
@@ -6174,28 +6122,33 @@ function confirmPetEvolution(petId, moedas, cristais) {
     toast('🎇 LIMIT BREAK! Seu mascote ascendeu e pode subir de nível novamente!', 'var(--gold)');
     openStoreModal(); // Volta pra loja e mostra que desativou a trava
 }
-// ✨ MODAL DE ASCENSÃO DO JOGADOR
+// ✨ MODAL DE ASCENSÃO DO JOGADOR (AGORA COM EXIGÊNCIA DE ACERTOS!)
 function openPlayerAscensionModal() {
     const rank = getUserTitle();
     
-    // Supondo que a variável de prestígio fique salva na sua STATS
+    if (STATS.achievements === undefined) STATS.achievements = {};
     if (STATS.achievements.currentPrestige === undefined) STATS.achievements.currentPrestige = 1;
+    if (STATS.totalAcertos === undefined) STATS.totalAcertos = 0;
+    
     const currentPrestige = STATS.achievements.currentPrestige;
+    const acertosAtuais = STATS.totalAcertos;
     
-    // Exigências para a Bolinha subir
+    // 🚨 OS REQUISITOS (A Matemática do Sofrimento)
     const reqMoedas = 50000 * currentPrestige;
-    const reqCentelhas = 1 * currentPrestige; // Aquele item 'playerSparks' que colocamos na loja
+    const reqCentelhas = 1 * currentPrestige;
+    const reqAcertos = 1000 * currentPrestige; // 1000, 2000, 3000 acertos...
     
-    // Regra: Só pode evoluir a bolinha se a XP estiver cheia!
+    // Checagens
     const isXpMaxed = rank.currentXP >= rank.nextXP;
-    
     const hasMoedas = STATS.moedas >= reqMoedas;
     const hasCentelhas = (STATS.inventory.playerSparks || 0) >= reqCentelhas;
-    const canAscend = isXpMaxed && hasMoedas && hasCentelhas;
+    const hasAcertos = acertosAtuais >= reqAcertos;
+    
+    const canAscend = isXpMaxed && hasMoedas && hasCentelhas && hasAcertos;
 
     let html = `
     <h3 style="color:#00f5ff; text-transform:uppercase; font-weight:bold; text-shadow:0 0 10px rgba(0,245,255,0.4)">⚡ Ascensão do Herói</h3>
-    <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Evolua sua Bolinha para o Prestígio <b>${currentPrestige + 1}</b>! Isso demonstrará seu domínio absoluto sobre o idioma.</p>
+    <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Evolua sua Bolinha para o Prestígio <b>${currentPrestige + 1}</b>! Prove seu domínio absoluto sobre o idioma para ascender.</p>
     
     <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:8px; padding:15px; margin-bottom:15px">
         <div style="font-weight:bold; color:var(--gold); margin-bottom:10px; font-size:14px">Requisitos de Prestígio:</div>
@@ -6203,6 +6156,11 @@ function openPlayerAscensionModal() {
         <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px">
             <span>✨ Nível Máximo Atingido:</span>
             <span style="color:${isXpMaxed ? 'var(--green)' : 'var(--red)'}; font-weight:bold">${isXpMaxed ? 'Sim' : 'Não'}</span>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px">
+            <span>🎯 Cartas Acertadas:</span>
+            <span style="color:${hasAcertos ? 'var(--green)' : 'var(--red)'}; font-weight:bold">${acertosAtuais.toLocaleString()} / ${reqAcertos.toLocaleString()}</span>
         </div>
 
         <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px">
@@ -6230,6 +6188,9 @@ function confirmPlayerAscension(moedas, centelhas) {
     STATS.moedas -= moedas;
     STATS.inventory.playerSparks -= centelhas;
     STATS.achievements.currentPrestige++; // Sobe a bolinha!
+    
+    // NOTA: Nós NÃO zeramos os acertos totais! O cara batalhou muito por eles. 
+    // Como a próxima exigência é multiplicada, ele terá que conseguir +1000 acertos naturalmente.
     
     if (typeof saveStats === 'function') saveStats();
     
