@@ -6051,7 +6051,55 @@ function buyGachaBox(boxType, price) {
     `);
 }
 // ✨ SINTETIZADOR RETRÔ DE ÁUDIO PARA O GACHA
+// ✨ SINTETIZADOR RETRÔ DE ÁUDIO PARA O GACHA
+function playGachaSound(soundType) {
+    // Verifica se o áudio do jogo está ativado/disponível
+    if (typeof audioCtx === 'undefined' || !audioCtx) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    // Função interna para tocar uma nota musical rápida
+    function playNote(freq, typeOsc, startTime, duration) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = typeOsc;
+        osc.frequency.setValueAtTime(freq, startTime);
+        
+        // Efeito de "fade out" no som para não estourar o ouvido
+        gain.gain.setValueAtTime(0.1, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+    }
+
+    const now = audioCtx.currentTime;
+
+    if (soundType === 'win') {
+        // 🌟 SOM DE VITÓRIA: Notas subindo felizes
+        playNote(440.00, 'sine', now, 0.1);       // Lá
+        playNote(554.37, 'sine', now + 0.1, 0.1); // Dó sustenido
+        playNote(659.25, 'sine', now + 0.2, 0.3); // Mi (Longo)
+    } 
+    else if (soundType === 'jackpot') {
+        // 🎰 SOM DE JACKPOT SUPREMO: Fanfarra Épica
+        playNote(523.25, 'square', now, 0.1);       // Dó
+        playNote(659.25, 'square', now + 0.1, 0.1); // Mi
+        playNote(783.99, 'square', now + 0.2, 0.1); // Sol
+        playNote(1046.50, 'square', now + 0.3, 0.4); // Dó Agudo (Forte)
+        // Adiciona um grave junto para dar impacto
+        playNote(261.63, 'sine', now + 0.3, 0.4); 
+    } 
+    else if (soundType === 'loss') {
+        // 🌩️ SOM DE DERROTA: Notas descendo tristes
+        playNote(300, 'sawtooth', now, 0.2);
+        playNote(250, 'sawtooth', now + 0.2, 0.2);
+        playNote(200, 'sawtooth', now + 0.4, 0.4);
+    }
+}
 // ✨ A MÁQUINA DA SORTE COM RARIDADE E BLINDAGEM (Corrigida!)
+
 function playGacha() {
     if (!STATS.inventory) STATS.inventory = {};
     if (!STATS.pets) STATS.pets = {};
