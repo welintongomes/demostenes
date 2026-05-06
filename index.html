@@ -65,7 +65,7 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Crimson
 /* ── CARDS ── */
 .card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);overflow:clip;margin-bottom:12px;position:relative;}
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.4),transparent);}
-.card-head{margin: 5px;padding:0px 0px;display:flex;align-items:baseline;gap: 31px;justify-content:space-between;}
+.card-head{margin: 5px;padding:0px 0px;display:flex;align-items:baseline;gap: 20px;justify-content:space-between;}
 .card-title{font-family:'Cinzel',serif;font-size:13px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--stone3);}
 .card-body{padding:14px;}
 
@@ -338,8 +338,10 @@ svg.ring{transform:rotate(-90deg);}
 </button>
     <div class="tab on" data-tab="study" onclick="setTab('study')">📚 Estudar</div>
     <div class="tab" data-tab="words" onclick="setTab('words')">📖 Léxico</div>
-    <div class="tab" data-tab="add" onclick="setTab('add')">✦ Adicionar</div>
+    <div class="tab" data-tab="add" onclick="setTab('add')">➕ Add</div>
     <div class="tab" data-tab="stats" onclick="setTab('stats')">⚑ Estatus</div>
+        <button onclick="openStoreModal()" style="width: 40px; height: 40px; border-radius: 50%; background: #14121000; border: none; color: white; font-size: 20px; display: inline-flex; justify-content: center; align-items: center; cursor: pointer;" title="Configurações">🛒</button>
+
     <!-- ⚙️ BOTÃO DE CONFIGURAÇÕES -->
     <button onclick="abrirConfig()" style="width: 40px; height: 40px; border-radius: 50%; background: #14121000; border: none; color: white; font-size: 20px; display: inline-flex; justify-content: center; align-items: center; cursor: pointer;" title="Configurações">⚙️</button>
   </div>
@@ -554,11 +556,17 @@ const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 let checandoMissoes = false;
 
 function playSfx(type) {
-  if (!STATS.totalAcertos) STATS.totalAcertos = 0; // Cria o contador na memória se não existir
+    if (!STATS.totalAcertos) STATS.totalAcertos = 0; 
+    if (!STATS.acertosComRelogio) STATS.acertosComRelogio = 0; // ✨ Novo contador do relógio!
     
-    // ✨ CONTA OS ACERTOS EM SEGUNDO PLANO
+    // CONTA OS ACERTOS EM SEGUNDO PLANO
     if (type === 'ok' || type === 'crit') {
         STATS.totalAcertos++;
+        
+        // ✨ Se ele acertou E o relógio estava ligado, ganha um ponto hardcore!
+        if (typeof enableTimer !== 'undefined' && enableTimer === true) {
+            STATS.acertosComRelogio++;
+        }
     }
   if (!studySession) return;
   const sess = studySession;
@@ -3962,6 +3970,7 @@ function openStoreModal() {
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🐢 Tartaruga de Esopo <span style="font-size:10px; background:#27ae60; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlTartaruga}</span></div>
+                                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#27ae60; font-weight:bold">+${powTartaruga} ✨</span> extras.</div>
                         ${capTartaruga 
                             ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('tartaruga', '🐢 Tartaruga')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxTartaruga})</button></div>`
                             : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextTartaruga} acertos</div>`
@@ -3975,6 +3984,7 @@ function openStoreModal() {
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🐜 Formiga Mirmidão <span style="font-size:10px; background:#d35400; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlFormiga}</span></div>
+                                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#d35400; font-weight:bold">+${powFormiga} 🪙</span> extras.</div>
                         ${capFormiga 
                             ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('formiga', '🐜 Formiga')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxFormiga})</button></div>`
                             : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextFormiga} acertos</div>`
@@ -3988,6 +3998,7 @@ function openStoreModal() {
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🦉 Coruja de Atena <span style="font-size:10px; background:#b4a7d6; color:#000; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlCoruja}</span></div>
+                                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#b4a7d6; font-weight:bold">+${powCoruja} ✨</span> extras.</div>
                         ${capCoruja 
                             ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('coruja', '🦉 Coruja')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxCoruja})</button></div>`
                             : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextCoruja} acertos</div>`
@@ -4001,6 +4012,7 @@ function openStoreModal() {
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🔥 Fênix de Apolo <span style="font-size:10px; background:#ff5e00; color:#000; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlFenix}</span></div>
+                                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Alimentada dá: <span style="color:#ff5e00; font-weight:bold">+${powFenix} 🪙</span> extras.</div>
                         ${capFenix 
                             ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('fenix', '🔥 Fênix')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxFenix})</button></div>`
                             : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextFenix} acertos</div>`
@@ -4014,6 +4026,7 @@ function openStoreModal() {
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px; color:#e024ff; text-shadow: 0 0 5px rgba(224,36,255,0.5)">🐉 Dragão de Ladão <span style="font-size:10px; background:#e024ff; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px; text-shadow:none">Nv. ${lvlDragao}</span></div>
+                                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A Besta Mítica. Alimentada dá Absurdos: <span style="color:#e024ff; font-weight:bold">+${powDragaoGold} 🪙</span> e <span style="color:#00e5ff; font-weight:bold">+${powDragaoXP} ✨</span> extras.</div>
                         ${capDragao 
                             ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('dragao', '🐉 Dragão')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxDragao})</button></div>`
                             : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextDragao} acertos</div>`
@@ -6122,33 +6135,38 @@ function confirmPetEvolution(petId, moedas, cristais) {
     toast('🎇 LIMIT BREAK! Seu mascote ascendeu e pode subir de nível novamente!', 'var(--gold)');
     openStoreModal(); // Volta pra loja e mostra que desativou a trava
 }
-// ✨ MODAL DE ASCENSÃO DO JOGADOR (AGORA COM EXIGÊNCIA DE ACERTOS!)
+// ✨ MODAL DE ASCENSÃO DO JOGADOR (AGORA COM EXIGÊNCIA DE ACERTOS E COM PRESSÃO DE TEMPO!!)
 function openPlayerAscensionModal() {
     const rank = getUserTitle();
     
     if (STATS.achievements === undefined) STATS.achievements = {};
     if (STATS.achievements.currentPrestige === undefined) STATS.achievements.currentPrestige = 1;
     if (STATS.totalAcertos === undefined) STATS.totalAcertos = 0;
+    if (STATS.acertosComRelogio === undefined) STATS.acertosComRelogio = 0; // Memória do Relógio
     
     const currentPrestige = STATS.achievements.currentPrestige;
     const acertosAtuais = STATS.totalAcertos;
+    const acertosRelogioAtuais = STATS.acertosComRelogio;
     
-    // 🚨 OS REQUISITOS (A Matemática do Sofrimento)
+    // 🚨 OS REQUISITOS (A Matemática do Sofrimento Máximo)
     const reqMoedas = 50000 * currentPrestige;
     const reqCentelhas = 1 * currentPrestige;
-    const reqAcertos = 1000 * currentPrestige; // 1000, 2000, 3000 acertos...
+    const reqAcertos = 1000 * currentPrestige; 
+    const reqAcertosRelogio = 1500 * currentPrestige; // ✨ Exigência do Relógio Ativado!
     
     // Checagens
     const isXpMaxed = rank.currentXP >= rank.nextXP;
     const hasMoedas = STATS.moedas >= reqMoedas;
     const hasCentelhas = (STATS.inventory.playerSparks || 0) >= reqCentelhas;
     const hasAcertos = acertosAtuais >= reqAcertos;
+    const hasAcertosRelogio = acertosRelogioAtuais >= reqAcertosRelogio;
     
-    const canAscend = isXpMaxed && hasMoedas && hasCentelhas && hasAcertos;
+    // Tem que ter TUDO para poder subir
+    const canAscend = isXpMaxed && hasMoedas && hasCentelhas && hasAcertos && hasAcertosRelogio;
 
     let html = `
     <h3 style="color:#00f5ff; text-transform:uppercase; font-weight:bold; text-shadow:0 0 10px rgba(0,245,255,0.4)">⚡ Ascensão do Herói</h3>
-    <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Evolua sua Bolinha para o Prestígio <b>${currentPrestige + 1}</b>! Prove seu domínio absoluto sobre o idioma para ascender.</p>
+    <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Evolua sua Bolinha para o Prestígio <b>${currentPrestige + 1}</b>! Prove seu domínio absoluto e rapidez sob pressão para ascender.</p>
     
     <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:8px; padding:15px; margin-bottom:15px">
         <div style="font-weight:bold; color:var(--gold); margin-bottom:10px; font-size:14px">Requisitos de Prestígio:</div>
@@ -6161,6 +6179,11 @@ function openPlayerAscensionModal() {
         <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px">
             <span>🎯 Cartas Acertadas:</span>
             <span style="color:${hasAcertos ? 'var(--green)' : 'var(--red)'}; font-weight:bold">${acertosAtuais.toLocaleString()} / ${reqAcertos.toLocaleString()}</span>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px">
+            <span>⏱️ Acertos sob Pressão (Relógio):</span>
+            <span style="color:${hasAcertosRelogio ? 'var(--green)' : 'var(--red)'}; font-weight:bold">${acertosRelogioAtuais.toLocaleString()} / ${reqAcertosRelogio.toLocaleString()}</span>
         </div>
 
         <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px">
@@ -6187,16 +6210,13 @@ function openPlayerAscensionModal() {
 function confirmPlayerAscension(moedas, centelhas) {
     STATS.moedas -= moedas;
     STATS.inventory.playerSparks -= centelhas;
-    STATS.achievements.currentPrestige++; // Sobe a bolinha!
-    
-    // NOTA: Nós NÃO zeramos os acertos totais! O cara batalhou muito por eles. 
-    // Como a próxima exigência é multiplicada, ele terá que conseguir +1000 acertos naturalmente.
+    STATS.achievements.currentPrestige++; 
     
     if (typeof saveStats === 'function') saveStats();
     
     toast(`⚡ ASCENSÃO SUPREMA! Você agora é Prestígio ${STATS.achievements.currentPrestige}!`, 'var(--blue)');
     closeModal();
-    updateHeader(); // Atualiza a bolinha na hora
+    updateHeader(); 
 }
 /* ═══════════════════════════════════════
    🧠 MOTOR DE MEMÓRIA DE INTERFACE E GAVETAS (INTELIGENTE)
