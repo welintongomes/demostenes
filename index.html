@@ -598,19 +598,29 @@ function playSfx(type) {
         if (STATS.activeEvent && STATS.activeEvent.id === 'ev_crit') chanceCritico += 0.35;
         
         // Se o HACK de crítico estiver ativo, ele SOMA a porcentagem!
-        if (configJogo.criticoCustom > 0) {
+        if (typeof configJogo !== 'undefined' && configJogo.criticoCustom > 0) {
             chanceCritico += (configJogo.criticoCustom / 100); 
         }
 
-        // ✨ BÔNUS DE CRÍTICO DA ÁGUIA DE ZEUS (Leitura Antecipada)
-        if (STATS.pets && STATS.pets.active === 'aguia') {
-            let lvlAguia = getPetCappedLevel('aguia');
-            // Verifica se está alimentada (levando em conta o evento grátis)
-            let isFedAguia = (STATS.pets.fedCharges > 0 || (STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_fed')) && !sess.isFreeMode;
+        // ✨ BÔNUS DE CRÍTICO DOS MASCOTES (Leitura Antecipada)
+        if (STATS.pets && STATS.pets.active) {
+            let petAtivo = STATS.pets.active;
             
-            // ÁGUIA: +5% base (+1% por nível) | Não-Alimentada: +2% (+0.5% por nível)
-            let bonusCrit = isFedAguia ? (0.05 + ((lvlAguia - 1) * 0.01)) : (0.02 + ((lvlAguia - 1) * 0.005));
-            chanceCritico += bonusCrit;
+            if (petAtivo === 'aguia' || petAtivo === 'dragao') {
+                let lvlPet = getPetCappedLevel(petAtivo);
+                let isFedPet = (STATS.pets.fedCharges > 0 || (STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_fed')) && !sess.isFreeMode;
+                
+                if (petAtivo === 'aguia') {
+                    // ÁGUIA: +5% base (+1% por nível) | Não-Alimentada: +2% (+0.5% por nível)
+                    let bonusCrit = isFedPet ? (0.05 + ((lvlPet - 1) * 0.01)) : (0.02 + ((lvlPet - 1) * 0.005));
+                    chanceCritico += bonusCrit;
+                } 
+                else if (petAtivo === 'dragao') {
+                    // DRAGÃO (O Meta): +3% base (+0.5% por nível) | Não-Alimentado: +1% (+0.2% por nível)
+                    let bonusCrit = isFedPet ? (0.03 + ((lvlPet - 1) * 0.005)) : (0.01 + ((lvlPet - 1) * 0.002));
+                    chanceCritico += bonusCrit;
+                }
+            }
         }
 
         const isMilestone = (sess.combo % 5 === 0);
@@ -788,7 +798,17 @@ function playSfx(type) {
                 if (q.id === 'q_smart' && !sess.isFreeMode && !isQuizNow) match = true; 
                 if (q.id === 'q_quiz' && isQuizNow) match = true;
                 if (q.id === 'q_crit' && isCrit) match = true;
-                if (q.id === 'q_syn_ant' && typeof card !== 'undefined' && (card.cardType === 'sinônimo' || card.cardType === 'antônimo')) match = true;
+                // ✨ Diária: Acertar Sinônimos/Antônimos
+if (q.id === 'q_syn_ant') {
+    const sess = (typeof studySession !== 'undefined') ? studySession : null;
+    if (sess && sess.queue && sess.queue[sess.current]) {
+        const currentCard = sess.queue[sess.current];
+        const isCorrect = (type === 'ok' || type === 'crit'); // Aceita acerto normal e crítico!
+        if ((currentCard.cardType === 'sinônimo' || currentCard.cardType === 'antônimo') && isCorrect) {
+            match = true; 
+        }
+    }
+}
                 
                 if (q.id === 'q_timer' && isTimerOn) match = true;
                 if (q.id === 'q_lightning' && isLightning) match = true;
@@ -832,7 +852,17 @@ function playSfx(type) {
                 if (wq.id === 'wq_crits' && isCrit) wq.progress += 1;
                 if (wq.id === 'wq_pet' && petActiveFlag) wq.progress += 1; 
                 if (wq.id === 'wq_smart_rev' && !sess.isFreeMode && !isQuizNow) wq.progress += 1;
-                if (wq.id === 'wq_syn_ant' && typeof card !== 'undefined' && (card.cardType === 'sinônimo' || card.cardType === 'antônimo')) wq.progress += 1;
+                // ✨ Semanal: Acertar Sinônimos/Antônimos
+if (wq.id === 'wq_syn_ant') {
+    const sess = (typeof studySession !== 'undefined') ? studySession : null;
+    if (sess && sess.queue && sess.queue[sess.current]) {
+        const currentCard = sess.queue[sess.current];
+        const isCorrect = (type === 'ok' || type === 'crit'); 
+        if ((currentCard.cardType === 'sinônimo' || currentCard.cardType === 'antônimo') && isCorrect) {
+            wq.progress += 1; 
+        }
+    }
+}
                 
                 if (wq.progress > wq.target) wq.progress = wq.target;
                 
@@ -3880,6 +3910,7 @@ function openStoreModal() {
   const lvlFormiga = getLvl('formiga'), nextFormiga = getNext('formiga'), powFormiga = 2 + Math.floor((lvlFormiga - 1) * 0.5);
   const lvlDragao = getLvl('dragao'), nextDragao = getNext('dragao');
   const powDragaoGold = 10 + ((lvlDragao - 1) * 2), powDragaoXP = 30 + ((lvlDragao - 1) * 5); 
+  const powDragaoCrit = (3 + ((lvlDragao - 1) * 0.5)).toFixed(1); // ✨ CRÍTICO DO DRAGÃO NA LOJA 
   // ✨ VARIÁVEIS DA ÁGUIA
   const lvlAguia = getLvl('aguia'), nextAguia = getNext('aguia');
   const powAguiaCrit = (5 + ((lvlAguia - 1) * 1)).toFixed(1); 
@@ -4120,11 +4151,12 @@ function openStoreModal() {
                      ${getPetBtn('aguia', 4500, 30, '#3498db')}
                   </div>
                 </div>
+                <!-- DRAGÃO (AGORA MOSTRA O CRÍTICO) -->
                 <div class="card" style="border: 2px solid #e024ff; box-shadow: 0 0 15px rgba(224, 36, 255, 0.2); margin-bottom:0">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px; color:#e024ff; text-shadow: 0 0 5px rgba(224,36,255,0.5)">🐉 Dragão de Ladão <span style="font-size:10px; background:#e024ff; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px; text-shadow:none">Nv. ${lvlDragao}</span></div>
-                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A Besta Mítica. Alimentada dá Absurdos: <span style="color:#e024ff; font-weight:bold">+${powDragaoGold} 🪙</span> e <span style="color:#00e5ff; font-weight:bold">+${powDragaoXP} ✨</span> extras.</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A Besta Mítica. Alimentada dá Absurdos: <span style="color:#e024ff; font-weight:bold">+${powDragaoGold} 🪙</span>, <span style="color:#00e5ff; font-weight:bold">+${powDragaoXP} ✨</span> e <span style="color:#ff2424; font-weight:bold">+${powDragaoCrit}% Crítico</span>.</div>
                         ${capDragao 
                             ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('dragao', '🐉 Dragão')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxDragao})</button></div>`
                             : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextDragao} acertos</div>`
@@ -5754,6 +5786,11 @@ function runEventManager() {
 
 // ✨ SISTEMA GACHA: O CASSINO DO DESTINO (Yin-Yang)
 function showYinYang() {
+    // ✨ O HACK DO MODO DEUS: Se o Auto-Gacha estiver ligado, gira instantaneamente!
+    if (typeof configJogo !== 'undefined' && configJogo.autoGacha) {
+        playGacha(); // Chama o sorteio direto, ignorando o botão e a tela de confirmação
+        return;      // Encerra a função aqui para ele não tentar desenhar o botão Yin-Yang
+    }
     let btn = document.getElementById('btnYinYang');
     if (!btn) {
         btn = document.createElement('button');
@@ -6183,6 +6220,14 @@ function abrirConfig() {
                 </div>
                 <input type="checkbox" id="pularInfinito" class="config-cb" ${configJogo.pularInfinito ? 'checked' : ''} style="transform:scale(1.3); accent-color:var(--green)">
             </label>
+            <!-- Gacha Automático (Auto-Spin) -->
+            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; margin-top: 10px; font-size:13px; color:#fff; cursor:pointer">
+                <div>
+                    <div>🎲 Gacha Automático</div>
+                    <div style="font-size:10px; color:var(--stone2); margin-top:2px">Pula os menus e gira a Roleta na mesma hora!</div>
+                </div>
+                <input type="checkbox" id="autoGacha" class="config-cb" ${configJogo.autoGacha ? 'checked' : ''} style="transform:scale(1.3); accent-color:#e024ff">
+            </label>
             <!-- ✨ Controlador de Crítico Customizado -->
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:13px; color:#fff;">
                 <div>
@@ -6208,6 +6253,7 @@ function abrirConfig() {
     
     openModal(html);
 }
+
 // Fecha o modal sem salvar
 function fecharConfig() {
     document.getElementById('modalConfig').style.display = 'none';
@@ -6225,13 +6271,19 @@ function salvarConfig() {
     configJogo.timerMinInterval = novoIntervalo;
     
     // (Futuro) Aqui você vai colocar um código para salvar isso no IndexedDB para não perder quando fechar a aba
-    
+    configJogo.autoGacha = document.getElementById('autoGacha') ? document.getElementById('autoGacha').checked : false;
+    localStorage.setItem('config_autoGacha', configJogo.autoGacha);
+
     toast('⚙️ Configurações aplicadas!', 'ok');
     fecharConfig();
 }
+
 // Carrega o valor salvo no navegador assim que o jogo abre
 const savedCrit = localStorage.getItem('config_criticoCustom');
 if (savedCrit !== null) configJogo.criticoCustom = parseInt(savedCrit);
+
+const savedAutoGacha = localStorage.getItem('config_autoGacha');
+if (savedAutoGacha !== null) configJogo.autoGacha = (savedAutoGacha === 'true');
 
 // ✨ FUNÇÃO QUE CONTROLA O + E O -
 function changeCritHack(amount) {
@@ -6248,6 +6300,7 @@ function changeCritHack(amount) {
     if (span) span.innerText = val + '%';
     if (pen) pen.innerText = val > 0 ? `Penalidade: -${val}% Ouro e XP` : `Sem penalidade extra`;
 }
+
 //capturar da camera ou da galeria
 // ✨ MODAL DE ESCOLHA DE IMAGEM (Versão Segura - Não fecha o Modal de Edição!)
 function abrirModalEscolhaImagem() {
