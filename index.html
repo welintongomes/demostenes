@@ -1678,8 +1678,8 @@ function buildStudyCard() {
         <!-- ✨ A ETIQUETA COM O NOME DA RARIDADE -->
         <span class="badge ${rarity.txtCls}" style="background:transparent; border:1px solid currentColor; font-family:'Cinzel',serif">${rarity.label}</span>
         <span class="badge ${getStatus(card)}">${statusLabel(getStatus(card))}</span>
-        <button class="btn ghost sm" onclick="clearTimeout(studySession?.timerId); studySession=null; render()">✕ Sair</button>
-      </div>
+        <button class="btn ghost sm" onclick="clearTimeout(studySession?.timerId); studySession=null; if(typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo('normal'); render()">✕ Sair</button>
+        </div>
     </div>
     
     ${card.isLeech ? `<div style="background:rgba(231,76,60,0.1); border:1px solid var(--red); color:var(--red); padding:6px; border-radius:var(--r); font-size:12px; margin-bottom:10px; text-align:center;"><b>🩸 Sanguessuga:</b> Você tem errado muito esta palavra. Cuidado!</div>` : ''}
@@ -1795,6 +1795,8 @@ function buildChoiceMode(card) {
   }
   
   const answered = sess.choiceAnswered;
+  // ✨ A MÁGICA ACONTECE AQUI TAMBÉM!
+  if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
   const typeLbl = card.cardType === 'sinônimo' ? `Selecione um ${hl('sinônimo')} para:` : (card.cardType === 'antônimo' ? `Selecione um ${hl('antônimo')} para:` : 'Qual a definição de:');
 
   return `
@@ -1851,6 +1853,8 @@ function buildRevChoiceMode(card) {
   }
   
   const answered = sess.revChoiceAnswered;
+  // ✨ A MÁGICA ACONTECE AQUI! O fundo muda assim que a carta aparece!
+  if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
   const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
   const promptTxt = isRel ? `Qual palavra possui este ${hl(card.cardType)}:` : 'Qual é a palavra para esta definição:';
 
@@ -1858,7 +1862,7 @@ function buildRevChoiceMode(card) {
     <div class="card" style="margin-bottom:12px">
       <div class="card-body" style="text-align:center">
         <div class="fc-type" style="margin-bottom:10px">${promptTxt}</div>
-        ${renderVisual(card)}<div class="fc-definition" style="font-size:18px;line-height:1.6">${esc(sess.revChoicePrompt)}</div>
+        ${renderVisual(card)}<div class="fc-definition" style="font-size:20px;font-weight: bolder;color: orange;line-height:1.6">${esc(sess.revChoicePrompt)}</div>
       </div>
     </div>
     <div id="choices">
@@ -1925,6 +1929,10 @@ function buildTFMode(card) {
   }
   
   const answered = sess.tfAnswered;
+  // ✨ A MÁGICA ACONTECE AQUI! O fundo muda assim que a carta aparece!
+  if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
+  // ✨ A MÁGICA ACONTECE AQUI! O fundo muda assim que a carta aparece!
+  if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
   const typeText = card.cardType === 'sinônimo' ? `Tem como ${hl('sinônimo')}:` : (card.cardType === 'antônimo' ? `Tem como ${hl('antônimo')}:` : 'Significa:');
 
   return `
@@ -2328,6 +2336,8 @@ function buildScrambleMode(card) {
   }
   
   const answered = sess.scrambleAnswered;
+  // ✨ A MÁGICA ACONTECE AQUI! O fundo muda assim que a carta aparece!
+  if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
   const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
   const promptTxt = isRel ? `Desembaralhe UM ${hl(card.cardType)} de:` : `Desembaralhe as letras:`;
   const displayTxt = isRel ? card.word : clean(card.definition);
@@ -2374,6 +2384,8 @@ function buildSpellMode(card) {
   }
   
   const answered = sess.spellAnswered;
+  // ✨ A MÁGICA ACONTECE AQUI! O fundo muda assim que a carta aparece!
+  if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
   const ansHtml = sess.spellAnswer.map(id => {
     const item = sess.spellPool.find(p => p.id === id);
     return `<button class="btn gold sm" style="width:38px;height:38px;padding:0;font-size:18px;font-weight:700" onclick="${answered ? '' : `spellRemove(${id})`}">${item.char}</button>`;
@@ -2446,6 +2458,8 @@ function buildSyntaxMode(card) {
   }
   
   const answered = sess.syntaxAnswered;
+  // ✨ A MÁGICA ACONTECE AQUI! O fundo muda assim que a carta aparece!
+  if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
   const ansHtml = sess.syntaxAnswer.map(id => {
     const item = sess.syntaxPool.find(p => p.id === id);
     return `<button class="btn gold sm" style="padding:6px 12px;font-size:14px;width:auto;text-transform:none;letter-spacing:normal" onclick="${answered?'':`syntaxRemove(${id})`}">${esc(item.word)}</button>`;
@@ -2553,6 +2567,8 @@ function buildClozeMode(card) {
   }
   
   const answered = sess.clozeAnswered;
+  // ✨ A MÁGICA ACONTECE AQUI! O fundo muda assim que a carta aparece!
+  if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
   let displayText = sess.clozeText, slotIndex = 0;
   
   displayText = displayText.replace(/___/g, () => {
@@ -5037,6 +5053,26 @@ function getRatingRowHtml(isCorrect, correctLabel = 'Correto ✓') {
     </button>
   </div>`;
 }
+// ✨ SISTEMA DE IMERSÃO DE COR (Verde para Sinônimo, Vermelho para Antônimo)
+function atualizarCorDeFundo(cardType) {
+    const body = document.body;
+    
+    // Adiciona uma transição suave para a cor não "piscar" e doer os olhos
+    body.style.transition = "background-color 0.4s ease"; 
+
+    if (cardType === 'sinônimo') {
+        // Um verde escuro e profundo
+        body.style.backgroundColor = "rgba(8, 43, 18, 0.5)"; 
+    } 
+    else if (cardType === 'antônimo') {
+        // Um vermelho escuro e ameaçador
+        body.style.backgroundColor = "rgba(43, 8, 8, 0.5)"; 
+    } 
+    else {
+        // Se for definição normal ou sair da sessão, limpa a cor e volta para a original do seu CSS
+        body.style.backgroundColor = ""; 
+    }
+}
 // funçao para colorir os nomes sinonimos antonimos etc.
 function hl(txt) {
   return `<strong style="color:#e024ff; font-size:1.15em; text-transform:uppercase; text-shadow: 0px 0px 8px rgba(224,36,255,0.6);">${txt}</strong>`;
@@ -5798,7 +5834,7 @@ function showYinYang() {
         btn.innerHTML = '☯︎';
         // Estilo dramático: Grande, brilhante e no centro da tela!
         btn.style.cssText = `
-            position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            position: fixed; top: 90%; left: 50%; transform: translate(-50%, -50%);
             font-size: 80px; background: none; border: none; color: white;
             text-shadow: 0 0 20px #e024ff, 0 0 40px #00e5ff;
             cursor: pointer; z-index: 9999;
@@ -6586,6 +6622,16 @@ function sellStoreItem(itemId, basePrice, isPet) {
     openStoreModal(); 
     updateHeader(); 
 }
+// ✨ APAGA A COR DE FUNDO AO TOCAR EM QUALQUER LUGAR DA TELA
+function limparLuzDeFundo() {
+    if (typeof atualizarCorDeFundo === 'function') {
+        atualizarCorDeFundo('normal');
+    }
+}
+
+// O "true" no final garante que ele apague a luz milissegundos ANTES de renderizar a próxima carta!
+document.addEventListener('mousedown', limparLuzDeFundo, true);
+document.addEventListener('touchstart', limparLuzDeFundo, {capture: true, passive: true});
 /* ═══════════════════════════════════════
    🧠 MOTOR DE MEMÓRIA DE INTERFACE E GAVETAS (INTELIGENTE)
 ═══════════════════════════════════════ */
