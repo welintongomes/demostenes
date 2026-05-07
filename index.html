@@ -1411,10 +1411,17 @@ function buildStudyTab() {
           </select>
         </div>` : `<input type="hidden" id="studyCatFilter" value="">`}
         
-        <div class="btn-row" style="flex-wrap:nowrap;gap:8px">
-          <button class="btn gold" onclick="startSession('adaptive', document.getElementById('studyCatFilter')?.value, null, false)" style="flex:1;font-size:14px;padding:14px;letter-spacing:1px">🧠 Inteligente</button>
-          <button class="btn" onclick="openCustomModal(false)" style="flex:1;font-size:14px;padding:14px;letter-spacing:1px;border-color:var(--border2);color:var(--gold2)">🎛️ Seleções</button>
+        <!-- ✨ BOTÕES DE REVISÃO ATUALIZADOS -->
+        <div class="btn-row" style="flex-wrap:nowrap;gap:6px">
+          <button class="btn gold" onclick="startSession('adaptive', document.getElementById('studyCatFilter')?.value, null, false)" style="flex:1;font-size:13px;padding:12px;letter-spacing:0.5px">🧠 Smart</button>
+          
+          <!-- ✨ O SEU NOVO BOTÃO DE INÍCIO RÁPIDO (Puxa do filtro e inicia os modos salvos) -->
+          <button class="btn" onclick="startCustomSession(document.getElementById('studyCatFilter')?.value || '', false)" style="flex:1;font-size:13px;padding:12px;border-color:var(--gold);color:var(--gold);font-weight:bold;letter-spacing:0.5px">▶️ Modos Salvos</button>
+          
+          <!-- Botão menor de engrenagem para alterar os modos -->
+          <button class="btn ghost" onclick="openCustomModal(false)" style="flex:auto;font-size:16px;padding:10px 14px;border-color:var(--border2);color:var(--stone2)">⚙️</button>
         </div>
+
       </div>
     </div>
     </div>
@@ -1442,26 +1449,32 @@ function buildStudyTab() {
           <select class="inp" id="freeStudyFilter" style="border-color:rgba(52, 152, 219, 0.4)">
             <option value="">📚 Todo o Léxico (${W.length})</option>
             <optgroup label="Categorias">
-              <!-- ✨ AQUI ELE CONTA QUANTAS VEZES A CATEGORIA APARECE -->
               ${allCats.map(c => `<option value="${esc(c)}">📁 ${esc(c)} (${W.filter(w => w.category === c).length})</option>`).join('')}
             </optgroup>
             ${allTags.length ? `<optgroup label="Tags">
-              <!-- ✨ AQUI ELE CONTA QUANTAS VEZES A TAG APARECE -->
               ${allTags.map(t => `<option value="tag:${esc(t)}">🏷️ #${esc(t)} (${W.filter(w => (w.tags || '').includes(t)).length})</option>`).join('')}
             </optgroup>` : ''}
           </select>
         </div>
-        <div class="btn-row" style="flex-wrap:nowrap;gap:8px">
-          <button class="btn" onclick="startSession('adaptive', document.getElementById('freeStudyFilter')?.value, null, true)" style="flex:1;border-color:var(--blue2);color:var(--blue2)">♾️ Treino Livre</button>
-          <!-- ✨ O BOTÃO VOLTOU PARA ABRIR O SEU MODAL LIMPINHO -->
-          <button class="btn" onclick="openCustomModal(true)" style="flex:1;border-color:var(--border2)">🎛️ Específicos</button>
+        
+        <!-- ✨ BOTÕES DE TREINO LIVRE ATUALIZADOS -->
+        <div class="btn-row" style="flex-wrap:nowrap;gap:6px">
+          <button class="btn" onclick="startSession('adaptive', document.getElementById('freeStudyFilter')?.value, null, true)" style="flex:1;font-size:13px;padding:12px;border-color:var(--blue2);color:var(--blue2)">♾️ Livre</button>
+          
+          <!-- ✨ NOVO BOTÃO DE INÍCIO RÁPIDO PARA O TREINO LIVRE -->
+          <button class="btn" onclick="startCustomSession(document.getElementById('freeStudyFilter')?.value || '', true)" style="flex:1;font-size:13px;padding:12px;border-color:var(--blue);color:white;background:rgba(41, 128, 185, 0.8);font-weight:bold;">▶️ Modos Salvos</button>
+          
+          <!-- Botão menor de engrenagem -->
+          <button class="btn ghost" onclick="openCustomModal(true)" style="flex:auto;font-size:16px;padding:10px 14px;border-color:var(--border2);color:var(--stone2)">⚙️</button>
         </div>
+
       </div>
     </div>
     </div>
       `;
   }
-// ✨ BANNER DA LOJA (Mercado de Atenas)
+  
+  // ✨ BANNER DA LOJA (Mercado de Atenas)
   if (W.length > 0) {
     html += `
     <div class="card" style="border-color:var(--gold); cursor:pointer; background:rgba(212,175,55,0.05)" onclick="openStoreModal()">
@@ -1477,8 +1490,9 @@ function buildStudyTab() {
        </div>
     </div>`;
   }
+  
   // ✨ BANNER LIVE-OPS (Versão com Identificação de Turno)
-if (STATS.activeEvent) {
+  if (STATS.activeEvent) {
     const timeLeftMinutes = Math.max(0, Math.ceil((STATS.activeEvent.endTime - Date.now()) / 60000));
     
     // 🏷️ Define o rótulo do turno para o topo do banner
@@ -1510,8 +1524,9 @@ if (STATS.activeEvent) {
     <style>
         @keyframes shine { 100% { left: 200%; } }
     </style>`;
-}
-// ✨ BANNER DE BACKUP E SINCRONIZAÇÃO
+  }
+  
+  // ✨ BANNER DE BACKUP E SINCRONIZAÇÃO
   if (W.length > 0) {
     html += `
     <div class="card" style="border-color:var(--blue); cursor:pointer; background:rgba(41, 128, 185, 0.05); margin-top: 10px" onclick="openBackupModal()">
@@ -1527,6 +1542,7 @@ if (STATS.activeEvent) {
        </div>
     </div>`;
   }
+  
   const quotes = [
     '"Nada é mais fácil do que enganar a si mesmo." — Demóstenes',
     '"A palavra é a única arma que nunca enferruja." — Proverbio',
@@ -1535,7 +1551,6 @@ if (STATS.activeEvent) {
   html += `<div class="quote" style="margin-top:4px">${quotes[new Date().getDate() % quotes.length]}</div>`;
   return html;
 }
-
 function buildStudyCard() {
   const sess = studySession;
   const card = sess.queue[sess.current];
@@ -4634,20 +4649,41 @@ function openCustomModal(isFreeMode = false) {
     {id:'type', lbl:'⌨ Digitação'}, {id:'context', lbl:'📜 Contexto'},
     {id:'syntax', lbl:'🧩 Sintaxe da Frase'}, {id:'cloze', lbl:'🕳️ Lacunas'},
     {id:'imgchoice', lbl:'🖼️ Escolha Visual'}, 
-    {id:'blind', lbl:'🎧 Ditado Cego'}, // ✨ ADICIONADO
-    {id:'boss', lbl:'🔥 Prova Final'}   // ✨ ADICIONADO
+    {id:'blind', lbl:'🎧 Ditado Cego'}, 
+    {id:'boss', lbl:'🔥 Prova Final'}   
   ];
+  
+  // ✨ LÊ OS MODOS SALVOS NA MEMÓRIA
+  let savedModes = [];
+  const savedStr = localStorage.getItem('savedCustomModes');
+  if (savedStr) {
+      savedModes = JSON.parse(savedStr);
+  } else {
+      // Se for a primeira vez jogando, deixa alguns ativados por padrão
+      savedModes = ['flash', 'choice', 'tf']; 
+  }
   
 openModal(`
     <h3>🎛️ Modos Aleatórios</h3>
     <div style="font-size:13px;color:var(--stone2);margin-bottom:12px;line-height:1.5">Selecione os modos que deseja incluir na rotação:</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
       ${modes.map(m => {
-        // ✨ Pequeno truque para deixar as bordas vermelha/dourada nos novos modos
         let baseColor = m.id === 'boss' ? 'var(--red)' : (m.id === 'blind' ? 'var(--gold2)' : 'var(--border2)');
+        
+        // ✨ Verifica se o modo está na memória para já vir com o "checked"
+        let isChecked = savedModes.includes(m.id) ? 'checked' : '';
+        let activeColor = isChecked ? 'var(--gold)' : baseColor;
+        
         return `
-        <label style="display:flex;align-items:center;gap:8px;background:var(--bg3);padding:10px;border:1px solid ${baseColor};border-radius:var(--r);cursor:pointer;transition:all 0.2s" onclick="this.style.borderColor = this.querySelector('input').checked ? 'var(--gold)' : '${baseColor}'">
-          <input type="checkbox" class="custom-mode-cb" value="${m.id}" style="accent-color:var(--gold);width:16px;height:16px" >
+        <label style="display:flex;align-items:center;gap:8px;background:var(--bg3);padding:10px;border:1px solid ${activeColor};border-radius:var(--r);cursor:pointer;transition:all 0.2s" 
+        onclick="setTimeout(() => { 
+            this.style.borderColor = this.querySelector('input').checked ? 'var(--gold)' : '${baseColor}';
+            
+            // ✨ MAGIA: Salva na memória no exato milissegundo em que você marca a caixinha!
+            const checkedList = Array.from(document.querySelectorAll('.custom-mode-cb:checked')).map(cb => cb.value);
+            localStorage.setItem('savedCustomModes', JSON.stringify(checkedList));
+        }, 50)">
+          <input type="checkbox" class="custom-mode-cb" value="${m.id}" style="accent-color:var(--gold);width:16px;height:16px" ${isChecked}>
           <span style="font-size:12px;font-family:'Cinzel',serif;font-weight:600">${m.lbl}</span>
         </label>
       `}).join('')}
@@ -4659,12 +4695,30 @@ openModal(`
   `);
 }
 
-function startCustomSession(cat, isFreeMode) {
-  const cbs = document.querySelectorAll('.custom-mode-cb:checked');
-  const selectedModes = Array.from(cbs).map(cb => cb.value);
-  if (selectedModes.length === 0) { toast('Selecione pelo menos um modo!', 'err'); return; }
-  closeModal();
-  startSession('custom', cat, selectedModes, isFreeMode);
+// ✨ INICIA O MODO CUSTOMIZADO LENDO DA TELA OU DA MEMÓRIA
+function startCustomSession(category, isFreeMode) {
+    // 1. Tenta pegar da tela (caso a pessoa tenha acabado de clicar no modal)
+    let selectedModes = Array.from(document.querySelectorAll('.custom-mode-cb:checked')).map(cb => cb.value);
+    
+    // 2. Se a tela estiver fechada (botão Início Rápido), pega da memória do navegador!
+    if (selectedModes.length === 0) {
+        const saved = localStorage.getItem('savedCustomModes');
+        if (saved) {
+            selectedModes = JSON.parse(saved);
+        }
+    }
+
+    // 3. Se a memória também estiver vazia, avisa o jogador
+    if (selectedModes.length === 0) {
+        if (typeof toast === 'function') toast('Selecione pelo menos um modo na engrenagem ⚙️!');
+        return;
+    }
+
+    // 4. Salva a escolha por segurança e inicia o jogo!
+    localStorage.setItem('savedCustomModes', JSON.stringify(selectedModes));
+    if (typeof closeModal === 'function') closeModal();
+    
+    startSession('custom', category, selectedModes, isFreeMode);
 }
 
 async function saveNewWord() { 
