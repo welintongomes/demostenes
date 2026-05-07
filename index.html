@@ -934,7 +934,7 @@ if (wq.id === 'wq_syn_ant') {
 
         if (isCrit) {
           showFloatingText(`CRÍTICO! +${ganhoMoedas} 🪙${petVisualCoins} | +${ganhoXP} ✨${petVisualXP}`, '#e024ff'); 
-          if (typeof shootConfetti === 'function') shootConfetti();
+          if (typeof shootConfetti === 'function'); //shootConfetti(); aqui tinha um confeti mais tava incomodando toda hora entao removi
           if (typeof showYinYang === 'function') showYinYang(); 
         } else {
           const iconCoins = nectarActive ? '🍷' : '';
@@ -3845,8 +3845,13 @@ function confirmClearAll() {
   });
 }
 // ✨ LOJA: MERCADO DE ATENAS E ITENS (AGORA COM CONSUMIVEIS, VIDAS, MINI ESCUDOS, LOOT BOXES, PETS AGORA EM GAVETAS COM MEMÓRIA)
+// ✨ LOJA: MERCADO DE ATENAS E ITENS
 function openStoreModal() {
-// ✨ INVENTÁRIO ATUALIZADO (Agora suporta estocar caixas gacha!)
+  
+  // BLINDAGEM MESTRA: Garante que STATS existe
+  if (!STATS) STATS = {};
+  
+  // ✨ INVENTÁRIO ATUALIZADO (Agora suporta estocar caixas gacha!)
   if (!STATS.inventory) {
       STATS.inventory = { 
           magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, 
@@ -3854,9 +3859,13 @@ function openStoreModal() {
           boxBronze: 0, boxPrata: 0, boxOuro: 0 // As caixas gacha!
       };
   }
-  if (!STATS.pets.evoLevel) STATS.pets.evoLevel = {}; // Memória para saber quantas vezes o pet evoluiu!
+
+  // ✨ A ORDEM CORRETA: Primeiro cria o armário (pets), depois as gavetas (evoLevel e affinity)!
   if (!STATS.pets) STATS.pets = { owned: [], active: null, fedCharges: 0 };
+  if (!STATS.pets.evoLevel) STATS.pets.evoLevel = {}; 
   if (!STATS.pets.affinity) STATS.pets.affinity = {};
+  
+  if (STATS.moedas === undefined || isNaN(STATS.moedas)) STATS.moedas = 0;
 
   const currentLevel = getUserTitle().level;
 
@@ -3866,7 +3875,7 @@ function openStoreModal() {
   const freePrata = evId === 'ev_box_pandora';
   const freeOuro = evId === 'ev_box_olimpo';
 
-// ✨ GERA O BOTÃO DE PET (COM OPÇÃO DE VENDA!)
+  // ✨ GERA O BOTÃO DE PET (COM OPÇÃO DE VENDA!)
   function getPetBtn(id, price, reqLvl, colorHex) {
       if (currentLevel < reqLvl) return `<button class="btn sm ghost" disabled style="padding:8px; border-color:var(--stone); color:var(--stone)">🔒 Nv. ${reqLvl}</button>`;
       
@@ -4823,24 +4832,41 @@ function loadStarter() {
 /* ═══════════════════════════════════════
    UTILS
 ═══════════════════════════════════════ */
-// ✨ SISTEMA HÍBRIDO DE PRESTÍGIO E XP INFINITO (Com Trava de Ascensão)
+// ✨ SISTEMA HÍBRIDO DE PRESTÍGIO E XP INFINITO (Com Progressão RPG Real!)
 function getUserTitle() {
   if (!STATS.earnedXP) STATS.earnedXP = 0;
   
-  // O PRESTÍGIO agora é uma variável controlada pelo Modal da Loja!
-  // Se não existir, nasce como 1.
   if (STATS.achievements === undefined) STATS.achievements = {};
   if (STATS.achievements.currentPrestige === undefined) STATS.achievements.currentPrestige = 1;
   
   const prestige = STATS.achievements.currentPrestige; 
   
-  // 1 Carta = 50 XP Base. Somado ao XP que você ganha jogando!
-  const baseXP = W.length * 50; 
+  const baseXP = W.length * 10; 
   const totalXP = baseXP + STATS.earnedXP;
   
-  const xpPerLevel = 1000; 
-  let level = Math.floor(totalXP / xpPerLevel);
-  let currentLevelXP = totalXP % xpPerLevel; 
+  // ✨ MOTOR DE NÍVEIS RPG (A Dificuldade Escala!)
+  let remainingXP = totalXP;
+  let level = 0;
+  let nextXP = 1000;
+  
+  // Multiplicador de Prestígio (Ex: P1 = 1x normal, P2 = 1.5x mais difícil, P3 = 2x mais difícil...)
+  const prestigeMult = 1 + ((prestige - 1) * 0.5);
+
+  // O jogo "compra" os níveis com o seu XP até o XP acabar
+  while (true) {
+      // A FÓRMULA DO SOFRIMENTO: Custa 1000 base + 200 para cada nível que você já tem. 
+      // E no final, ainda é multiplicado pelo seu Prestígio atual!
+      nextXP = Math.floor((1000 + (level * 200)) * prestigeMult);
+      
+      if (remainingXP >= nextXP) {
+          remainingXP -= nextXP; // Paga o preço do nível
+          level++;               // Sobe de nível!
+      } else {
+          break; // O XP acabou, para de subir!
+      }
+  }
+  
+  let currentLevelXP = remainingXP; // O que sobrou é a sua barra atual
   
   const titles = [
     { t: 'Plebeu', icon: '⛺' }, { t: 'Noviço', icon: '🪶' }, { t: 'Iniciado', icon: '📘' },
@@ -4862,14 +4888,17 @@ function getUserTitle() {
     { t: 'Ápice', icon: '🚀' }, { t: 'Demóstenes', icon: '👑🔥' }
   ];
   
-  // ✨ A SUPER TRAVA DE SEGURANÇA (Se o XP for maior que o limite do Prestígio atual)
-  const maxLevelForPrestige = prestige * titles.length; // Ex: Prestígio 1 trava no nível 50.
+  // ✨ A SUPER TRAVA DE SEGURANÇA (Para o Prestígio Atual)
+  const maxLevelForPrestige = prestige * titles.length; 
   
   let isMaxed = false;
   if (level >= maxLevelForPrestige) {
-      level = maxLevelForPrestige - 1; // Trava no último título (Demóstenes)
-      currentLevelXP = xpPerLevel; // A barra fica no visual "1000 / 1000" cheia!
-      isMaxed = true; // Flag para piscar o botão vermelho depois
+      level = maxLevelForPrestige - 1; 
+      
+      // Recalcula o tamanho da última barra para ela ficar cheia no visual
+      nextXP = Math.floor((1000 + (level * 200)) * prestigeMult);
+      currentLevelXP = nextXP; 
+      isMaxed = true; 
   }
   
   const titleIndex = level % titles.length; 
@@ -4878,7 +4907,7 @@ function getUserTitle() {
   '#5a5a5a', '#616161', '#696969', '#707070', '#787878',
   '#808080', '#888888', '#909090', '#989898', '#a0a0a0',
   '#7a5c2e', '#8a6a35', '#9a783c', '#aa8643', '#ba944a',
-  '#c0c0c0', '#c8c8c8', '#d0d0d0', '#d8d8d8', '#e0e0e0',
+  '#c0c0c0', '#c8c8c8', '#d0d0d0', '#d8d8d8', '#d8d8d8',
   '#d4af37', '#ddb93f', '#e6c347', '#efcd4f', '#f8d757',
   '#ff6b6b', '#ff5252', '#ff3b3b', '#ff2424', '#ff0d0d',
   '#c77dff', '#b266ff', '#9d4edd', '#8936c9', '#741fb5',
@@ -4896,11 +4925,10 @@ function getUserTitle() {
       prestige: prestige,
       level: level,
       currentXP: currentLevelXP,
-      nextXP: xpPerLevel,
-      isMaxed: isMaxed // Diz para a tela se o limite foi batido
+      nextXP: nextXP,
+      isMaxed: isMaxed 
   };
 }
-
 // ✨ SISTEMA DE LIMIT BREAK (XP acumulando em Segundo Plano)
 function getPetMaxLevel(petId) {
     if (!STATS.pets.evoLevel) STATS.pets.evoLevel = {};
@@ -5500,8 +5528,9 @@ function generateWeeklyQuests() {
 }
 // ✨ MOTOR DE PRESTÍGIO E CONQUISTAS (A Bolinha)
 // ✨ MOTOR DE PRESTÍGIO E CONQUISTAS (Inteligente e Auto-Atualizável)
+// ✨ GERENCIADOR DE CONQUISTAS (Blindado contra contas novas!)
 function manageAchievements() {
-    if (!STATS) return;
+    if (!STATS) STATS = {};
     
     // 1. A SUA LISTA MESTRE (Onde você vai adicionar dezenas de novas conquistas no futuro)
     const masterAchievementsList = [
@@ -5524,7 +5553,6 @@ function manageAchievements() {
         { id: 'ach_quests', name: 'Herói de Atena 📜', desc: 'Resgate {X} missões diárias ou semanais', target: 50, progress: 0, claimed: false, rewardCoins: 3000, rewardXP: 8000 },
         { id: 'ach_smart', name: 'Revisor Implacável 🔄', desc: 'Revise {X} cartas na Revisão Inteligente', target: 800, progress: 0, claimed: false, rewardCoins: 2500, rewardXP: 7000 },
         { id: 'ach_syn_ant', name: 'Mestre da Retórica 🗣️', desc: 'Acerte {X} cartas de Sinônimo ou Antônimo', target: 300, progress: 0, claimed: false, rewardCoins: 2000, rewardXP: 6000 }
-        // ➡️ FUTURO: Quando quiser criar uma nova, é só colar aqui!
     ];
 
     // 2. Cria a estrutura básica se for o primeiríssimo acesso do jogador
@@ -5533,6 +5561,11 @@ function manageAchievements() {
             currentPrestige: 1, 
             list: []
         };
+    }
+    
+    // BLINDAGEM EXTRA: Garante que "list" seja um array real antes do "find" rodar
+    if (!Array.isArray(STATS.achievements.list)) {
+        STATS.achievements.list = [];
     }
 
     // 3. ✨ A MÁGICA DE ATUALIZAÇÃO: Mescla a lista do jogador com a Lista Mestre!
@@ -6484,6 +6517,15 @@ function confirmPetEvolution(petId, moedas, cristais) {
 }
 // ✨ MODAL DE ASCENSÃO DO JOGADOR (AGORA COM EXIGÊNCIA DE ACERTOS E COM PRESSÃO DE TEMPO!!)
 function openPlayerAscensionModal() {
+  // ✨ BLINDAGEM MESTRA: Garante que o inventário exista antes de ler as Centelhas!
+    if (!STATS) STATS = {};
+    if (!STATS.inventory) {
+        STATS.inventory = { 
+            magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, 
+            doubleXp: 0, petCrystals: 0, playerSparks: 0,
+            boxBronze: 0, boxPrata: 0, boxOuro: 0
+        };
+    }
     const rank = getUserTitle();
     
     if (STATS.achievements === undefined) STATS.achievements = {};
