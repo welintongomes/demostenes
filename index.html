@@ -6689,9 +6689,6 @@ function limparLuzDeFundo(event) {
 // e usamos apenas o clique padrão, que funciona perfeitamente em PC e Mobile!
 document.addEventListener('click', limparLuzDeFundo);
 
-// O "true" no final garante que ele apague a luz milissegundos ANTES de renderizar a próxima carta!
-document.addEventListener('mousedown', limparLuzDeFundo, true);
-document.addEventListener('touchstart', limparLuzDeFundo, {capture: true, passive: true});
 /* ═══════════════════════════════════════
    🧠 MOTOR DE MEMÓRIA DE INTERFACE E GAVETAS (INTELIGENTE)
 ═══════════════════════════════════════ */
