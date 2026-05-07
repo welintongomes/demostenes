@@ -5082,25 +5082,30 @@ function getRatingRowHtml(isCorrect, correctLabel = 'Correto ✓') {
   </div>`;
 }
 // ✨ SISTEMA DE IMERSÃO DE COR (Verde para Sinônimo, Vermelho para Antônimo)
+// Variável na memória para controlar o tempo do "Flash" de cor
+let timerCorDeFundo;
+
+// ✨ SISTEMA DE IMERSÃO DE COR (Verde = Sinônimo, Vermelho = Antônimo)
 function atualizarCorDeFundo(cardType) {
     const body = document.body;
-    
-    // Adiciona uma transição suave para a cor não "piscar" e doer os olhos
     body.style.transition = "background-color 0.4s ease"; 
+    
+    // Cancela o cronômetro anterior
+    clearTimeout(timerCorDeFundo);
 
     if (cardType === 'sinônimo') {
-        // Um verde escuro e profundo
-        body.style.backgroundColor = "rgba(8, 43, 18, 0.5)"; 
+        body.style.backgroundColor = "#082b12"; 
+        timerCorDeFundo = setTimeout(() => { body.style.backgroundColor = ""; }, 3000);
     } 
     else if (cardType === 'antônimo') {
-        // Um vermelho escuro e ameaçador
-        body.style.backgroundColor = "rgba(43, 8, 8, 0.5)"; 
+        body.style.backgroundColor = "#2b0808"; 
+        timerCorDeFundo = setTimeout(() => { body.style.backgroundColor = ""; }, 3000);
     } 
     else {
-        // Se for definição normal ou sair da sessão, limpa a cor e volta para a original do seu CSS
         body.style.backgroundColor = ""; 
     }
 }
+
 // funçao para colorir os nomes sinonimos antonimos etc.
 function hl(txt) {
   return `<strong style="color:#e024ff; font-size:1.15em; text-transform:uppercase; text-shadow: 0px 0px 8px rgba(224,36,255,0.6);">${txt}</strong>`;
@@ -6664,12 +6669,25 @@ function sellStoreItem(itemId, basePrice, isPet) {
     openStoreModal(); 
     updateHeader(); 
 }
-// ✨ APAGA A COR DE FUNDO AO TOCAR EM QUALQUER LUGAR DA TELA
-function limparLuzDeFundo() {
-    if (typeof atualizarCorDeFundo === 'function') {
-        atualizarCorDeFundo('normal');
+// ✨ APAGA A COR (SOMENTE SE TOCAR FORA DOS BOTÕES)
+function limparLuzDeFundo(event) {
+    // 📱 A CORREÇÃO MOBILE: Se o jogador tocou em um botão de resposta, ignora e deixa o jogo rodar!
+    if (event && event.target) {
+        if (event.target.tagName === 'BUTTON' || event.target.closest('button') || event.target.closest('.btn')) {
+            return; // Sai da função sem fazer nada
+        }
+    }
+
+    // Se tocou em um lugar vazio, apaga a luz normalmente
+    if (document.body.style.backgroundColor !== "") {
+        document.body.style.backgroundColor = "";
+        clearTimeout(timerCorDeFundo); 
     }
 }
+
+// 📱 Removemos os rastreadores agressivos (touchstart/mousedown) que bugavam o celular
+// e usamos apenas o clique padrão, que funciona perfeitamente em PC e Mobile!
+document.addEventListener('click', limparLuzDeFundo);
 
 // O "true" no final garante que ele apague a luz milissegundos ANTES de renderizar a próxima carta!
 document.addEventListener('mousedown', limparLuzDeFundo, true);
