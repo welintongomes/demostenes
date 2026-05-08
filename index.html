@@ -326,7 +326,7 @@ svg.ring{transform:rotate(-90deg);}
         <div class="hstat" style="color:var(--gold)"><div class="hstat-val" id="hMoedas">0🪙</div><div class="hstat-lbl">Moedas</div></div>
         <div class="hstat" style="color:var(--red)"><div class="hstat-val" id="hVidas">0❤️</div><div class="hstat-lbl">Vidas</div></div>
       </div>
-    </div>
+    </div> 
     <div class="prog-bar"><div class="prog-fill" id="hProg" style="width:0%"></div></div>
   </div>
 
@@ -5640,10 +5640,18 @@ function openBackupModal() {
 }
 
 function exportBackup() {
+    // 1. Garante que os últimos dados (como o fogo do streak) estão atualizados antes de salvar
+    if (typeof saveStats === 'function') saveStats();
+
     const data = { words: W, stats: STATS };
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+    const jsonStr = JSON.stringify(data);
+    
+    // ✨ A MÁGICA DO BLOB: Cria um arquivo virtual real na memória, sem limites de tamanho!
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
     const dl = document.createElement('a');
-    dl.setAttribute("href", dataStr);
+    dl.setAttribute("href", url);
     
     // Cria um nome de arquivo automático com a data de hoje!
     const date = new Date().toISOString().slice(0,10);
@@ -5652,6 +5660,10 @@ function exportBackup() {
     document.body.appendChild(dl);
     dl.click();
     dl.remove();
+    
+    // ✨ FAXINEIRO: Libera a memória do celular que o arquivo virtual usou
+    URL.revokeObjectURL(url);
+    
     toast('💾 Backup exportado com sucesso!', 'ok');
 }
 
@@ -5659,36 +5671,66 @@ function importBackup(event) {
     const file = event.target.files[0];
     if(!file) return;
     const reader = new FileReader();
+    
     reader.onload = function(e) {
         try {
             const data = JSON.parse(e.target.result);
             if(data.words && data.stats) {
-                // Substitui a memória atual pela do arquivo
+                // 1. Substitui a memória atual pela do arquivo
                 W = data.words;
                 STATS = data.stats;
                 
-                // Salva o STATS no banco de dados
+                // ✨ Proteção extra para o seu Foguinho: 
+                // Se o backup for antigo e não tiver o streak salvo, não deixa ficar 'undefined'
+                if (typeof STATS.streak === 'undefined') STATS.streak = 0; 
+                
+                // 2. Salva o STATS no banco de dados
                 if (typeof saveStats === 'function') saveStats();
                 
-                // Salva TODAS as cartas do arquivo no banco de dados na mesma hora
-                W.forEach(w => { if (typeof saveCard === 'function') saveCard(w); });
+                // Avisa o usuário que o processo começou
+                toast('📦 Desempacotando dados, aguarde...', 'gold');
                 
-                toast('✨ Progresso restaurado com sucesso!', 'gold');
-                closeModal();
-                updateHeader();
-                if (typeof updateWordList === 'function') updateWordList();
-                render();
+                // ✨ 3. O ANTÍDOTO CONTRA O TRAVAMENTO MOBILE (Salvamento em Lotes)
+                let index = 0;
+                const batchSize = 50; // Salva 50 cartas por vez para o celular respirar
+                
+                function saveNextBatch() {
+                    const end = Math.min(index + batchSize, W.length);
+                    
+                    // Salva o lote atual
+                    for(; index < end; index++) {
+                        if (typeof saveCard === 'function') saveCard(W[index]);
+                    }
+                    
+                    // Se ainda tem cartas para salvar, agenda o próximo lote
+                    if (index < W.length) {
+                        setTimeout(saveNextBatch, 30); // Pausa de 30ms para o IndexedDB não estourar
+                    } else {
+                        // 🎉 Terminou todas as cartas com segurança! Atualiza a tela.
+                        toast('✨ Progresso restaurado com sucesso!', 'ok');
+                        if (typeof closeModal === 'function') closeModal();
+                        if (typeof updateHeader === 'function') updateHeader();
+                        if (typeof updateWordList === 'function') updateWordList();
+                        if (typeof render === 'function') render();
+                    }
+                }
+                
+                // Dispara o motor de salvamento seguro
+                saveNextBatch(); 
+
             } else {
                 toast('Arquivo incompatível ou corrompido.', 'err');
-                triggerScreenShake();
+                if (typeof triggerScreenShake === 'function') triggerScreenShake();
             }
         } catch(err) {
+            console.error(err);
             toast('Erro ao ler o arquivo!', 'err');
-            triggerScreenShake();
+            if (typeof triggerScreenShake === 'function') triggerScreenShake();
         }
     };
     reader.readAsText(file);
 }
+
 // ✨ MOTOR DE DIÁRIAS (Agora com 6 missões, Adrenalina e Categorias Dinâmicas!)
 function generateDailyQuests() {
     if (!STATS) return;
