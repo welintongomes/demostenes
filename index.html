@@ -1551,6 +1551,7 @@ function buildStudyTab() {
   html += `<div class="quote" style="margin-top:4px">${quotes[new Date().getDate() % quotes.length]}</div>`;
   return html;
 }
+
 function buildStudyCard() {
   const sess = studySession;
   const card = sess.queue[sess.current];
@@ -1780,8 +1781,10 @@ function buildFlashMode(card, intervals) {
       </button>`).join('')}
     </div>` : `<button class="btn" style="margin-top:14px" onclick="flipCard()">↩ Revelar resposta</button>`}`;
 }
+
 function buildChoiceMode(card) {
   const sess = studySession;
+  
   if (!sess.choices) {
     const valids = getValidAnswers(card);
     const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
@@ -1792,29 +1795,61 @@ function buildChoiceMode(card) {
     let pool = W.filter(w => w.id !== card.id);
     const isLong = (c) => ['técnica', 'falácia', 'citação'].includes(c.cardType || 'normal');
     
+    // ✨ O NOVO SISTEMA DE FILTRAGEM (Prioridade Absoluta por Idioma/Categoria)
+    // O jogo procura opções no mesmo "idioma" comparando a categoria da carta atual.
+    
+    let langStrict = pool.filter(w => w.category === card.category && w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
+    let langType   = pool.filter(w => w.category === card.category && w.cardType === card.cardType);
+    let langOnly   = pool.filter(w => w.category === card.category);
+    
+    // Fallbacks originais (se a pessoa não tiver categorias, usa o padrão antigo)
     let t1 = pool.filter(w => w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
     let t2 = pool.filter(w => w.cardType === card.cardType);
     let t3 = pool.filter(w => isLong(w) === isLong(card));
 
-    let othersCards = t1.length >= 3 ? t1 : (t2.length >= 3 ? t2 : (t3.length >= 3 ? t3 : pool));
+    // 🧠 A Inteligência: Escolhe as iscas na ordem de perfeição do idioma!
+    let othersCards = langStrict.length >= 3 ? langStrict 
+                    : (langType.length >= 3 ? langType 
+                    : (langOnly.length >= 3 ? langOnly 
+                    : (t1.length >= 3 ? t1 
+                    : (t2.length >= 3 ? t2 
+                    : (t3.length >= 3 ? t3 : pool)))));
+
     let others = [];
 
+    // Extrai as opções da lista de elite
     if (isRel) {
       others = othersCards.flatMap(w => (w.cardType === 'sinônimo' || w.cardType === 'antônimo') ? getValidAnswers(w) : [w.word]);
-      if (others.length < totalOptions) others = [...others, ...pool.map(w => w.word)];
+      
+      // Se faltar opções, preenche com palavras do MESMO IDIOMA (Categoria) primeiro!
+      if (others.length < totalOptions) {
+         let backup = langOnly.length > 0 ? langOnly : pool;
+         others = [...others, ...backup.map(w => w.word)];
+      }
     } else {
       others = othersCards.flatMap(w => (w.cardType === 'sinônimo' || w.cardType === 'antônimo') ? [] : getValidAnswers(w));
-      // ✨ LIMPANDO OS DISTRATORES:
-      if (others.length < totalOptions) others = [...others, ...pool.filter(w => w.cardType !== 'sinônimo' && w.cardType !== 'antônimo').map(w => clean(w.definition))];
+      
+      if (others.length < totalOptions) {
+         let backup = langOnly.length > 0 ? langOnly : pool;
+         // Proteção para o 'clean' existir no ambiente
+         others = [...others, ...backup.filter(w => w.cardType !== 'sinônimo' && w.cardType !== 'antônimo').map(w => typeof clean === 'function' ? clean(w.definition) : (w.definition || w.word))];
+      }
     }
     
     others = [...new Set(others)].filter(opt => !sess.validChoices.includes(opt));
+    
+    // 🛡️ Segurança Máxima: Se o jogador tiver pouquíssimas cartas cadastradas no total
+    // força o preenchimento com qualquer coisa para a tela não quebrar
+    if (others.length < (totalOptions - sess.validChoices.length)) {
+         let absoluteBackup = pool.map(w => isRel ? w.word : (typeof clean === 'function' && w.definition ? clean(w.definition) : (w.definition || w.word)));
+         others = [...new Set([...others, ...absoluteBackup])].filter(opt => !sess.validChoices.includes(opt));
+    }
+
     const wrongs = others.sort(() => Math.random() - 0.5).slice(0, totalOptions - sess.validChoices.length);
     sess.choices = [...sess.validChoices, ...wrongs].sort(() => Math.random() - 0.5);
   }
   
   const answered = sess.choiceAnswered;
-  // ✨ A MÁGICA ACONTECE AQUI TAMBÉM!
   if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
   const typeLbl = card.cardType === 'sinônimo' ? `Selecione um ${hl('sinônimo')} para:` : (card.cardType === 'antônimo' ? `Selecione um ${hl('antônimo')} para:` : 'Qual a definição de:');
 
@@ -1822,7 +1857,7 @@ function buildChoiceMode(card) {
     <div class="card" style="margin-bottom:12px">
       <div class="card-body" style="text-align:center">
         <div class="fc-type" style="margin-bottom:10px">${typeLbl}</div>
-        ${renderVisual(card)} <div class="fc-word">${esc(card.word)}</div>
+        ${typeof renderVisual === 'function' ? renderVisual(card) : ''} <div class="fc-word">${esc(card.word)}</div>
       </div>
     </div>
     <div id="choices" style="${sess.choices.length > 4 ? 'display:grid;grid-template-columns:1fr 1fr;gap:6px' : ''}">
@@ -1833,7 +1868,14 @@ function buildChoiceMode(card) {
           else if (ch === sess.choiceSelected) cls += ' wrong reveal';
           else cls += ' reveal';
         }
-        return `<div class="${cls}" style="margin-bottom:8;font-size:14px;padding:10px" onclick="${answered ? '' : `choiceAnswer(${i})`}">${esc(ch)}</div>`;
+        
+        // ✨ BÔNUS DE UX: Adiciona as letras de A a F nas alternativas!
+        const letras = ['A', 'B', 'C', 'D', 'E', 'F'];
+        
+        return `<div class="${cls}" style="margin-bottom:8px; font-size:14px; padding:12px; display:flex; align-items:center;" onclick="${answered ? '' : `choiceAnswer(${i})`}">
+   <span style="opacity:0.4; margin-right:12px; font-weight:bold; font-family:'Cinzel',serif;">${letras[i]}.</span> 
+   <span style="flex:1; text-align:left;">${esc(ch)}</span>
+</div>`;
       }).join('')}
     </div>
     ${answered ? `
@@ -1847,23 +1889,44 @@ function buildChoiceMode(card) {
 
 function buildRevChoiceMode(card) {
   const sess = studySession;
+  
   if (!sess.revChoices) {
     const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
     let pool = W.filter(w => w.id !== card.id);
     const isLong = (c) => ['técnica', 'falácia', 'citação'].includes(c.cardType || 'normal');
     
+    // ✨ O NOVO SISTEMA DE FILTRAGEM (Prioridade Absoluta por Idioma/Categoria)
+    let langStrict = pool.filter(w => w.category === card.category && w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
+    let langType   = pool.filter(w => w.category === card.category && w.cardType === card.cardType);
+    let langOnly   = pool.filter(w => w.category === card.category);
+
     let t1 = pool.filter(w => w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
     let t2 = pool.filter(w => w.cardType === card.cardType);
     let t3 = pool.filter(w => isLong(w) === isLong(card));
 
-    let othersCards = t1.length >= 3 ? t1 : (t2.length >= 3 ? t2 : (t3.length >= 3 ? t3 : pool));
-    if (othersCards.length < 3) othersCards = W.filter(w => w.id !== card.id);
+    // 🧠 A Inteligência: Escolhe as palavras falsas priorizando a mesma categoria (Idioma)
+    let othersCards = langStrict.length >= 3 ? langStrict 
+                    : (langType.length >= 3 ? langType 
+                    : (langOnly.length >= 3 ? langOnly 
+                    : (t1.length >= 3 ? t1 
+                    : (t2.length >= 3 ? t2 
+                    : (t3.length >= 3 ? t3 : pool)))));
+
+    // Extrai as palavras e garante que não haja repetições e nem a resposta certa no meio
+    let othersWords = [...new Set(othersCards.map(w => w.word))].filter(w => w !== card.word);
+
+    // 🛡️ Segurança: Se depois de filtrar não sobrarem 3 palavras falsas, puxa do baralho todo
+    if (othersWords.length < 3) {
+        let backupWords = [...new Set(pool.map(w => w.word))].filter(w => w !== card.word);
+        othersWords = [...othersWords, ...backupWords];
+    }
+
+    // Sorteia as 3 iscas e mistura com a palavra certa
+    const shuffled = othersWords.sort(() => Math.random() - .5).slice(0, 3);
+    sess.revChoices = [...shuffled, card.word].sort(() => Math.random() - .5);
     
-    const shuffled = othersCards.sort(() => Math.random() - .5).slice(0, 3);
-    sess.revChoices = [...shuffled.map(w => w.word), card.word].sort(() => Math.random() - .5);
-    
-    // ✨ LIMPANDO A PERGUNTA INVERSA:
-    let def = clean(card.definition);
+    // ✨ LIMPANDO A PERGUNTA INVERSA COM SEGURANÇA:
+    let def = typeof clean === 'function' && card.definition ? clean(card.definition) : (card.definition || "");
     if (isRel) {
        const valids = getValidAnswers(card);
        def = valids[Math.floor(Math.random() * valids.length)];
@@ -1872,7 +1935,7 @@ function buildRevChoiceMode(card) {
   }
   
   const answered = sess.revChoiceAnswered;
-  // ✨ A MÁGICA ACONTECE AQUI! O fundo muda assim que a carta aparece!
+  
   if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
   const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
   const promptTxt = isRel ? `Qual palavra possui este ${hl(card.cardType)}:` : 'Qual é a palavra para esta definição:';
@@ -1881,10 +1944,14 @@ function buildRevChoiceMode(card) {
     <div class="card" style="margin-bottom:12px">
       <div class="card-body" style="text-align:center">
         <div class="fc-type" style="margin-bottom:10px">${promptTxt}</div>
-        ${renderVisual(card)}<div class="fc-definition" style="font-size:20px;font-weight: bolder;color: orange;line-height:1.6">${esc(sess.revChoicePrompt)}</div>
+        ${typeof renderVisual === 'function' ? renderVisual(card) : ''}
+        <div class="fc-definition" style="font-size:20px; font-weight:bolder; color:var(--gold); line-height:1.6">
+          "${esc(sess.revChoicePrompt)}"
+        </div>
       </div>
     </div>
-    <div id="choices">
+    
+    <div id="choices" style="${sess.revChoices.length > 4 ? 'display:grid;grid-template-columns:1fr 1fr;gap:6px' : ''}">
       ${sess.revChoices.map((ch, i) => {
         let cls = 'choice-opt';
         if (answered) {
@@ -1892,12 +1959,20 @@ function buildRevChoiceMode(card) {
           else if (ch === sess.revChoiceSelected) cls += ' wrong reveal';
           else cls += ' reveal';
         }
-        return `<div class="${cls}" style="font-family:'Cinzel',serif;font-style:normal;font-weight:600;text-align:center;font-size:16px" onclick="${answered ? '' : `revChoiceAnswer(${i})`}">${esc(ch)}</div>`;
+        
+        // ✨ BÔNUS DE UX: Adiciona as letras de A a D com estilo elegante e alinha a palavra à esquerda
+        const letras = ['A', 'B', 'C', 'D', 'E', 'F'];
+        
+        return `<div class="${cls}" style="margin-bottom:8px; padding:12px; display:flex; align-items:center;" onclick="${answered ? '' : `revChoiceAnswer(${i})`}">
+           <span style="opacity:0.4; margin-right:12px; font-weight:bold; font-family:'Cinzel',serif; font-size:14px;">${letras[i]}.</span> 
+           <span style="flex:1; text-align:left; font-family:'Cinzel',serif; font-weight:600; font-size:16px;">${esc(ch)}</span>
+        </div>`;
       }).join('')}
     </div>
+    
     ${answered ? `
     <div style="margin-top:6px">
-      <div class="rating-row">
+      <div class="rating-row" style="margin-top:10px">
         <button class="rating-btn r1" onclick="rateCard(0)"><span class="rating-lbl">De novo</span></button>
         <button class="rating-btn r${sess.revChoiceCorrect ? '4' : '2'}" onclick="rateCard(${sess.revChoiceCorrect ? 3 : 1})">
           <span class="rating-lbl">${sess.revChoiceCorrect ? 'Fácil ✓' : 'Difícil'}</span>
@@ -1908,6 +1983,7 @@ function buildRevChoiceMode(card) {
 
 function buildTFMode(card) {
   const sess = studySession;
+  
   if (!sess.tfSetup) {
     const isCorrect = Math.random() > 0.5;
     let def = '';
@@ -1915,30 +1991,57 @@ function buildTFMode(card) {
     
     // ✨ LIMPANDO A RESPOSTA CORRETA:
     const correctAnswers = getValidAnswers(card);
-    const correctDef = isRel ? correctAnswers[Math.floor(Math.random() * correctAnswers.length)] : clean(card.definition);
+    const correctDef = isRel ? correctAnswers[Math.floor(Math.random() * correctAnswers.length)] : (typeof clean === 'function' ? clean(card.definition) : card.definition);
 
     if (!isCorrect && W.length > 1) {
       let pool = W.filter(w => w.id !== card.id);
       const isLong = (c) => ['técnica', 'falácia', 'citação'].includes(c.cardType || 'normal');
       
+      // ✨ A CASCATA DE IDIOMAS (Prioridade Absoluta por Categoria)
+      let langStrict = pool.filter(w => w.category === card.category && w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
+      let langType   = pool.filter(w => w.category === card.category && w.cardType === card.cardType);
+      let langOnly   = pool.filter(w => w.category === card.category);
+
       let t1 = pool.filter(w => w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
       let t2 = pool.filter(w => w.cardType === card.cardType);
       let t3 = pool.filter(w => isLong(w) === isLong(card));
 
-      let othersCards = t1.length >= 1 ? t1 : (t2.length >= 1 ? t2 : (t3.length >= 1 ? t3 : pool));
+      // Pega do mais restrito para o mais genérico (precisamos de apenas 1 isca)
+      let othersCards = langStrict.length >= 1 ? langStrict 
+                      : (langType.length >= 1 ? langType 
+                      : (langOnly.length >= 1 ? langOnly 
+                      : (t1.length >= 1 ? t1 
+                      : (t2.length >= 1 ? t2 
+                      : (t3.length >= 1 ? t3 : pool)))));
+
       let others = [];
       
       if (isRel) {
         others = othersCards.flatMap(w => (w.cardType === 'sinônimo' || w.cardType === 'antônimo') ? getValidAnswers(w) : [w.word]);
-        if (others.length === 0) others = pool.map(w => w.word);
+        if (others.length === 0) {
+           let backup = langOnly.length > 0 ? langOnly : pool;
+           others = backup.map(w => w.word);
+        }
       } else {
         others = othersCards.flatMap(w => (w.cardType === 'sinônimo' || w.cardType === 'antônimo') ? [] : getValidAnswers(w));
         // ✨ LIMPANDO OS DISTRATORES AQUI TAMBÉM:
-        if (others.length === 0) others = pool.filter(w => w.cardType !== 'sinônimo' && w.cardType !== 'antônimo').map(w => clean(w.definition));
+        if (others.length === 0) {
+           let backup = langOnly.length > 0 ? langOnly : pool;
+           others = backup.filter(w => w.cardType !== 'sinônimo' && w.cardType !== 'antônimo').map(w => typeof clean === 'function' ? clean(w.definition) : w.definition);
+        }
       }
       
-      def = others[Math.floor(Math.random() * others.length)] || correctDef;
-      sess.tfIsCorrect = def === correctDef;
+      // Filtro vital: A afirmação "Falsa" não pode, por coincidência, ser idêntica à "Verdadeira"
+      others = [...new Set(others)].filter(opt => opt !== correctDef);
+      
+      if (others.length > 0) {
+          def = others[Math.floor(Math.random() * others.length)];
+          sess.tfIsCorrect = false;
+      } else {
+          // Fallback de segurança extrema: se der erro e não achar NADA falso, vira verdadeira
+          def = correctDef;
+          sess.tfIsCorrect = true; 
+      }
     } else {
       sess.tfIsCorrect = true;
       def = correctDef;
@@ -1948,29 +2051,28 @@ function buildTFMode(card) {
   }
   
   const answered = sess.tfAnswered;
-  // ✨ A MÁGICA ACONTECE AQUI! O fundo muda assim que a carta aparece!
-  if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
-  // ✨ A MÁGICA ACONTECE AQUI! O fundo muda assim que a carta aparece!
+  
+  // ✨ A MÁGICA DA COR: (Removi a duplicação que existia na função anterior)
   if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
   const typeText = card.cardType === 'sinônimo' ? `Tem como ${hl('sinônimo')}:` : (card.cardType === 'antônimo' ? `Tem como ${hl('antônimo')}:` : 'Significa:');
 
   return `
     <div class="card" style="margin-bottom:12px;border:2px solid ${answered ? (sess.tfUserCorrect ? 'var(--green)' : 'var(--red)') : 'var(--border)'}">
       <div class="card-body" style="text-align:center;padding:24px 16px">
-        ${renderVisual(card)}<div class="fc-word" style="font-size:32px;margin-bottom:16px">${esc(card.word)}</div>
+        ${typeof renderVisual === 'function' ? renderVisual(card) : ''}<div class="fc-word" style="font-size:32px;margin-bottom:16px">${esc(card.word)}</div>
         <div style="font-size:13px;color:var(--stone2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">${typeText}</div>
         <div class="fc-definition" style="font-size:18px;">"${esc(sess.tfDefinition)}"</div>
       </div>
     </div>
     ${!answered ? `
-    <div class="btn-row" style="margin-top:16px">
-      <button class="btn success" style="padding:14px;font-size:14px" onclick="checkTF(true)">✓ Verdadeiro</button>
-      <button class="btn danger" style="padding:14px;font-size:14px" onclick="checkTF(false)">✕ Falso</button>
+    <div class="btn-row" style="margin-top:16px; display:flex; gap:8px;">
+      <button class="btn success" style="padding:14px; font-size:14px; flex:1" onclick="checkTF(true)">✓ Verdadeiro</button>
+      <button class="btn danger" style="padding:14px; font-size:14px; flex:1" onclick="checkTF(false)">✕ Falso</button>
     </div>` : `
-    <div class="type-result ${sess.tfUserCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px">
-      ${sess.tfUserCorrect ? '✓ Acertou!' : `✗ Errou. A resposta era <b>${sess.tfIsCorrect ? 'Verdadeiro' : 'Falso'}</b>.`}
+    <div class="type-result ${sess.tfUserCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px; text-align:center;">
+      ${sess.tfUserCorrect ? '<b>✓ Acertou em cheio!</b>' : `<b>✗ Enganado!</b> A afirmação era <b>${sess.tfIsCorrect ? 'Verdadeira' : 'Falsa'}</b>.`}
     </div>
-    ${!sess.tfIsCorrect && !sess.tfUserCorrect ? `<div class="quote" style="margin-bottom:10px">${card.cardType === 'sinônimo' ? 'Sinônimos reais:' : 'Definição real:'} ${esc(clean(card.definition))}</div>` : ''}
+    ${!sess.tfIsCorrect && !sess.tfUserCorrect ? `<div class="quote" style="margin-bottom:10px">${card.cardType === 'sinônimo' ? 'Os sinônimos reais são:' : 'A definição real é:'} <br><b>${esc(typeof clean === 'function' ? clean(card.definition) : card.definition)}</b></div>` : ''}
     <div class="rating-row">
       <button class="rating-btn r1" onclick="rateCard(0)"><span class="rating-lbl">De novo</span></button>
       <button class="rating-btn r${sess.tfUserCorrect ? '4' : '2'}" onclick="rateCard(${sess.tfUserCorrect ? 3 : 1})">
@@ -1978,6 +2080,7 @@ function buildTFMode(card) {
       </button>
     </div>`}`;
 }
+
 // ✨ O MODO BOSS - FALA OBRIGATÓRIA DA PALAVRA BASE
 function buildBossMode(card) {
   const sess = studySession;
@@ -2176,6 +2279,7 @@ function checkBoss() {
   render(); 
   setTimeout(playAnswerAudio, 100);
 }
+
 function buildTypeMode(card) {
   const sess = studySession;
   const answered = sess.typeAnswered;
@@ -2735,7 +2839,6 @@ function buildImgChoiceMode(card) {
   `;
 }
 
-
 // ✨ INTERAÇÕES DINÂMICAS: Escondem a dica mágica assim que usada!
 function spellAdd(id) { if(!studySession)return; studySession.spellAnswer.push(id); hideMagicHint(); render(); }
 function spellRemove(id) { if(!studySession)return; studySession.spellAnswer = studySession.spellAnswer.filter(i => i !== id); hideMagicHint(); render(); }
@@ -2872,20 +2975,43 @@ function choiceAnswer(idx) {
 }
 
 function checkType() {
-  const sess = studySession; if (!sess || sess.typeAnswered) return;
-  const card = sess.queue[sess.current]; const inp = document.getElementById('typeInput'); if (!inp) return;
+  const sess = studySession; 
+  if (!sess || sess.typeAnswered) return;
+  
+  const card = sess.queue[sess.current]; 
+  const inp = document.getElementById('typeInput'); 
+  if (!inp) return;
+  
+  // Limpa acentos e espaços para ser justo com o jogador
   const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  const ans = normalizeTxt(inp.value); const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+  const ans = normalizeTxt(inp.value); 
+  const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+  
   if (isRel) {
     const valids = getValidAnswers(card).map(v => normalizeTxt(v));
-    sess.typeCorrect = valids.some(v => ans === v || levenshtein(ans, v) <= 1);
+    // ✨ Inteligência extra: Só aceita erro de digitação (levenshtein) se a palavra for maior que 3 letras!
+    sess.typeCorrect = valids.some(v => ans === v || (ans.length > 3 && levenshtein(ans, v) <= 1));
   } else {
     const correctWord = normalizeTxt(card.word);
-    sess.typeCorrect = ans === correctWord || levenshtein(ans, correctWord) <= 1;
+    // ✨ Mesma regra aqui, evita aprovar palavras de 2 letras que não têm nada a ver.
+    sess.typeCorrect = ans === correctWord || (ans.length > 3 && levenshtein(ans, correctWord) <= 1);
   }
+  
   sess.typeAnswered = true;
+  
+  // ✨ O ESCUDO ANTI-BUG DA PLAYSFX: 
+  // Se a variável isQuizNow não existir no jogo, nós a criamos invisível aqui mesmo!
+  // Assim a playSfx lê ela, fica feliz e não trava o seu jogo.
+  if (typeof isQuizNow === 'undefined') {
+      window.isQuizNow = false; 
+  }
+  
   playSfx(sess.typeCorrect ? 'ok' : 'fail');
-  render(); setTimeout(playAnswerAudio, 100);
+  render(); 
+  
+  if (typeof playAnswerAudio === 'function') {
+      setTimeout(playAnswerAudio, 100);
+  }
 }
 // ✨ BOTÃO DE DESISTÊNCIA (Para quando der "Branco" na memória)
 function skipContext() {
@@ -4529,39 +4655,71 @@ function useHint() {
   render(); // Recria a tela atualizada
 }
 
-
 function useSkipItem() {
-  const sess = studySession;
-  if (!sess) return;
-  
-  // ✨ Só barra se NÃO tiver hack E não tiver estoque
-  if (!configJogo.pularInfinito && (!STATS.inventory || STATS.inventory.skips <= 0)) {
-      toast('Você não tem Saltos de Cronos!', 'err');
-      return;
-  }
-  
-  // Só desconta do estoque se NÃO for infinito
-  if (!configJogo.pularInfinito) {
-      STATS.inventory.skips--;
-  }
-  
-  if (typeof saveStats === 'function') saveStats();
-  
-  sess.queue.splice(sess.current, 1);
-  sess.currentAdaptiveMode = null; 
-  clearTimeout(sess.timerId);
-  sess.hintUsed = false;
-  sess.magicHintUsed = false;
-  
-  // Mensagem personalizada para o Hacker
-  if (configJogo.pularInfinito) {
-      toast('⏭️ Salto do Modo Deus!', 'var(--red)');
-  } else {
-      toast('⏭️ Salto Temporal! Card pulado sem punição.', 'ok');
-  }
-  
-  render();
+    const sess = studySession;
+    if (!sess) return;
+    
+    // ✨ Só barra se NÃO tiver hack E não tiver estoque
+    if (!configJogo.pularInfinito && (!STATS.inventory || STATS.inventory.skips <= 0)) {
+        toast('Você não tem Saltos de Cronos!', 'err');
+        return;
+    }
+    
+    // Só desconta do estoque se NÃO for infinito
+    if (!configJogo.pularInfinito) {
+        STATS.inventory.skips--;
+    }
+    
+    if (typeof saveStats === 'function') saveStats();
+    
+    // 1. Remove a carta atual da fila
+    sess.queue.splice(sess.current, 1);
+    
+    // 2. ✨ O FAXINEIRO: Limpa a memória das perguntas para a próxima carta nascer "virgem"
+    sess.currentAdaptiveMode = null; 
+    sess.currentCardId = null; // Força o relógio e os construtores a resetarem
+    
+    // Reseta as flags e iscas de todos os modos de jogo!
+    sess.choices = null;
+    sess.validChoices = null;
+    sess.choiceAnswered = false;
+    
+    sess.tfSetup = false;
+    sess.tfDefinition = null;
+    sess.tfAnswered = false;
+    
+    sess.revChoices = null;
+    sess.revChoicePrompt = null;
+    sess.revChoiceAnswered = false;
+    
+    sess.flipped = false;
+    sess.typeAnswered = false;
+    sess.scrambleAnswered = false;
+    sess.spellAnswered = false;
+    sess.syntaxAnswered = false;
+    sess.clozeAnswered = false;
+    sess.contextAnswered = false;
+    sess.imgChoiceAnswered = false;
+    sess.bossAnswered = false;
+    sess.blindAnswered = false;
+
+    // 3. Limpa relógios e dicas
+    clearTimeout(sess.timerId);
+    clearInterval(sess.timerId);
+    sess.hintUsed = false;
+    sess.magicHintUsed = false;
+    
+    // Mensagem personalizada para o Hacker
+    if (configJogo.pularInfinito) {
+        toast('⏭️ Salto do Modo Deus!', 'var(--red)');
+    } else {
+        toast('⏭️ Salto Temporal! Card pulado sem punição.', 'ok');
+    }
+    
+    // 4. Redesenha a tela limpíssima com a nova carta
+    render();
 }
+
 function useMiniShield() {
   const sess = studySession;
   if (!sess || sess.miniShieldActive) return;
