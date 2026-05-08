@@ -1419,7 +1419,7 @@ function buildStudyTab() {
           <button class="btn" onclick="startCustomSession(document.getElementById('studyCatFilter')?.value || '', false)" style="flex:1;font-size:13px;padding:12px;border-color:var(--gold);color:var(--gold);font-weight:bold;letter-spacing:0.5px">▶️ Modos Salvos</button>
           
           <!-- Botão menor de engrenagem para alterar os modos -->
-          <button class="btn ghost" onclick="openCustomModal(false)" style="flex:auto;font-size:16px;padding:10px 14px;border-color:var(--border2);color:var(--stone2)">⚙️</button>
+          <button class="btn ghost" onclick="openCustomModal(false)" style="flex:auto; width: 0%;font-size:16px;padding:10px 14px;border-color:var(--border2);color:var(--stone2)">⚙️</button>
         </div>
 
       </div>
@@ -1465,7 +1465,7 @@ function buildStudyTab() {
           <button class="btn" onclick="startCustomSession(document.getElementById('freeStudyFilter')?.value || '', true)" style="flex:1;font-size:13px;padding:12px;border-color:var(--blue);color:white;background:rgba(41, 128, 185, 0.8);font-weight:bold;">▶️ Modos Salvos</button>
           
           <!-- Botão menor de engrenagem -->
-          <button class="btn ghost" onclick="openCustomModal(true)" style="flex:auto;font-size:16px;padding:10px 14px;border-color:var(--border2);color:var(--stone2)">⚙️</button>
+          <button class="btn ghost" onclick="openCustomModal(true)" style="flex:auto; width: 0%;font-size:16px;padding:10px 14px;border-color:var(--border2);color:var(--stone2)">⚙️</button>
         </div>
 
       </div>
@@ -1617,7 +1617,7 @@ function buildStudyCard() {
 
   const isAns = sess.typeAnswered || sess.choiceAnswered || sess.tfAnswered || sess.revChoiceAnswered || sess.scrambleAnswered || sess.spellAnswered || sess.syntaxAnswered || sess.clozeAnswered || sess.contextAnswered || sess.imgChoiceAnswered || sess.bossAnswered || sess.blindAnswered || sess.flipped;
 
-  let timerHtml = '';
+let timerHtml = '';
     // Removido o bloqueio de "interval >= 3". Agora aparece para quase todas!
     if (enableTimer && card.interval >= configJogo.timerMinInterval && activeMode !== 'flash') {
         
@@ -1627,21 +1627,25 @@ function buildStudyCard() {
         if (activeMode === 'boss') timeLimit = 15; 
         
         if (!isAns) {
+            // Desenha a barra sem animação no CSS (o JS vai controlar o tamanho)
+            timerHtml = `
+            <div style="width:100%; height:6px; background:var(--bg4); margin-bottom:10px; border-radius:4px; overflow:hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);">
+                <div id="survival-bar" style="height:100%; width:100%; background:var(--gold2);"></div>
+            </div>`;
+
             if (sess.currentCardId !== card.id) {
                 sess.currentCardId = card.id;
                 // Salva o tempo máximo na sessão para calcular o bônus depois
                 sess.maxTimeLimit = timeLimit; 
-                setTimeout(() => startSurvivalTimer(timeLimit), 100);
+                
+                // Dá o tiro de largada UMA ÚNICA VEZ por carta
+                setTimeout(() => startSurvivalTimer(timeLimit), 50);
             }
-            timerHtml = `
-            <div style="width:100%; height:6px; background:var(--bg4); margin-bottom:10px; border-radius:4px; overflow:hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);">
-                <div id="survival-bar" style="height:100%; width:100%; background:#ffd700; transition: width 0.1s linear, background-color 0.3s;"></div>
-            </div>`;
         } else {
-            clearTimeout(sess.timerId); 
+            clearInterval(sess.timerId); // Para o motor quando você responde
         }
     } else {
-        clearTimeout(sess.timerId);
+        clearInterval(sess.timerId);
     }
 
   // ✨ BARRA DE ITENS MÁGICOS (AGORA COM MODO DEUS)
@@ -4047,6 +4051,7 @@ function openStoreModal() {
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">✨ Dica de Atena</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">dá uma dica aí, Sem Punição</div>
                         <div style="font-size:11px; margin-top:4px; color:var(--gold2);">Estoque: ${STATS.inventory.magicHints || 0}</div>
                      </div>
                      ${getItemBtn(`buyItem('magicHints', 100)`, 100, 0, 'var(--gold2)', false, 'magicHints')}
@@ -4056,6 +4061,7 @@ function openStoreModal() {
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">⏭️ Salto de Cronos</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Próxima por favor, Nao afeta SM-2</div>
                         <div style="font-size:11px; margin-top:4px; color:var(--green);">Estoque: ${STATS.inventory.skips || 0}</div>
                      </div>
                      ${getItemBtn(`buyItem('skips', 100)`, 100, 0, 'var(--green)', false, 'skips')}
@@ -4065,9 +4071,43 @@ function openStoreModal() {
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🛡️ Égide Menor</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Te Proteje caso Errar.</div>
                         <div style="font-size:11px; margin-top:4px; color:var(--stone);">Estoque: ${STATS.inventory.miniShields || 0}</div>
                      </div>
                      ${getItemBtn(`buyItem('miniShields', 100)`, 100, 0, 'var(--stone)', false, 'miniShields')}
+                  </div>
+                </div>
+                <div class="card" style="border-color:#00e5ff; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">💧 Água de Mnemósine</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Dobro De Xp Consome 1 Por Carta</div>
+                        <div style="font-size:11px; margin-top:4px; color:#00e5ff;">Cargas ativas: ${STATS.inventory.doubleXp || 0}</div>
+                     </div>
+                     ${getItemBtn(`buyItem('doubleXp', 250, 20)`, 250, 5, '#00e5ff', false, 'doubleXp')}
+                  </div>
+                </div>
+                <div class="card" style="border-color:#e024ff; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🍷 Néctar dos Deuses</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Dobro De Moedas, 1 Por Carta</div>
+                        <div style="font-size:11px; margin-top:4px; color:#e024ff;">Cargas ativas: ${STATS.inventory.doubleCoins || 0}</div>
+                     </div>
+                     ${getItemBtn(`buyItem('doubleCoins', 250, 20)`, 250, 0, '#e024ff', false, 'doubleCoins')}
+                  </div>
+                </div>
+                <div class="card" style="border-color:var(--blue2); margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🏺 Escudo de Esparta</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Proteja O Seu Foguinho Por Um Dia</div>
+                        <div style="font-size:11px; margin-top:4px; color:var(--blue2);">Equipados: ${STATS.inventory.shields || 0}/2</div>
+                     </div>
+                     <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end">
+                        <button class="btn sm" style="padding:8px; border-color:var(--blue2); color:var(--blue2)" onclick="buyShield()" ${STATS.inventory.shields >= 2 ? 'disabled' : ''}>250 🪙</button>
+                        ${STATS.inventory.shields > 0 ? `<button class="btn ghost sm" style="padding:2px 6px; font-size:9px; color:var(--red); border-color:var(--red)" onclick="sellStoreItem('shields', 250, false)">Vender: +75</button>` : ''}
+                     </div>
                   </div>
                 </div>
                 <div class="card" style="border-color:var(--red); margin-bottom:0">
@@ -4082,41 +4122,11 @@ function openStoreModal() {
                      </div>
                   </div>
                 </div>
-                <div class="card" style="border-color:var(--blue2); margin-bottom:0">
-                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-                     <div style="text-align:left; flex:1; padding-right:8px">
-                        <div style="font-weight:bold; font-size:14px">🏺 Escudo de Esparta</div>
-                        <div style="font-size:11px; margin-top:4px; color:var(--blue2);">Equipados: ${STATS.inventory.shields || 0}/2</div>
-                     </div>
-                     <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end">
-                        <button class="btn sm" style="padding:8px; border-color:var(--blue2); color:var(--blue2)" onclick="buyShield()" ${STATS.inventory.shields >= 2 ? 'disabled' : ''}>250 🪙</button>
-                        ${STATS.inventory.shields > 0 ? `<button class="btn ghost sm" style="padding:2px 6px; font-size:9px; color:var(--red); border-color:var(--red)" onclick="sellStoreItem('shields', 250, false)">Vender: +75</button>` : ''}
-                     </div>
-                  </div>
-                </div>
-                <div class="card" style="border-color:#00e5ff; margin-bottom:0">
-                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-                     <div style="text-align:left; flex:1; padding-right:8px">
-                        <div style="font-weight:bold; font-size:14px">💧 Água de Mnemósine</div>
-                        <div style="font-size:11px; margin-top:4px; color:#00e5ff;">Cargas ativas: ${STATS.inventory.doubleXp || 0}</div>
-                     </div>
-                     ${getItemBtn(`buyItem('doubleXp', 250, 20)`, 250, 5, '#00e5ff', false, 'doubleXp')}
-                  </div>
-                </div>
-                <div class="card" style="border-color:#e024ff; margin-bottom:0">
-                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-                     <div style="text-align:left; flex:1; padding-right:8px">
-                        <div style="font-weight:bold; font-size:14px">🍷 Néctar dos Deuses</div>
-                        <div style="font-size:11px; margin-top:4px; color:#e024ff;">Cargas ativas: ${STATS.inventory.doubleCoins || 0}</div>
-                     </div>
-                     ${getItemBtn(`buyItem('doubleCoins', 250, 20)`, 250, 0, '#e024ff', false, 'doubleCoins')}
-                  </div>
-                </div>
                 <div class="card" style="border-color:var(--red); margin-bottom:0">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🌫️ Névoa de Lete</div>
-                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Purifica todo o léxico.</div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Purifica Todas As Cartas Sangue-suga Do Léxico.</div>
                      </div>
                      <button class="btn danger sm" style="padding:8px" onclick="buyMist()">1000 🪙</button> <!-- Consumo imediato -->
                   </div>
@@ -5043,41 +5053,48 @@ function skipCardWithoutPenalty() {
    render(); // O render vai recarregar a tela automaticamente na próxima carta
 }
 
-
-// ✨ RELÓGIO DA SOBREVIVÊNCIA
+// ✨ RELÓGIO DA SOBREVIVÊNCIA (Motor Contínuo - Imune a Redraw)
 function startSurvivalTimer(seconds) {
-    clearTimeout(studySession.timerId);
+    // 1. Limpa o motor anterior para não termos dois relógios brigando
+    clearInterval(studySession.timerId);
     
-    // 🕒 REGISTRO DE TEMPO: Salva o momento exato em que a barra começou a descer
+    // 2. 🕒 REGISTRO DE TEMPO: Salva a hora exata do sistema (Impossível de bugar)
     studySession.timerStartTime = Date.now();
-    studySession.maxTimeLimit = seconds * 1000; // Guardamos em milissegundos
-    studySession.timeLeft = studySession.maxTimeLimit; // Inicia cheio
+    studySession.maxTimeLimit = seconds * 1000;
+    studySession.timeLeft = studySession.maxTimeLimit; 
 
-    const bar = document.getElementById('survival-bar');
-    if(bar) {
-        // Reseta a barra instantaneamente para o topo
-        bar.style.transition = 'none'; 
-        bar.style.width = '100%'; 
-        bar.style.backgroundColor = 'var(--gold2)';
+    // 3. O "Game Loop": Roda a cada 30 milissegundos para a barra ficar lisa (60FPS)
+    studySession.timerId = setInterval(() => {
         
-        // Inicia a animação suave do CSS até ficar vermelha e zerar
-        setTimeout(() => {
-            bar.style.transition = `width ${seconds}s linear, background-color ${seconds}s linear`;
-            bar.style.width = '0%'; 
-            bar.style.backgroundColor = 'var(--red)'; // Você pode usar '#ff4444' se não tiver a variável
-        }, 50);
-    }
-    
-    studySession.timerId = setTimeout(() => {
-        // Se a barra ainda estiver na tela quando o tempo acabar, significa que não respondeu!
-        if (document.getElementById('survival-bar')) {
-            studySession.timeLeft = 0; // O tempo acabou, não tem bônus
-            toast('⏳ O tempo esgotou!', 'err');
-            playSfx('fail');
-            rateCard(0); // Reprova o card automaticamente!
+        // Descobre quanto tempo se passou de verdade
+        const elapsed = Date.now() - studySession.timerStartTime;
+        studySession.timeLeft = Math.max(0, studySession.maxTimeLimit - elapsed);
+        
+        // 📡 O RADAR: Procura a barra na tela. Se a tela recarregou, ele acha a barra nova!
+        const bar = document.getElementById('survival-bar');
+        if (bar) {
+            const percent = (studySession.timeLeft / studySession.maxTimeLimit) * 100;
+            bar.style.width = percent + '%'; // Corta a barra no tamanho certo na marra
+            
+            // Bônus visual imersivo
+            if (percent < 25) bar.style.backgroundColor = 'var(--red)';
+            else if (percent < 50) bar.style.backgroundColor = '#ffcc00';
+            else bar.style.backgroundColor = 'var(--gold2)';
         }
-    }, seconds * 1000);
+
+        // 💥 O TEMPO ACABOU DE VERDADE
+        if (studySession.timeLeft <= 0) {
+            clearInterval(studySession.timerId); // Desliga o motor
+            
+            if (document.getElementById('survival-bar')) {
+                toast('⏳ O tempo esgotou!', 'err');
+                if (typeof playSfx === 'function') playSfx('fail');
+                if (typeof rateCard === 'function') rateCard(0); // Punição aplicada!
+            }
+        }
+    }, 30); 
 }
+
 // ✨ MOTOR DE RECONHECIMENTO DE VOZ
 function startDictation(inputId, lang, btnElement) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
