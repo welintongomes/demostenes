@@ -3900,7 +3900,7 @@ function openStoreModal() {
       if (STATS.pets.owned.includes(id)) {
           let statusBtn = STATS.pets.active === id 
               ? `<button class="btn sm ghost" disabled style="padding:4px 8px; border-color:${colorHex}; color:${colorHex}">Equipado</button>`
-              : `<button class="btn sm" style="padding:4px 8px; border-color:${colorHex}; color:${colorHex}" onclick="equipPet('${id}')">Equipar</button>`;
+              : `<button class="btn sm" style="width: 100%; padding:4px 8px; border-color:${colorHex}; color:${colorHex}" onclick="equipPet('${id}')">Equipar</button>`;
           
           const lvl = getPetRealLevel(id);
           const sellValue = Math.floor(price * (0.30 + (lvl * 0.02))); // Calcula o valor de venda na hora
