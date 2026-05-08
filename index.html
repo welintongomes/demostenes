@@ -3864,7 +3864,6 @@ function confirmClearAll() {
   });
 }
 // ✨ LOJA: MERCADO DE ATENAS E ITENS (AGORA COM CONSUMIVEIS, VIDAS, MINI ESCUDOS, LOOT BOXES, PETS AGORA EM GAVETAS COM MEMÓRIA)
-// ✨ LOJA: MERCADO DE ATENAS E ITENS
 function openStoreModal() {
   
   // BLINDAGEM MESTRA: Garante que STATS existe
@@ -3938,7 +3937,7 @@ function openStoreModal() {
         return `
         <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end">
             <!-- ✨ O PAINEL DE CONTROLE DE QUANTIDADE -->
-            <div style="display:flex; align-items:center; gap:8px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:6px; border:1px solid var(--border2)">
+            <div style="display:flex; align-items:center; gap:8px; width: 100%; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:6px; border:1px solid var(--border2)">
                 <button class="btn ghost sm" style="padding:0 6px; font-size:14px; border:none; color:var(--stone)" onclick="changeStoreQty('${itemId}', -1, ${price}, ${sellValue})">➖</button>
                 <span id="qty_${itemId}" style="font-weight:bold; font-size:14px; width:24px; text-align:center; color:white">1</span>
                 <button class="btn ghost sm" style="padding:0 6px; font-size:14px; border:none; color:var(--stone)" onclick="changeStoreQty('${itemId}', 1, ${price}, ${sellValue})">➕</button>
@@ -3947,7 +3946,7 @@ function openStoreModal() {
             <!-- Botão de Comprar Lendo da Memória (data-action) -->
             <button id="btn_buy_${itemId}" class="btn sm" style="padding:6px 12px; border-color:${colorHex}; color:${colorHex}; font-weight:bold" data-action="${safeBuyAction}" onclick="runBulkAction('${itemId}', this.getAttribute('data-action'))">Comprar: ${price} 🪙</button>
             
-            ${hasItem ? `<button id="btn_sell_${itemId}" class="btn ghost sm" style="padding:4px 10px; font-size:11px; color:var(--red); border-color:var(--red)" data-action="${safeSellAction}" onclick="runBulkAction('${itemId}', this.getAttribute('data-action'))">Vender: +${sellValue} 🪙</button>` : ''}
+            ${hasItem ? `<button id="btn_sell_${itemId}" class="btn ghost sm" style="padding:4px 10px; width: 100%; font-size:11px; color:var(--red); border-color:var(--red)" data-action="${safeSellAction}" onclick="runBulkAction('${itemId}', this.getAttribute('data-action'))">Vender: +${sellValue} 🪙</button>` : ''}
         </div>`;
     }
       
@@ -3999,6 +3998,7 @@ function openStoreModal() {
           <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
              <div style="text-align:left; flex:1; padding-right:8px">
                 <div style="font-weight:bold; font-size:14px">📦 Ânfora de Bronze</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;"> ? (🪙 ✨) ? 🍷 ? 💧</div>
                 <div style="font-size:11px; margin-top:4px; color:#cd7f32;">Estoque: ${STATS.inventory.boxBronze || 0}</div>
              </div>
              <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end">
@@ -4015,6 +4015,7 @@ function openStoreModal() {
           <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
              <div style="text-align:left; flex:1; padding-right:8px">
                 <div style="font-weight:bold; font-size:14px">📦 Caixa de Pandora</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;"> ? (🪙 ✨) ? 🍷 ? 💧</div>
                 <div style="font-size:11px; margin-top:4px; color:#c0c0c0;">Estoque: ${STATS.inventory.boxPrata || 0}</div>
              </div>
              <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end">
@@ -4029,6 +4030,7 @@ function openStoreModal() {
           <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
              <div style="text-align:left; flex:1; padding-right:8px">
                 <div style="font-weight:bold; font-size:14px; color:#ffcc00">🎁 Baú do Olimpo</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px;"> ? (🪙 ✨) ? 🍷 ? 💧</div>
                 <div style="font-size:11px; margin-top:4px; color:#ffcc00;">Estoque: ${STATS.inventory.boxOuro || 0}</div>
              </div>
              <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end">
@@ -6146,12 +6148,12 @@ function buyGachaBox(boxType, price) {
             STATS.moedas += 50; STATS.earnedXP += 50;
             rewardHtml = `<b>50 🪙</b> e <b>50 XP ✨</b><br><span style="color:var(--stone2); font-size:10px">(Ficou no prejuízo...)</span>`;
         } else if (roll < 0.90) {
-            STATS.inventory.doubleXp += 10;
-            rewardHtml = `<b style="color:#00e5ff">10x Água de Mnemósine 💧</b><br><span style="color:var(--green); font-size:10px">(Vale 125 🪙!)</span>`;
+            STATS.inventory.doubleXp += 20;
+            rewardHtml = `<b style="color:#00e5ff">20x Água de Mnemósine 💧</b><br><span style="color:var(--green); font-size:10px">(Boa Vale 250 🪙!)</span>`;
             soundType = 'win';
         } else {
             STATS.inventory.doubleCoins += 10; STATS.inventory.doubleXp += 10;
-            rewardHtml = `<b style="color:var(--gold)">10x Néctar 🍷 + 10x Água 💧</b><br><span style="color:var(--gold); font-size:10px">(Boa! Vale 250 🪙)</span>`;
+            rewardHtml = `<b style="color:var(--gold)">20x Néctar 🍷 + 20x Água 💧</b><br><span style="color:var(--gold); font-size:10px">(Boa! Vale 500 🪙)</span>`;
             soundType = 'jackpot';
         }
     } 
@@ -6161,8 +6163,8 @@ function buyGachaBox(boxType, price) {
             STATS.moedas += 100; STATS.earnedXP += 100;
             rewardHtml = `<b>100 🪙</b> e <b>100 XP ✨</b><br><span style="color:var(--stone2); font-size:10px">(A esperança foi a última a morrer...)</span>`;
         } else if (roll < 0.85) {
-            STATS.inventory.doubleCoins += 20;
-            rewardHtml = `<b style="color:var(--gold)">20x Néctar dos Deuses 🍷</b><br><span style="color:var(--green); font-size:10px">(Vale 250 🪙!)</span>`;
+            STATS.inventory.doubleCoins += 60;
+            rewardHtml = `<b style="color:var(--gold)">60x Néctar dos Deuses 🍷</b><br><span style="color:var(--green); font-size:10px">(Boa Vale 750 🪙!)</span>`;
             soundType = 'win';
         } else {
             STATS.earnedXP += 1500;
@@ -6173,11 +6175,11 @@ function buyGachaBox(boxType, price) {
     else if (boxType === 'ouro') {
         boxName = 'Baú do Olimpo';
         if (roll < 0.50) {
-            STATS.inventory.doubleXp += 30;
-            rewardHtml = `<b style="color:#00e5ff">30x Água de Mnemósine 💧</b><br><span style="color:var(--stone2); font-size:10px">(Vale 375 🪙. Você perdeu dinheiro...)</span>`;
+            STATS.inventory.doubleXp += 40;
+            rewardHtml = `<b style="color:#00e5ff">40x Água de Mnemósine 💧</b><br><span style="color:var(--stone2); font-size:10px">(Vale 500 🪙. Você perdeu dinheiro...)</span>`;
         } else if (roll < 0.85) {
-            STATS.inventory.doubleCoins += 40; STATS.inventory.doubleXp += 40;
-            rewardHtml = `<b style="color:var(--gold)">4x Néctar 🍷 e 4x Água 💧</b><br><span style="color:var(--green); font-size:10px">(Vale 1.000 🪙! Lucrou absurdo!)</span>`;
+            STATS.inventory.doubleCoins += 100; STATS.inventory.doubleXp += 100;
+            rewardHtml = `<b style="color:var(--gold)">100x Néctar 🍷 e 100x Água 💧</b><br><span style="color:var(--green); font-size:10px">(Vale 2.500 🪙! Lucrou absurdo!)</span>`;
             soundType = 'win';
         } else {
             STATS.moedas += 3000; STATS.earnedXP += 5000;
