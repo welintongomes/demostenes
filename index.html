@@ -44,7 +44,7 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Crimson
 
 /* ── HEADER ── */
 #header{background:var(--bg2);border-bottom:1px solid var(--border2);padding:12px 16px 10px;flex-shrink:0;}
-.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.header-top{display:flex;align-items:stretch;justify-content:space-between;margin-bottom:8px;}
 .app-title{font-family:'Cinzel',serif;font-size:18px;font-weight:700;color:var(--gold2);letter-spacing:3px;text-transform:uppercase;}
 .app-subtitle{font-size:11px;color:var(--stone);letter-spacing:2px;text-transform:uppercase;font-style:italic;}
 .header-stats{display:flex;gap:2px;}
@@ -1288,6 +1288,7 @@ function render() {
   }
   else if (currentTab === 'stats') body.innerHTML = buildStatsTab();
   attachListeners();
+  window.speechSynthesis.cancel();
 }
 // ✨ O CABEÇALHO DO JOGO (COM A BOLINHA CLICÁVEL)
 function updateHeader() {
@@ -1617,37 +1618,53 @@ function buildStudyCard() {
   else if (activeMode === 'boss') inner = buildBossMode(card); 
 
   const isAns = sess.typeAnswered || sess.choiceAnswered || sess.tfAnswered || sess.revChoiceAnswered || sess.scrambleAnswered || sess.spellAnswered || sess.syntaxAnswered || sess.clozeAnswered || sess.contextAnswered || sess.imgChoiceAnswered || sess.bossAnswered || sess.blindAnswered || sess.flipped;
+// ✨ O GATILHO DA LEITURA CONTÍNUA (Blindado e fora do cronômetro)
+  if (!isAns && sess.ultimoLidoId !== card.id) {
+      sess.ultimoLidoId = card.id; // Marca que já agendou a leitura desta carta
+      
+      // Se o Leitor Completo e o Áudio Geral do jogo estiverem ligados:
+      if (configJogo.leituraCompleta && typeof autoPlayAudio !== 'undefined' && autoPlayAudio) {
+          setTimeout(lerTelaCompleta, 200); // Dá 200ms para a tela carregar
+      }
+  }
+// ✨ SISTEMA UNIFICADO DE ÁUDIO E RELÓGIO
+  let timerHtml = '';
+  
+  // Verifica se esta carta específica precisa de relógio
+  let hasTimer = enableTimer && card.interval >= configJogo.timerMinInterval && activeMode !== 'flash';
+  
+  // Define o limite de tempo
+  let timeLimit = 20; 
+  if (card.interval >= 21) timeLimit = 12; 
+  if (activeMode === 'boss') timeLimit = 15; 
 
-let timerHtml = '';
-    // Removido o bloqueio de "interval >= 3". Agora aparece para quase todas!
-    if (enableTimer && card.interval >= configJogo.timerMinInterval && activeMode !== 'flash') {
-        
-        // Define o limite de tempo (cartas velhas = menos tempo, boss = 15s, novas = 20s)
-        let timeLimit = 20; 
-        if (card.interval >= 21) timeLimit = 12; 
-        if (activeMode === 'boss') timeLimit = 15; 
-        
-        if (!isAns) {
-            // Desenha a barra sem animação no CSS (o JS vai controlar o tamanho)
-            timerHtml = `
-            <div style="width:100%; height:6px; background:var(--bg4); margin-bottom:10px; border-radius:4px; overflow:hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);">
-                <div id="survival-bar" style="height:100%; width:100%; background:var(--gold2);"></div>
-            </div>`;
+  if (!isAns) {
+      // 1. Desenha a barra apenas se o relógio estiver ativado
+      if (hasTimer) {
+          timerHtml = `
+          <div style="width:100%; height:6px; background:var(--bg4); margin-bottom:10px; border-radius:4px; overflow:hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);">
+              <div id="survival-bar" style="height:100%; width:100%; background:var(--gold2);"></div>
+          </div>`;
+      }
 
-            if (sess.currentCardId !== card.id) {
-                sess.currentCardId = card.id;
-                // Salva o tempo máximo na sessão para calcular o bônus depois
-                sess.maxTimeLimit = timeLimit; 
-                
-                // Dá o tiro de largada UMA ÚNICA VEZ por carta
-                setTimeout(() => startSurvivalTimer(timeLimit), 50);
-            }
-        } else {
-            clearInterval(sess.timerId); // Para o motor quando você responde
-        }
-    } else {
-        clearInterval(sess.timerId);
-    }
+      // 2. Dispara os eventos da Carta Nova UMA ÚNICA VEZ
+      if (sess.currentCardId !== card.id) {
+          sess.currentCardId = card.id;
+          sess.maxTimeLimit = hasTimer ? timeLimit : 0;
+          
+          // Se o "Mãos Livres" (Leitura Completa) estiver ligado
+          if (configJogo.leituraCompleta && typeof autoPlayAudio !== 'undefined' && autoPlayAudio) {
+              // Manda ler. Se tiver relógio, passa o 'timeLimit' para segurar a barra. Se não tiver, passa 'null'.
+              setTimeout(() => lerTelaCompleta(hasTimer ? timeLimit : null), 200);
+          } 
+          // Se o Mãos Livres estiver desligado, mas o relógio existir, liga o relógio direto!
+          else if (hasTimer) {
+              setTimeout(() => startSurvivalTimer(timeLimit), 50);
+          }
+      }
+  } else {
+      clearInterval(sess.timerId); // Desliga o relógio quando você responde
+  }
 
   // ✨ BARRA DE ITENS MÁGICOS (AGORA COM MODO DEUS)
   let toolsHtml = '';
@@ -1698,7 +1715,7 @@ let timerHtml = '';
         <!-- ✨ A ETIQUETA COM O NOME DA RARIDADE -->
         <span class="badge ${rarity.txtCls}" style="background:transparent; border:1px solid currentColor; font-family:'Cinzel',serif">${rarity.label}</span>
         <span class="badge ${getStatus(card)}">${statusLabel(getStatus(card))}</span>
-        <button class="btn ghost sm" onclick="clearTimeout(studySession?.timerId); studySession=null; if(typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo('normal'); render()">✕ Sair</button>
+        <button class="btn ghost sm" onclick="window.speechSynthesis.cancel(); clearTimeout(studySession?.timerId); studySession=null; if(typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo('normal'); render()">✕ Sair</button>
         </div>
     </div>
     
@@ -5294,6 +5311,7 @@ function startDictation(inputId, lang, btnElement) {
     btnElement.textContent = oldText;
   };
 }
+
 /*dicas*/
 
 // ✨ GERADOR DE BOTÕES COM TRAVA DE SM-2
@@ -5471,11 +5489,147 @@ function ouvirPalavra(texto, lang) {
   window.speechSynthesis.speak(u);
 }
 
+// ✨ MOTOR DO LEITOR MÃOS LIVRES (MULTILÍNGUE)
+// ✨ MOTOR DO LEITOR MÃOS LIVRES (MULTILÍNGUE ANTI-BUG)
+// ✨ MOTOR DO LEITOR MÃOS LIVRES (SEGURA O TEMPO ATÉ TERMINAR!)
+// ✨ MOTOR DO LEITOR MÃOS LIVRES (COM CADEADO ANTI-REPETIÇÃO)
+// ✨ CAIXA FORTE GLOBAL (Impede o navegador de apagar o áudio da memória)
+
+// ✨ MOTOR DO LEITOR MÃOS LIVRES (COM CADEADO E RELÓGIO BLINDADO)
+// ✨ VARIÁVEIS GLOBAIS DE SEGURANÇA (Para o navegador não esquecer o relógio)
+window.vozesMaoLivre = [];
+window.leituraDebounce = null;
+
+// ✨ MOTOR DO LEITOR MÃOS LIVRES (MÉTODO CLÁSSICO COM ANTI-ECO)
+function lerTelaCompleta(tempoDoRelogio) {
+    if (!configJogo.leituraCompleta || typeof studySession === 'undefined' || !studySession) return;
+    
+    const sess = studySession;
+    
+    const checkRespondido = () => sess.typeAnswered || sess.choiceAnswered || sess.tfAnswered || sess.revChoiceAnswered || sess.scrambleAnswered || sess.spellAnswered || sess.syntaxAnswered || sess.clozeAnswered || sess.contextAnswered || sess.imgChoiceAnswered || sess.bossAnswered || sess.blindAnswered || sess.flipped;
+    
+    if (checkRespondido()) return;
+
+    // 🛡️ O MATA-FANTASMAS (Debounce): 
+    // Se o seu código disparar essa função 2 vezes rápido, ele cancela a primeira e roda só a última!
+    clearTimeout(window.leituraDebounce);
+
+    window.leituraDebounce = setTimeout(() => {
+        
+        // 🔒 O CADEADO DA RODADA: Garante que não vai ter eco se a tela piscar
+        if (sess.leituraLidaNoIndex === sess.current) return;
+
+        const card = sess.queue[sess.current];
+        let activeMode = sess.currentAdaptiveMode || (typeof studyMode !== 'undefined' ? studyMode : 'flash');
+
+        // Cancela vozes antigas imediatamente
+        window.speechSynthesis.cancel();
+        
+        // Esvazia a caixa para a nova rodada
+        window.vozesMaoLivre = []; 
+
+        function falar(texto, idioma) {
+            if (!texto) return;
+            const textoLimpo = typeof clean === 'function' ? clean(texto) : texto;
+            const u = new SpeechSynthesisUtterance(textoLimpo);
+            u.lang = idioma || 'pt-BR';
+            u.rate = 0.95; 
+            window.vozesMaoLivre.push(u); // Guarda na caixa global
+        }
+
+        const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+        const langPergunta = 'pt-BR'; 
+        const langPalavra = card.langWord || 'pt-BR';
+        const langDef = card.langDef || 'pt-BR';
+        const langOpcoes = isRel ? langPalavra : langDef;
+
+        // 🧠 ROTEIRO INTELIGENTE
+        if (activeMode === 'choice') {
+            const typeLbl = isRel ? `Selecione um ${card.cardType} para:` : 'Qual a definição de:';
+            falar(typeLbl, langPergunta);
+            falar(card.word, langPalavra);
+            
+            const letras = ['A', 'B', 'C', 'D', 'E', 'F'];
+            if (sess.choices) {
+                sess.choices.forEach((ch, i) => { 
+                    falar(`Alternativa ${letras[i]}.`, langPergunta);
+                    falar(ch, langOpcoes);
+                });
+            }
+        }
+        else if (activeMode === 'tf') {
+            const typeText = isRel ? `Tem como ${card.cardType}:` : 'Significa:';
+            falar(card.word, langPalavra);
+            falar(typeText, langPergunta);
+            falar(sess.tfDefinition, langOpcoes);
+        }
+        else if (activeMode === 'revchoice') {
+            const promptTxt = isRel ? `Qual palavra possui este ${card.cardType}:` : 'Qual é a palavra para esta definição:';
+            falar(promptTxt, langPergunta);
+            falar(sess.revChoicePrompt, langOpcoes);
+            
+            const letras = ['A', 'B', 'C', 'D', 'E', 'F'];
+            if (sess.revChoices) {
+                sess.revChoices.forEach((ch, i) => { 
+                    falar(`Alternativa ${letras[i]}.`, langPergunta);
+                    falar(ch, langPalavra); 
+                });
+            }
+        }
+        else if (activeMode === 'type') {
+             const promptTxt = isRel ? `Digite um ${card.cardType} para:` : 'Escreva a palavra para esta definição:';
+             falar(promptTxt, langPergunta);
+             falar(isRel ? card.word : card.definition, isRel ? langPalavra : langDef);
+        }
+        // ✨ NOVO: MODO DITADO CEGO (Sem revelar a resposta!)
+        else if (activeMode === 'blind') {
+             falar("Ditado Cego. Fale a palavra correspondente para este significado:", langPergunta);
+             falar(card.definition, langDef);
+        }
+        // ✨ NOVO: MODO BOSS PROVA FINAL (Lê as exigências dinâmicas)
+        else if (activeMode === 'boss') {
+             let exigencias = ['a palavra'];
+             if (card.synonyms) exigencias.push('um sinônimo');
+             if (card.antonyms) exigencias.push('um antônimo');
+             let textoExigencia = exigencias.join(', ').replace(/,([^,]*)$/, ' e$1'); 
+             
+             falar(`Prova Final. A escuridão exige o seu conhecimento. Ouça o significado e fale ${textoExigencia}:`, langPergunta);
+             falar(card.definition, langDef);
+        }
+        else {
+             falar(card.word, langPalavra);// O Flashcard clássico continua lendo a palavra
+        }
+
+        // ⏱️ O MÉTODO CLÁSSICO QUE FUNCIONA (onend)
+        if (window.vozesMaoLivre.length > 0) {
+            
+            // Avisa a ÚLTIMA frase para ligar o relógio assim que terminar
+            window.vozesMaoLivre[window.vozesMaoLivre.length - 1].onend = () => {
+                if (tempoDoRelogio && !checkRespondido()) {
+                    startSurvivalTimer(tempoDoRelogio);
+                }
+            };
+            
+            // Tranca o cadeado SÓ AQUI, na hora exata que manda falar as cartas
+            sess.leituraLidaNoIndex = sess.current;
+            
+            // Manda o robô falar toda a fila
+            window.vozesMaoLivre.forEach(u => window.speechSynthesis.speak(u));
+            
+        } else if (tempoDoRelogio) {
+            // Segurança: Se por algum motivo a carta for muda, liga o relógio direto
+            startSurvivalTimer(tempoDoRelogio);
+        }
+
+    }, 150); // Fôlego de 150ms para juntar e eliminar chamadas fantasmas
+}
+
 function toggleAudio() {
   autoPlayAudio = !autoPlayAudio;
   toast(autoPlayAudio ? '🔊 Áudio: ON' : '🔈 Áudio: OFF', autoPlayAudio ? 'gold' : 'err');
   
-  if (autoPlayAudio && studySession && !studySession.flipped && !studySession.choiceAnswered && !studySession.tfAnswered && !studySession.typeAnswered && !studySession.revChoiceAnswered && !studySession.scrambleAnswered && !studySession.contextAnswered) {
+  // ✨ A CATRACA: Só toca o áudio normal (de teste) se a Leitura Completa estiver DESLIGADA!
+  if (autoPlayAudio && !configJogo.leituraCompleta && studySession && !studySession.flipped && !studySession.choiceAnswered && !studySession.tfAnswered && !studySession.typeAnswered && !studySession.revChoiceAnswered && !studySession.scrambleAnswered && !studySession.contextAnswered) {
     playQuestionAudio();
   }
   
@@ -5484,6 +5638,8 @@ function toggleAudio() {
 }
 
 function playQuestionAudio() {
+  // 🛑 O ESCUDO ANTI-TIQUE: Se o Mãos Livres estiver ligado, proíbe o áudio normal de nascer!
+  if (configJogo.leituraCompleta) return;
   if (!autoPlayAudio || !studySession) return;
   const card = studySession.queue[studySession.current];
   if (!card) return;
@@ -6570,7 +6726,17 @@ function abrirConfig() {
     <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Ajuste as engrenagens e a dificuldade do seu treinamento.</p>
     
     <div style="height: 60vh; overflow-y: auto; padding-right:5px">
+        <!-- ✨ SEÇÃO: ACESSIBILIDADE E ÁUDIO -->
+        <div style="font-weight:bold; margin-top:20px; margin-bottom:10px; color:var(--gold2); text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(212, 175, 55, 0.3); padding-bottom:4px">🎧 Acessibilidade & Áudio</div>
         
+        <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; border: 1px solid var(--border2);">
+            <div style="padding-right: 10px;">
+                <div style="font-size:14px; font-weight:bold; color:var(--gold)">🗣️ Leitor de Tela Completo</div>
+                <div style="font-size:10px; color:var(--stone2); margin-top:4px; line-height:1.4">Lê a pergunta e todas as opções em voz alta automaticamente. Perfeito para usar no trânsito ou academia.</div>
+            </div>
+            <!-- Esse input já salva no localStorage assim que você clica! -->
+            <input type="checkbox" id="leituraCompleta" class="config-cb" ${configJogo.leituraCompleta ? 'checked' : ''} onchange="configJogo.leituraCompleta = this.checked; localStorage.setItem('config_leituraCompleta', this.checked); toast(this.checked ? '🔊 Leitura Completa Ativada' : '🔇 Leitura Completa Desativada', 'gold')" style="transform:scale(1.3); accent-color:var(--gold)">
+        </label>
         <!-- SEÇÃO: PRESSÃO DE TEMPO -->
         <div style="font-weight:bold; margin-bottom:10px; color:#ffd700; text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(255, 215, 0, 0.3); padding-bottom:4px">⏱️ Pressão e Recompensas</div>
         
@@ -6688,6 +6854,9 @@ if (savedCrit !== null) configJogo.criticoCustom = parseInt(savedCrit);
 
 const savedAutoGacha = localStorage.getItem('config_autoGacha');
 if (savedAutoGacha !== null) configJogo.autoGacha = (savedAutoGacha === 'true');
+
+const savedLeitura = localStorage.getItem('config_leituraCompleta');
+if (savedLeitura !== null) configJogo.leituraCompleta = savedLeitura === 'true';
 
 // ✨ FUNÇÃO QUE CONTROLA O + E O -
 function changeCritHack(amount) {
