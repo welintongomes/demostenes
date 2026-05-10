@@ -532,11 +532,16 @@ let enableTimer = false;
 //botão de configuraçoes tudo ficará aqui para ser configurado em game
 // ⚙️ Variáveis Globais de Configuração Futuramente você vai adicionar outras aqui:
 let configJogo = {
-    timerMinInterval: 0, // Valor padrão que você está usando agora
-    dicasInfinitas: false,   // Punição: -50% Ouro e XP
-    vidasInfinitas: false,   // Punição: -30% Ouro e XP
-    escudosInfinitos: false,  // Punição: -20% Ouro e XP
-    pularInfinito: false // Punição: -40% Ouro e XP
+    timerMinInterval: 0, 
+    dicasInfinitas: false,   
+    vidasInfinitas: false,   
+    escudosInfinitos: false,  
+    pularInfinito: false,
+    focoXP: 0,       // 0 a 100%
+    focoOuro: 0,     // 0 a 100%
+    sacrificioGacha: 0,
+    criticoCustom: 0,
+    autoGacha: false
 };
 
 // ✨ DETECTOR DE RARIDADE DAS CARTAS (Risco Zero)
@@ -557,7 +562,7 @@ let checandoMissoes = false;
 
 function playSfx(type) {
     if (!STATS.totalAcertos) STATS.totalAcertos = 0; 
-    if (!STATS.acertosComRelogio) STATS.acertosComRelogio = 0; // ✨ Novo contador do relógio!
+    if (!STATS.acertosComRelogio) STATS.acertosComRelogio = 0; 
     
     // CONTA OS ACERTOS EM SEGUNDO PLANO
     if (type === 'ok' || type === 'crit') {
@@ -592,45 +597,51 @@ function playSfx(type) {
     try {
         sess.combo++;
         
-        // ✨ NOVIDADE: Verifica o Evento de Crítico (+35%)
-// ✨ VERIFICA A CHANCE DE CRÍTICO
-        let chanceCritico = 0.10; 
-        if (STATS.activeEvent && STATS.activeEvent.id === 'ev_crit') chanceCritico += 0.35;
+        // 🛑 1. IDENTIFICA O MODO (O Anti-Exploit do Flashcard entra em ação primeiro)
+        let activeModoJogo = sess.currentAdaptiveMode || (typeof studyMode !== 'undefined' ? studyMode : '');
+        let isFlashcard = (activeModoJogo === 'flash');
         
-        // Se o HACK de crítico estiver ativo, ele SOMA a porcentagem!
-        if (typeof configJogo !== 'undefined' && configJogo.criticoCustom > 0) {
-            chanceCritico += (configJogo.criticoCustom / 100); 
-        }
-
-        // ✨ BÔNUS DE CRÍTICO DOS MASCOTES (Leitura Antecipada)
-        if (STATS.pets && STATS.pets.active) {
-            let petAtivo = STATS.pets.active;
+        // ✨ COLE ESTA LINHA AQUI PARA ACABAR COM O ERRO VERMELHO:
+        const isQuizNow = (activeModoJogo === 'choice' || sess.choiceAnswered);
+        // ✨ 2. CÁLCULO DA CHANCE DE CRÍTICO
+        let chanceCritico = 0.10; // Chance base de 10%
+        
+        // Zera o crítico se for Flashcard (Fim da mamata!)
+        if (isFlashcard) {
+            chanceCritico = 0;
+        } else {
+            // Só adiciona os bônus de Hacks, Eventos e Pets se NÃO for flashcard
+            if (STATS.activeEvent && STATS.activeEvent.id === 'ev_crit') chanceCritico += 0.35;
             
-            if (petAtivo === 'aguia' || petAtivo === 'dragao') {
-                let lvlPet = getPetCappedLevel(petAtivo);
-                let isFedPet = (STATS.pets.fedCharges > 0 || (STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_fed')) && !sess.isFreeMode;
-                
-                if (petAtivo === 'aguia') {
-                    // ÁGUIA: +5% base (+1% por nível) | Não-Alimentada: +2% (+0.5% por nível)
-                    let bonusCrit = isFedPet ? (0.05 + ((lvlPet - 1) * 0.01)) : (0.02 + ((lvlPet - 1) * 0.005));
-                    chanceCritico += bonusCrit;
-                } 
-                else if (petAtivo === 'dragao') {
-                    // DRAGÃO (O Meta): +3% base (+0.5% por nível) | Não-Alimentado: +1% (+0.2% por nível)
-                    let bonusCrit = isFedPet ? (0.03 + ((lvlPet - 1) * 0.005)) : (0.01 + ((lvlPet - 1) * 0.002));
-                    chanceCritico += bonusCrit;
+            if (typeof configJogo !== 'undefined' && configJogo.criticoCustom > 0) {
+                chanceCritico += (configJogo.criticoCustom / 100); 
+            }
+
+            if (STATS.pets && STATS.pets.active) {
+                let petAtivo = STATS.pets.active;
+                if (petAtivo === 'aguia' || petAtivo === 'dragao' || petAtivo === 'grifo') {
+                    let lvlPet = getPetCappedLevel(petAtivo);
+                    let isFedPet = (STATS.pets.fedCharges > 0 || (STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_fed')) && !sess.isFreeMode;
+                    
+                    if (petAtivo === 'aguia') chanceCritico += isFedPet ? (0.05 + ((lvlPet - 1) * 0.01)) : (0.02 + ((lvlPet - 1) * 0.005));
+                    else if (petAtivo === 'dragao') chanceCritico += isFedPet ? (0.03 + ((lvlPet - 1) * 0.005)) : (0.01 + ((lvlPet - 1) * 0.002));
+                    else if (petAtivo === 'grifo') chanceCritico += isFedPet ? (0.04 + ((lvlPet - 1) * 0.005)) : (0.02 + ((lvlPet - 1) * 0.002));
                 }
             }
         }
 
+        // ✨ 3. DEFINE SE FOI CRÍTICO OU NÃO
         const isMilestone = (sess.combo % 5 === 0);
-        const isCrit = isMilestone || Math.random() < chanceCritico || type === 'crit'; 
+        // Só é crítico se bater a chance matemática OU se for combo de 5 (mas os dois são barrados se for flashcard)
+        const isCrit = (!isFlashcard) && (isMilestone || Math.random() < chanceCritico || type === 'crit'); 
 
+        // ✨ 4. RECOMPENSAS BASE (Treino Livre dá menos prêmios)
         let baseMoedas = sess.isFreeMode ? 1 : 3; 
         let baseXP = sess.isFreeMode ? 5 : 15; 
         let critMoedas = sess.isFreeMode ? 2 : 5;
         let critXP = 25;
 
+        // ✨ 5. O RELÓGIO (Pressão de Tempo)
         if (!enableTimer) {
             baseMoedas = sess.isFreeMode ? 0 : 1; 
             baseXP = sess.isFreeMode ? 2 : 5;     
@@ -649,9 +660,11 @@ function playSfx(type) {
                 if (percentTimeLeft > 0.7) {
                     baseMoedas = Math.floor(baseMoedas * 2.0);
                     baseXP = Math.floor(baseXP * 2.0);
-                    toast('⚡ Resposta Relâmpago! 2x Ouro e XP', 'ok');
-                    type = 'crit'; 
-                    
+                    // Não dá o prêmio relâmpago para flashcard!
+                    if (!isFlashcard) {
+                         toast('⚡ Resposta Relâmpago! 2x Ouro e XP', 'ok');
+                         type = 'crit'; 
+                    }
                 } else if (percentTimeLeft > 0.4) {
                     baseMoedas = Math.floor(baseMoedas * 1.5);
                     baseXP = Math.floor(baseXP * 1.5);
@@ -659,6 +672,32 @@ function playSfx(type) {
             }
         }
 
+        // 🧠✨ 6. O GRANDE INCENTIVO DO MODO SMART (REVISÃO PENDENTE)
+        let isModoSmart = (typeof studyMode !== 'undefined' && studyMode === 'adaptive' && !sess.isFreeMode);
+
+        if (isModoSmart) {
+            if (isFlashcard) {
+                // Prêmio de Consolação: Leu a carta no modo Smart, ganha o pão com manteiga.
+                baseMoedas = 2;
+                baseXP = 10;
+                critMoedas = 0; 
+                critXP = 0;
+            } else {
+                // Multiplicador Absoluto para perguntas reais
+                baseMoedas *= 2;
+                baseXP *= 2;
+                critMoedas *= 2;
+                critXP *= 2;
+            }
+        } else if (isFlashcard) {
+            // Se for Flashcard no Treino Livre ou Customizado: ZERO para evitar farm!
+            baseMoedas = 0;
+            baseXP = 0;
+            critMoedas = 0;
+            critXP = 0;
+        }
+
+        // ✨ 7. SOMA FINAL DO CRÍTICO
         let ganhoMoedas = baseMoedas; 
         let ganhoXP = baseXP; 
 
@@ -667,11 +706,13 @@ function playSfx(type) {
             ganhoXP += critXP; 
         }
 
+        // EVENTOS LIVE-OPS
         if (STATS.activeEvent && STATS.activeEvent.id === 'coins_double') ganhoMoedas *= 2;
         if (STATS.activeEvent && STATS.activeEvent.id === 'coins_triple') ganhoMoedas *= 3;
         if (STATS.activeEvent && STATS.activeEvent.id === 'xp_double') ganhoXP *= 2;
         if (STATS.activeEvent && STATS.activeEvent.id === 'xp_triple') ganhoXP *= 3;
 
+        // INVENTÁRIO (Néctar e Água)
         let nectarActive = false;
         if (STATS.inventory && STATS.inventory.doubleCoins > 0) {
             ganhoMoedas *= 2; STATS.inventory.doubleCoins--; nectarActive = true;
@@ -684,26 +725,27 @@ function playSfx(type) {
 
         let petVisualCoins = ''; let petVisualXP = ''; let petActiveFlag = false;
 
+        // BÔNUS DOS MASCOTES
         if (STATS.pets && STATS.pets.active) {
             petActiveFlag = true;
             const activePet = STATS.pets.active;
             
-            // ✨ NOVIDADE: Evento Barriga Cheia ativa o isFed de graça!
             const hasFreeFood = STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_fed';
             const isFed = (STATS.pets.fedCharges > 0 || hasFreeFood) && !sess.isFreeMode;
             
             if (!STATS.pets.affinity) STATS.pets.affinity = {};
             if (STATS.pets.affinity[activePet] === undefined) STATS.pets.affinity[activePet] = 0;
             
-            // ✨ NOVIDADE: Evento Festa dos Pets multiplica afinidade por 3
             let ganhoAfin = (STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_aff') ? 3 : 1;
             
-            // ✨ GANHO DE XP DO PET (Sempre ganha, vai direto pra poupança!)
-            STATS.pets.affinity[activePet] += ganhoAfin; 
+            // ✨ A NOVA REGRA DO MASCOTE: Se for Flashcard E estiver no Treino Livre, o Pet ganha ZERO XP!
+            if (isFlashcard && sess.isFreeMode) {
+                ganhoAfin = 0;
+            }
+            
+            STATS.pets.affinity[activePet] += ganhoAfin;
 
-            // Se estiver acima do limite, o poder dele não sobe, então avisamos o jogador!
             if (isPetCapped(activePet)) {
-                // Coloquei 15% de chance de novo para não irritar o jogador a cada resposta
                 if (Math.random() < 0.15) {
                     toast(`⚠️ Poder do ${activePet.toUpperCase()} estagnou! XP salvo em 2º plano. Evolua-o!`, 'var(--red)');
                 }
@@ -728,7 +770,6 @@ function playSfx(type) {
                 petVisualCoins = isFed ? '🐜🍎' : '🐜';
             }
             else if (activePet === 'aguia') { 
-                // ✨ A Águia é focada em crítico, então dá apenas um pouquinho de ouro/xp base
                 ganhoMoedas += isFed ? 3 : 1;
                 ganhoXP += isFed ? 10 : 3;
                 petVisualCoins = isFed ? '🦅🍎' : '🦅'; petVisualXP = isFed ? '🦅🍎' : '🦅';
@@ -738,38 +779,70 @@ function playSfx(type) {
                 ganhoXP += isFed ? (30 + ((petLevel - 1) * 5)) : (5 + (petLevel - 1));
                 petVisualCoins = isFed ? '🐉🍎' : '🐉'; petVisualXP = isFed ? '🐉🍎' : '🐉';
             }
+            else if (activePet === 'raposa') { 
+                ganhoMoedas += isFed ? 2 : 0;
+                ganhoXP += isFed ? 5 : 2;
+                petVisualCoins = isFed ? '🦊🍎' : '🦊'; petVisualXP = isFed ? '🦊🍎' : '🦊';
+            }
+            else if (activePet === 'grifo') { 
+                ganhoMoedas += isFed ? (5 + (petLevel - 1)) : 2;
+                ganhoXP += isFed ? (15 + ((petLevel - 1) * 2)) : 5;
+                petVisualCoins = isFed ? '🦁🍎' : '🦁'; petVisualXP = isFed ? '🦁🍎' : '🦁';
+            }
             
-            // ✨ NOVIDADE: Só consome a carga se não for o evento de Barriga Cheia!
             if (isFed && !hasFreeFood) STATS.pets.fedCharges--;
         }
 
         // 👹 A CONTA DO MODO DEUS (PUNIÇÕES)
         let multiplicadorPunicao = 1.0;
 
-        if (configJogo.dicasInfinitas) multiplicadorPunicao -= 0.50; // Perde metade
-        if (configJogo.pularInfinito) multiplicadorPunicao -= 0.40; // ✨ Perde 40% (NOVO!)
-        if (configJogo.vidasInfinitas) multiplicadorPunicao -= 0.30; // Perde 30%
-        if (configJogo.escudosInfinitos) multiplicadorPunicao -= 0.20; // Perde 20%
+        if (configJogo.dicasInfinitas) multiplicadorPunicao -= 0.50;
+        if (configJogo.pularInfinito) multiplicadorPunicao -= 0.40; 
+        if (configJogo.vidasInfinitas) multiplicadorPunicao -= 0.30; 
+        if (configJogo.escudosInfinitos) multiplicadorPunicao -= 0.20; 
 
-        // ✨ NOVA PUNIÇÃO DO CRÍTICO: 10% de hack = 10% de punição
         if (configJogo.criticoCustom > 0) {
             multiplicadorPunicao -= (configJogo.criticoCustom / 100);
         }
         
-        // Se ele ligar tudo junto, não deixa o multiplicador ficar abaixo de 10% (senão ele ganha 0)
         if (multiplicadorPunicao < 0.1) multiplicadorPunicao = 0.1;
 
-        // Aplica o corte (Apenas se o multiplicador for menor que 1.0)
         if (multiplicadorPunicao < 1.0) {
             ganhoMoedas = Math.floor(ganhoMoedas * multiplicadorPunicao);
             ganhoXP = Math.floor(ganhoXP * multiplicadorPunicao);
             
-            // Mensagem visual para ele lembrar do pecado kkk
             if (isCrit || type === 'ok') {
                 setTimeout(() => toast('⚠️ Ganhos reduzidos por Hacks ativos!', 'var(--red)'), 500);
             }
         }
 
+// ⚖️ A BALANÇA DO MODO DEUS (Foco Proporcional 0 a 100%)
+        let focoXP = configJogo.focoXP || 0;
+        let focoOuro = configJogo.focoOuro || 0;
+
+        if (focoXP > 0) {
+            let inc = 1 + (focoXP / 100); // Ex: 100% vira 2x
+            let dec = 1 - (focoXP / 100); // Ex: 100% vira 0x
+            ganhoXP = Math.floor(ganhoXP * inc);
+            ganhoMoedas = Math.floor(ganhoMoedas * dec);
+            if (focoXP >= 50 && (isCrit || type === 'ok')) setTimeout(() => toast(`✨ Foco em XP ativo!`, '#00e5ff'), 800);
+        } else if (focoOuro > 0) {
+            let inc = 1 + (focoOuro / 100); 
+            let dec = 1 - (focoOuro / 100); 
+            ganhoMoedas = Math.floor(ganhoMoedas * inc);
+            ganhoXP = Math.floor(ganhoXP * dec);
+            if (focoOuro >= 50 && (isCrit || type === 'ok')) setTimeout(() => toast(`🪙 Foco em Ouro ativo!`, '#ff8c00'), 800);
+        }
+
+        // 🎲 PACTO DO GACHA (Corta os ganhos para alimentar a Sorte da Roleta)
+        let pactoAtual = configJogo.sacrificioGacha || 0;
+        if (pactoAtual > 0) {
+            let reducaoGacha = 1 - (pactoAtual / 100);
+            ganhoMoedas = Math.floor(ganhoMoedas * reducaoGacha);
+            ganhoXP = Math.floor(ganhoXP * reducaoGacha);
+        }
+
+        // SALVA NA CARTEIRA DO JOGADOR
         STATS.moedas += ganhoMoedas; 
         if (STATS.earnedXP === undefined) STATS.earnedXP = 0;
         STATS.earnedXP += ganhoXP; 
@@ -779,6 +852,7 @@ function playSfx(type) {
         const moedasEl = document.getElementById('hMoedas');
         if (moedasEl) moedasEl.textContent = STATS.moedas + '🪙';
         
+        // --- DAQUI PARA BAIXO AS MISSÕES CONTINUAM INTACTAS ---
         let questUpdated = false;
         const todayStr = new Date().toISOString().slice(0, 10);
         
@@ -798,17 +872,16 @@ function playSfx(type) {
                 if (q.id === 'q_smart' && !sess.isFreeMode && !isQuizNow) match = true; 
                 if (q.id === 'q_quiz' && isQuizNow) match = true;
                 if (q.id === 'q_crit' && isCrit) match = true;
-                // ✨ Diária: Acertar Sinônimos/Antônimos
-if (q.id === 'q_syn_ant') {
-    const sess = (typeof studySession !== 'undefined') ? studySession : null;
-    if (sess && sess.queue && sess.queue[sess.current]) {
-        const currentCard = sess.queue[sess.current];
-        const isCorrect = (type === 'ok' || type === 'crit'); // Aceita acerto normal e crítico!
-        if ((currentCard.cardType === 'sinônimo' || currentCard.cardType === 'antônimo') && isCorrect) {
-            match = true; 
-        }
-    }
-}
+                if (q.id === 'q_syn_ant') {
+                    const sess = (typeof studySession !== 'undefined') ? studySession : null;
+                    if (sess && sess.queue && sess.queue[sess.current]) {
+                        const currentCard = sess.queue[sess.current];
+                        const isCorrect = (type === 'ok' || type === 'crit'); 
+                        if ((currentCard.cardType === 'sinônimo' || currentCard.cardType === 'antônimo') && isCorrect) {
+                            match = true; 
+                        }
+                    }
+                }
                 
                 if (q.id === 'q_timer' && isTimerOn) match = true;
                 if (q.id === 'q_lightning' && isLightning) match = true;
@@ -852,17 +925,17 @@ if (q.id === 'q_syn_ant') {
                 if (wq.id === 'wq_crits' && isCrit) wq.progress += 1;
                 if (wq.id === 'wq_pet' && petActiveFlag) wq.progress += 1; 
                 if (wq.id === 'wq_smart_rev' && !sess.isFreeMode && !isQuizNow) wq.progress += 1;
-                // ✨ Semanal: Acertar Sinônimos/Antônimos
-if (wq.id === 'wq_syn_ant') {
-    const sess = (typeof studySession !== 'undefined') ? studySession : null;
-    if (sess && sess.queue && sess.queue[sess.current]) {
-        const currentCard = sess.queue[sess.current];
-        const isCorrect = (type === 'ok' || type === 'crit'); 
-        if ((currentCard.cardType === 'sinônimo' || currentCard.cardType === 'antônimo') && isCorrect) {
-            wq.progress += 1; 
-        }
-    }
-}
+                
+                if (wq.id === 'wq_syn_ant') {
+                    const sess = (typeof studySession !== 'undefined') ? studySession : null;
+                    if (sess && sess.queue && sess.queue[sess.current]) {
+                        const currentCard = sess.queue[sess.current];
+                        const isCorrect = (type === 'ok' || type === 'crit'); 
+                        if ((currentCard.cardType === 'sinônimo' || currentCard.cardType === 'antônimo') && isCorrect) {
+                            wq.progress += 1; 
+                        }
+                    }
+                }
                 
                 if (wq.progress > wq.target) wq.progress = wq.target;
                 
@@ -932,15 +1005,18 @@ if (wq.id === 'wq_syn_ant') {
             });
         }
 
+// ✨ TEXTOS FLUTUANTES E INVOCAÇÃO DO YIN-YANG
+        // O Crítico foi libertado! Ele sempre roda, mesmo se os ganhos forem ZERO por causa da Alquimia.
         if (isCrit) {
-          showFloatingText(`CRÍTICO! +${ganhoMoedas} 🪙${petVisualCoins} | +${ganhoXP} ✨${petVisualXP}`, '#e024ff'); 
-          if (typeof shootConfetti === 'function'); //shootConfetti(); aqui tinha um confeti mais tava incomodando toda hora entao removi
-          if (typeof showYinYang === 'function') showYinYang(); 
-        } else {
-          const iconCoins = nectarActive ? '🍷' : '';
-          const iconXP = aguaActive ? '💧' : '';
-          const textColor = (nectarActive || aguaActive || petActiveFlag) ? '#00e5ff' : 'var(--gold)';
-          showFloatingText(`+${ganhoMoedas} 🪙${iconCoins}${petVisualCoins} | +${ganhoXP} ✨${iconXP}${petVisualXP}`, textColor); 
+            showFloatingText(`CRÍTICO! +${ganhoMoedas} 🪙${petVisualCoins} | +${ganhoXP} ✨${petVisualXP}`, '#e024ff'); 
+            if (typeof showYinYang === 'function') showYinYang(); 
+            
+        } else if (ganhoMoedas > 0 || ganhoXP > 0 || petActiveFlag) { 
+            // Para acertos normais, só polui a tela se realmente ganhou alguma coisa
+            const iconCoins = nectarActive ? '🍷' : '';
+            const iconXP = aguaActive ? '💧' : '';
+            const textColor = (nectarActive || aguaActive || petActiveFlag) ? '#00e5ff' : 'var(--gold)';
+            showFloatingText(`+${ganhoMoedas} 🪙${iconCoins}${petVisualCoins} | +${ganhoXP} ✨${iconXP}${petVisualXP}`, textColor); 
         }
 
     } finally {
@@ -1377,13 +1453,16 @@ function buildStudyTab() {
   
   const due = dueCards();
   
-  // Pega categorias e tags para o Treino Livre
-  const allCats = [...new Set(W.map(w => w.category).filter(Boolean))].sort();
-  const allTags = [...new Set(W.flatMap(w => (w.tags||'').split(',').map(t=>t.trim())).filter(Boolean))].sort();
+  // ✨ Tratamento blindado de Categorias e Tags para evitar quebras
+  const allCats = [...new Set(W.map(w => w.category).filter(c => c && c.trim() !== ''))].sort();
   
-  // Pega categorias e tags APENAS das cartas vencidas para a revisão normal
-  const dueCats = [...new Set(due.map(w => w.category).filter(Boolean))].sort();
-  const dueTags = [...new Set(due.flatMap(w => (w.tags||'').split(',').map(t=>t.trim())).filter(Boolean))].sort();
+  const allTagsList = W.flatMap(w => (w.tags || '').split(',').map(t => t.trim()));
+  const allTags = [...new Set(allTagsList.filter(t => t !== ''))].sort();
+  
+  const dueCats = [...new Set(due.map(w => w.category).filter(c => c && c.trim() !== ''))].sort();
+  
+  const dueTagsList = due.flatMap(w => (w.tags || '').split(',').map(t => t.trim()));
+  const dueTags = [...new Set(dueTagsList.filter(t => t !== ''))].sort();
   
   let html = '';
 
@@ -1398,15 +1477,18 @@ function buildStudyTab() {
       <div class="card-body">
         <div class="quote" style="margin-bottom:14px">"A perseverança é a virtude dos fortes." — Demóstenes</div>
         
-        ${(dueCats.length > 1 || dueTags.length > 0) ? `
+        ${(dueCats.length > 0 || dueTags.length > 0) ? `
         <div class="form-group" style="margin-bottom:14px">
           <label class="lbl">Focar em um assunto? (Opcional)</label>
           <select class="inp" id="studyCatFilter">
             <option value="">📚 Estudar Tudo (${due.length})</option>
+            ${dueCats.length > 0 ? `
             <optgroup label="Categorias">
               ${dueCats.map(c => `<option value="${esc(c)}">📁 ${esc(c)} (${due.filter(w=>w.category===c).length})</option>`).join('')}
-            </optgroup>
-            ${dueTags.length ? `<optgroup label="Tags">
+            </optgroup>` : ''}
+            
+            ${dueTags.length > 0 ? `
+            <optgroup label="Tags">
               ${dueTags.map(t => `<option value="tag:${esc(t)}">🏷️ #${esc(t)}</option>`).join('')}
             </optgroup>` : ''}
           </select>
@@ -1416,7 +1498,7 @@ function buildStudyTab() {
         <div class="btn-row" style="flex-wrap:nowrap;gap:6px">
           <button class="btn gold" onclick="startSession('adaptive', document.getElementById('studyCatFilter')?.value, null, false)" style="flex:1;font-size:13px;padding:12px;letter-spacing:0.5px">🧠 Smart</button>
           
-          <!-- ✨ O SEU NOVO BOTÃO DE INÍCIO RÁPIDO (Puxa do filtro e inicia os modos salvos) -->
+          <!-- ✨ O SEU NOVO BOTÃO DE INÍCIO RÁPIDO -->
           <button class="btn" onclick="startCustomSession(document.getElementById('studyCatFilter')?.value || '', false)" style="flex:1;font-size:13px;padding:12px;border-color:var(--gold);color:var(--gold);font-weight:bold;letter-spacing:0.5px">▶️ Modos Salvos</button>
           
           <!-- Botão menor de engrenagem para alterar os modos -->
@@ -1446,15 +1528,21 @@ function buildStudyTab() {
       </div>
       <div class="card-body">
         <div style="font-size:13px;color:var(--stone2);margin-bottom:12px;line-height:1.5">Estude qualquer assunto infinitamente sem alterar os dias de revisão do algoritmo SM-2.</div>
+        
         <div class="form-group" style="margin-bottom:14px">
           <select class="inp" id="freeStudyFilter" style="border-color:rgba(52, 152, 219, 0.4)">
             <option value="">📚 Todo o Léxico (${W.length})</option>
+            
+            ${allCats.length > 0 ? `
             <optgroup label="Categorias">
               ${allCats.map(c => `<option value="${esc(c)}">📁 ${esc(c)} (${W.filter(w => w.category === c).length})</option>`).join('')}
-            </optgroup>
-            ${allTags.length ? `<optgroup label="Tags">
+            </optgroup>` : ''}
+            
+            ${allTags.length > 0 ? `
+            <optgroup label="Tags">
               ${allTags.map(t => `<option value="tag:${esc(t)}">🏷️ #${esc(t)} (${W.filter(w => (w.tags || '').includes(t)).length})</option>`).join('')}
             </optgroup>` : ''}
+            
           </select>
         </div>
         
@@ -1475,7 +1563,7 @@ function buildStudyTab() {
       `;
   }
   
-  // ✨ BANNER DA LOJA (Mercado de Atenas)
+  // ✨ BANNER DA LOJA E LIVE-OPS...
   if (W.length > 0) {
     html += `
     <div class="card" style="border-color:var(--gold); cursor:pointer; background:rgba(212,175,55,0.05)" onclick="openStoreModal()">
@@ -1492,11 +1580,9 @@ function buildStudyTab() {
     </div>`;
   }
   
-  // ✨ BANNER LIVE-OPS (Versão com Identificação de Turno)
   if (STATS.activeEvent) {
     const timeLeftMinutes = Math.max(0, Math.ceil((STATS.activeEvent.endTime - Date.now()) / 60000));
     
-    // 🏷️ Define o rótulo do turno para o topo do banner
     let turnoLabel = "🔥 Evento Ativo 🔥";
     if (STATS.lastEventSlot === "TURNO_1") turnoLabel = "🌅 Mural da Manhã 🌅";
     if (STATS.lastEventSlot === "TURNO_2") turnoLabel = "🌆 Mural da Tarde 🌆";
@@ -1504,17 +1590,11 @@ function buildStudyTab() {
 
     html += `
     <div class="card" style="border: 2px dashed ${STATS.activeEvent.color}; background:rgba(0,0,0,0.3); margin-top: 15px; position:relative; overflow:hidden; border-radius:12px">
-        
-        <!-- Efeito de luz passando no fundo -->
         <div style="position:absolute; top:0; left:-100%; width:50%; height:100%; background:linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); animation: shine 3s infinite"></div>
-        
         <div class="card-body" style="text-align:center; padding: 16px">
-            <!-- Rótulo do Turno Dinâmico -->
             <div style="font-size:10px; font-weight:bold; letter-spacing:2px; color:var(--stone2); text-transform:uppercase; margin-bottom:6px">${turnoLabel}</div>
-            
             <div style="font-size:22px; font-weight:bold; color:${STATS.activeEvent.color}; text-shadow: 0 0 10px ${STATS.activeEvent.color}40">${STATS.activeEvent.name}</div>
             <div style="font-size:13px; color:white; margin-top:6px; font-style:italic">"${STATS.activeEvent.desc}"</div>
-            
             <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:12px">
                 <div style="background:var(--bg); border:1px solid ${STATS.activeEvent.color}; padding:4px 12px; border-radius:12px; font-size:12px; font-weight:bold; color:${STATS.activeEvent.color}">
                     ⏳ Termina em: ${timeLeftMinutes} min
@@ -1522,12 +1602,9 @@ function buildStudyTab() {
             </div>
         </div>
     </div>
-    <style>
-        @keyframes shine { 100% { left: 200%; } }
-    </style>`;
+    <style>@keyframes shine { 100% { left: 200%; } }</style>`;
   }
   
-  // ✨ BANNER DE BACKUP E SINCRONIZAÇÃO
   if (W.length > 0) {
     html += `
     <div class="card" style="border-color:var(--blue); cursor:pointer; background:rgba(41, 128, 185, 0.05); margin-top: 10px" onclick="openBackupModal()">
@@ -1618,7 +1695,7 @@ function buildStudyCard() {
   else if (activeMode === 'boss') inner = buildBossMode(card); 
 
   const isAns = sess.typeAnswered || sess.choiceAnswered || sess.tfAnswered || sess.revChoiceAnswered || sess.scrambleAnswered || sess.spellAnswered || sess.syntaxAnswered || sess.clozeAnswered || sess.contextAnswered || sess.imgChoiceAnswered || sess.bossAnswered || sess.blindAnswered || sess.flipped;
-// ✨ O GATILHO DA LEITURA CONTÍNUA (Blindado e fora do cronômetro)
+  // ✨ O GATILHO DA LEITURA CONTÍNUA (Blindado e fora do cronômetro)
   if (!isAns && sess.ultimoLidoId !== card.id) {
       sess.ultimoLidoId = card.id; // Marca que já agendou a leitura desta carta
       
@@ -1627,7 +1704,7 @@ function buildStudyCard() {
           setTimeout(lerTelaCompleta, 200); // Dá 200ms para a tela carregar
       }
   }
-// ✨ SISTEMA UNIFICADO DE ÁUDIO E RELÓGIO
+  // ✨ SISTEMA UNIFICADO DE ÁUDIO E RELÓGIO
   let timerHtml = '';
   
   // Verifica se esta carta específica precisa de relógio
@@ -1726,7 +1803,7 @@ function buildStudyCard() {
     ${timerHtml}
     ${toolsHtml} 
     
-<!-- ✨ O ENVELOPE MÁGICO QUE ABRAÇA A CARTA INTEIRA -->
+  <!-- ✨ O ENVELOPE MÁGICO QUE ABRAÇA A CARTA INTEIRA -->
     <div class="physical-card ${rarity.cls}">
        ${inner}
        
@@ -1792,7 +1869,8 @@ function buildFlashMode(card, intervals) {
     </div>
     ${flipped ? `
     <div class="rating-row" style="margin-top:14px">
-      ${[0,1,2,3].map(q => `<button class="rating-btn r${q+1}" onclick="rateCard(${q})">
+      <!-- ✨ MÁGICA AQUI: Chama o playSfx ANTES de rateCard, para garantir que o prêmio seja entregue! -->
+      ${[0,1,2,3].map(q => `<button class="rating-btn r${q+1}" onclick="playSfx(${q} === 0 ? 'fail' : 'ok'); rateCard(${q})">
         <span class="rating-lbl">${q===0?'De novo':q===1?'Difícil':q===2?'Bom':'Fácil'}</span>
         <span class="rating-days">${q===0?'1d':intervals[q]+'d'}</span>
       </button>`).join('')}
@@ -4113,6 +4191,16 @@ function openStoreModal() {
   const lvlAguia = getLvl('aguia'), nextAguia = getNext('aguia');
   const powAguiaCrit = (5 + ((lvlAguia - 1) * 1)).toFixed(1); 
   const capAguia = isPetCapped('aguia'), maxAguia = getPetMaxLevel('aguia');
+  // ✨ VARIÁVEIS DA RAPOSA (Drop Rate)
+  const lvlRaposa = getLvl('raposa'), nextRaposa = getNext('raposa');
+  const powRaposaDrop = (5 + ((lvlRaposa - 1) * 1)).toFixed(1); 
+  const capRaposa = isPetCapped('raposa'), maxRaposa = getPetMaxLevel('raposa');
+
+  // ✨ VARIÁVEIS DO GRIFO (Mestre do Farm: Crítico + Drop)
+  const lvlGrifo = getLvl('grifo'), nextGrifo = getNext('grifo');
+  const powGrifoCrit = (4 + ((lvlGrifo - 1) * 0.5)).toFixed(1); 
+  const powGrifoDrop = (3 + ((lvlGrifo - 1) * 0.5)).toFixed(1); 
+  const capGrifo = isPetCapped('grifo'), maxGrifo = getPetMaxLevel('grifo');
 // Verifica se a trava está ativa e qual o nível máximo atual
   const capTartaruga = isPetCapped('tartaruga'), maxTartaruga = getPetMaxLevel('tartaruga');
   const capFormiga = isPetCapped('formiga'), maxFormiga = getPetMaxLevel('formiga');
@@ -4353,6 +4441,35 @@ function openStoreModal() {
                         }
                      </div>
                      ${getPetBtn('aguia', 4500, 30, '#3498db')}
+                  </div>
+                </div>
+                <!-- O NOVO PET: RAPOSA DE NOVE CAUDAS (Foco em Sorte/Drop Rate) -->
+                <div class="card" style="border-color:#e67e22; margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🦊 Raposa Mística <span style="font-size:10px; background:#e67e22; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlRaposa}</span></div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A mascote da fortuna. Alimentada dá: <span style="color:#e67e22; font-weight:bold">+${powRaposaDrop}% de Chance de Vitória no Gacha</span>.</div>
+                        ${capRaposa 
+                            ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('raposa', '🦊 Raposa')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxRaposa})</button></div>`
+                            : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextRaposa} acertos</div>`
+                        }
+                     </div>
+                     ${getPetBtn('raposa', 5500, 35, '#e67e22')}
+                  </div>
+                </div>
+
+                <!-- O NOVO PET: GRIFO DOURADO (Mestre do Farm: Crítico + Drop Rate) -->
+                <div class="card" style="border-color:#ff4757; border-width: 2px; box-shadow: 0 0 10px rgba(255, 71, 87, 0.2); margin-bottom:0">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                     <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🦁 Grifo Dourado <span style="font-size:10px; background:#ff4757; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlGrifo}</span></div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">O Mestre do Farm. Alimentado dá: <span style="color:#ff4757; font-weight:bold">+${powGrifoCrit}% de Crítico e +${powGrifoDrop}% de Vitória no Gacha</span>.</div>
+                        ${capGrifo 
+                            ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('grifo', '🦁 Grifo')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxGrifo})</button></div>`
+                            : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextGrifo} acertos</div>`
+                        }
+                     </div>
+                     ${getPetBtn('grifo', 8000, 40, '#ff4757')}
                   </div>
                 </div>
                 <!-- DRAGÃO (AGORA MOSTRA O CRÍTICO) -->
@@ -4859,7 +4976,7 @@ function openCustomModal(isFreeMode = false) {
       savedModes = ['flash', 'choice', 'tf']; 
   }
   
-openModal(`
+  openModal(`
     <h3>🎛️ Modos Aleatórios</h3>
     <div style="font-size:13px;color:var(--stone2);margin-bottom:12px;line-height:1.5">Selecione os modos que deseja incluir na rotação:</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
@@ -6363,11 +6480,30 @@ openModal(`
 }
 
 // ✨ A MÁQUINA DA SORTE COM RARIDADE E BLINDAGEM
+// ✨ A MÁQUINA DA SORTE COM PACTO DE ALQUIMIA
+// ✨ A MÁQUINA DA SORTE COM PACTO DE ALQUIMIA (BLINDADA)
+// ✨ A MÁQUINA DA SORTE COM PACTO DE ALQUIMIA (BLINDAGEM ABSOLUTA)
 function playGacha() {
     if (!STATS.inventory) STATS.inventory = {};
     if (!STATS.pets) STATS.pets = {};
     
-    const win = Math.random() >= 0.5; // 50/50 de chance de ganhar ou perder
+    // 🛡️ GARRA DE FERRO: Busca o sacrifício na memória profunda do navegador!
+    let memoriaPacto = localStorage.getItem('config_sacrificioGacha');
+    let sacrificio = 0;
+    
+    if (memoriaPacto !== null && memoriaPacto !== '') {
+        sacrificio = parseInt(memoriaPacto);
+    } else if (typeof configJogo !== 'undefined' && configJogo.sacrificioGacha) {
+        sacrificio = parseInt(configJogo.sacrificioGacha);
+    }
+
+    // 🎲 CÁLCULO DA SORTE
+    let baseWinChance = 0.50; // Base: 50%
+    let bonusChance = sacrificio / 200; // Ex: 100% sacrifício = +0.50 bônus
+    let finalWinChance = baseWinChance + bonusChance;
+    
+    // ✨ O MARTELO DOS DEUSES: Se a chance for igual ou maior que 1.0 (100%), Vitória Absoluta e inegável!
+    const win = (finalWinChance >= 1.0) ? true : (Math.random() <= finalWinChance); 
     
     // 🏆 PISCINA DE PRÊMIOS (Peso maior = Mais fácil de sair)
     const winPool = [
@@ -6383,7 +6519,7 @@ function playGacha() {
         { id: 'petCrystals', name: 'Cristal de Quíron 💎', weight: 1, qty: 1, type: 'inv', color: '#2ecc71' } // Épico
     ];
     
-    // 🌩️ PISCINA DE PERDAS (Caixas e Cristais NÃO estão aqui! São blindados)
+    // 🌩️ PISCINA DE PERDAS
     const losePool = [
         { id: 'magicHints', name: 'Dica de Atena ✨' },
         { id: 'skips', name: 'Salto de Cronos ⏭️' },
@@ -6394,8 +6530,16 @@ function playGacha() {
 
     let resultHtml = '';
     
+    // ✨ TEXTO DE AVISO (Para você ter a prova visual de que o código leu os 100%)
+    let pactText = '';
+    let chanceExibida = Math.min(Math.round(finalWinChance * 100), 100);
+    
+    if (sacrificio > 0) {
+        pactText = `<div style="font-size:11px; color:#e024ff; margin-bottom:15px; font-style:italic; font-weight:bold;">🎲 Pacto Ativo: Sua chance de vitória foi para ${chanceExibida}%!</div>`;
+    }
+    
     if (win) {
-        // 🎉 LÓGICA DE VITÓRIA (Sorteio com Pesos)
+        // 🎉 LÓGICA DE VITÓRIA
         let totalWeight = winPool.reduce((acc, item) => acc + item.weight, 0);
         let randomNum = Math.random() * totalWeight;
         let selectedPrize = null;
@@ -6408,7 +6552,6 @@ function playGacha() {
             randomNum -= item.weight;
         }
 
-        // Entrega o Prêmio
         if (selectedPrize.type === 'pet') {
             STATS.pets.fedCharges = (STATS.pets.fedCharges || 0) + selectedPrize.qty;
         } else {
@@ -6421,6 +6564,7 @@ function playGacha() {
             <div style="text-align:center; animation: fadeIn 0.5s">
                 <div style="font-size:50px; margin-bottom:10px">🎉</div>
                 <h3 style="color:var(--gold)">VITÓRIA!</h3>
+                ${pactText}
                 <p style="font-size:13px; color:white; margin-top:10px">A roleta parou e os deuses sorriram! Você ganhou:<br>
                 <b style="color:${selectedPrize.color}; font-size:18px; display:block; margin-top:8px">+${selectedPrize.qty}x ${selectedPrize.name}</b></p>
                 <button class="btn ghost" style="margin-top:15px" onclick="closeModal()">Incrível!</button>
@@ -6430,13 +6574,12 @@ function playGacha() {
         if (typeof shootConfetti === 'function') shootConfetti();
         
     } else {
-        // 🌩️ LÓGICA DE DERROTA (Só varre itens permitidos)
+        // 🌩️ LÓGICA DE DERROTA
         const ownedItems = losePool.filter(i => STATS.inventory[i.id] > 0);
         
         if (ownedItems.length > 0) {
             const itemToLose = ownedItems[Math.floor(Math.random() * ownedItems.length)];
             
-            // Tira de 1 a 5 cargas se for Néctar/Água, senão tira só 1
             let amountLost = 1;
             if (itemToLose.id === 'doubleCoins' || itemToLose.id === 'doubleXp') {
                 amountLost = Math.min(5, STATS.inventory[itemToLose.id]);
@@ -6449,6 +6592,7 @@ function playGacha() {
                 <div style="text-align:center; animation: fadeIn 0.5s">
                     <div style="font-size:50px; margin-bottom:10px">🌩️</div>
                     <h3 style="color:var(--red)">DERROTA!</h3>
+                    ${pactText}
                     <p style="font-size:13px; color:white; margin-top:10px">A sorte virou as costas! Como tributo, os deuses levaram:<br>
                     <b style="color:var(--red); font-size:16px; display:block; margin-top:8px">-${amountLost}x ${itemToLose.name}</b></p>
                     <button class="btn ghost" style="margin-top:15px" onclick="closeModal()">Que azar...</button>
@@ -6457,12 +6601,12 @@ function playGacha() {
             if(typeof triggerScreenShake === 'function') triggerScreenShake();
             
         } else {
-            // Se o inventário comum estiver vazio (Mesmo que tenha itens raros blindados)
             resultHtml = `
                 <div style="text-align:center; animation: fadeIn 0.5s">
                     <div style="font-size:50px; margin-bottom:10px">💨</div>
                     <h3 style="color:var(--stone)">ESCAPOU!</h3>
-                    <p style="font-size:13px; color:white; margin-top:10px">Você perdeu na roleta, mas não possuía nenhum item comum para pagar o tributo. Seus itens raros estão protegidos. Nada foi levado!</p>
+                    ${pactText}
+                    <p style="font-size:13px; color:white; margin-top:10px">Você perdeu na roleta, mas não possuía nenhum item comum para pagar o tributo. Nada foi levado!</p>
                     <button class="btn ghost" style="margin-top:15px" onclick="closeModal()">Ufa!</button>
                 </div>`;
             toast('Sorte na miséria!', 'ok');
@@ -6471,7 +6615,6 @@ function playGacha() {
     
     if (typeof saveStats === 'function') saveStats();
     
-    // Atualiza o HTML do Modal com o resultado final
     openModal(`
         ${resultHtml}
         <div style="display:flex; justify-content:center; margin-top:20px">
@@ -6479,7 +6622,6 @@ function playGacha() {
         </div>
     `);
 }
-
 // ✨ SISTEMA GACHA DA LOJA (Loot Boxes com Som!)
 function buyGachaBox(boxType, price) {
     if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, doubleXp: 0 };
@@ -6610,14 +6752,77 @@ function playGachaSound(soundType) {
         playNote(200, 'sawtooth', now + 0.4, 0.4);
     }
 }
-// ✨ A MÁQUINA DA SORTE COM RARIDADE E BLINDAGEM (Corrigida!)
 
+// ✨ A MÁQUINA DA SORTE COM PACTO DE ALQUIMIA (AGORA VAI!)
+// ✨ A MÁQUINA DA SORTE (AGORA COM O TRIBUTO DE SANGUE BALANÇEADO)
+// ✨ A MÁQUINA DA SORTE (BALANÇEAMENTO JUSTO E SEM BUGS)
 function playGacha() {
     if (!STATS.inventory) STATS.inventory = {};
     if (!STATS.pets) STATS.pets = {};
     
-    const win = Math.random() >= 0.5; 
+    // 🛡️ CORREÇÃO DA MEMÓRIA: Tira o Math.max que estava agindo como "Agiota"!
+    let memoriaPacto = localStorage.getItem('config_sacrificioGacha');
+    let sacrificio = 0;
     
+    if (memoriaPacto !== null && memoriaPacto !== '') {
+        sacrificio = parseInt(memoriaPacto);
+    } else if (typeof configJogo !== 'undefined' && configJogo.sacrificioGacha !== undefined) {
+        sacrificio = parseInt(configJogo.sacrificioGacha);
+    }
+
+    // 💸 O TRIBUTO BALANCEADO (100% = 10 Ouro e 50 XP)
+    let custoOuro = 0;
+    let custoXP = 0;
+
+    if (sacrificio > 0) {
+        custoOuro = Math.floor(sacrificio * 0.10); // A cada 10%, cobra 1 Ouro
+        custoXP = Math.floor(sacrificio * 0.50);   // A cada 2%, cobra 1 XP
+        
+        // Só debita se realmente tiver custo
+        if (custoOuro > 0) STATS.moedas = Math.max(0, (STATS.moedas || 0) - custoOuro);
+        
+        if (custoXP > 0) {
+            if (!STATS.earnedXP) STATS.earnedXP = 0;
+            STATS.earnedXP = Math.max(0, STATS.earnedXP - custoXP);
+        }
+        
+        // Atualiza a barrinha de moedas na tela
+        const moedasEl = document.getElementById('hMoedas');
+        if (moedasEl) moedasEl.textContent = STATS.moedas + '🪙';
+    }
+
+// 🐾 BÔNUS DOS MASCOTES (DROP RATE NO GACHA)
+    let bonusPetDrop = 0;
+    if (STATS.pets && STATS.pets.active) {
+        let petAtivo = STATS.pets.active;
+        if (petAtivo === 'raposa' || petAtivo === 'grifo') {
+            let affinity = STATS.pets.affinity[petAtivo] || 0;
+            let lvlPet = Math.floor(affinity / 50) + 1;
+            // Caso exista uma função que crave o nível máximo do pet, usamos ela
+            if (typeof getPetCappedLevel === 'function') lvlPet = getPetCappedLevel(petAtivo);
+            
+            // O Gacha não consome a comida, ele só checa se o pet está de barriga cheia!
+            let isFedPet = (STATS.pets.fedCharges > 0 || (STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_fed'));
+            
+            if (petAtivo === 'raposa') {
+                // Raposa: Foco em Gacha
+                bonusPetDrop = isFedPet ? (0.05 + ((lvlPet - 1) * 0.01)) : (0.02 + ((lvlPet - 1) * 0.005));
+            } else if (petAtivo === 'grifo') {
+                // Grifo: Híbrido
+                bonusPetDrop = isFedPet ? (0.03 + ((lvlPet - 1) * 0.005)) : (0.01 + ((lvlPet - 1) * 0.002));
+            }
+        }
+    }
+
+    // 🎲 CÁLCULO DA SORTE (Agora somado com o Mascote!)
+    let baseWinChance = 0.50; // Base: 50%
+    let bonusChance = sacrificio / 200; 
+    let finalWinChance = baseWinChance + bonusChance + bonusPetDrop;
+    
+    // ✨ MARTELO DOS DEUSES
+    const win = (finalWinChance >= 1.0) ? true : (Math.random() <= finalWinChance); 
+    
+    // 🏆 PISCINA DE PRÊMIOS
     const winPool = [
         { id: 'magicHints', name: 'Dica de Atena ✨', weight: 25, qty: 1, type: 'inv', color: 'var(--gold2)' },
         { id: 'skips', name: 'Salto de Cronos ⏭️', weight: 25, qty: 1, type: 'inv', color: 'var(--green)' },
@@ -6631,6 +6836,7 @@ function playGacha() {
         { id: 'petCrystals', name: 'Cristal de Quíron 💎', weight: 1, qty: 1, type: 'inv', color: '#2ecc71' } 
     ];
     
+    // 🌩️ PISCINA DE PERDAS
     const losePool = [
         { id: 'magicHints', name: 'Dica de Atena ✨' },
         { id: 'skips', name: 'Salto de Cronos ⏭️' },
@@ -6641,7 +6847,20 @@ function playGacha() {
 
     let resultHtml = '';
     
+    // ✨ TEXTO DE AVISO
+    let pactText = '';
+    let chanceExibida = Math.min(Math.round(finalWinChance * 100), 100);
+    
+    if (sacrificio > 0) {
+        pactText = `
+        <div style="font-size:11px; color:#e024ff; margin-bottom:15px; background: rgba(224, 36, 255, 0.1); padding: 8px; border-radius: 6px; border: 1px solid rgba(224, 36, 255, 0.3);">
+            <div style="font-weight:bold; font-style:italic; margin-bottom: 4px;">🎲 Pacto Ativo: Sorte aumentada para ${chanceExibida}%!</div>
+            ${(custoOuro > 0 || custoXP > 0) ? `<div style="color:var(--red); font-weight:bold; font-size: 10px;">🩸 Tributo pago: -${custoOuro} 🪙 e -${custoXP} ✨</div>` : ''}
+        </div>`;
+    }
+    
     if (win) {
+        // 🎉 LÓGICA DE VITÓRIA
         let totalWeight = winPool.reduce((acc, item) => acc + item.weight, 0);
         let randomNum = Math.random() * totalWeight;
         let selectedPrize = null;
@@ -6659,19 +6878,24 @@ function playGacha() {
         } else {
             STATS.inventory[selectedPrize.id] = (STATS.inventory[selectedPrize.id] || 0) + selectedPrize.qty;
         }
+        
+        if (typeof saveStats === 'function') saveStats();
 
         resultHtml = `
             <div style="text-align:center; animation: fadeIn 0.5s">
                 <div style="font-size:50px; margin-bottom:10px">🎉</div>
                 <h3 style="color:var(--gold)">VITÓRIA!</h3>
+                ${pactText}
                 <p style="font-size:13px; color:white; margin-top:10px">A roleta parou e os deuses sorriram! Você ganhou:<br>
                 <b style="color:${selectedPrize.color}; font-size:18px; display:block; margin-top:8px">+${selectedPrize.qty}x ${selectedPrize.name}</b></p>
+                <button class="btn ghost" style="margin-top:15px; width:100%" onclick="closeModal()">Incrível!</button>
             </div>`;
         
         toast('Sorte Grande!', 'gold');
         if (typeof shootConfetti === 'function') shootConfetti();
         
     } else {
+        // 🌩️ LÓGICA DE DERROTA
         const ownedItems = losePool.filter(i => STATS.inventory[i.id] > 0);
         
         if (ownedItems.length > 0) {
@@ -6683,13 +6907,16 @@ function playGacha() {
             }
             
             STATS.inventory[itemToLose.id] -= amountLost;
+            if (typeof saveStats === 'function') saveStats();
 
             resultHtml = `
                 <div style="text-align:center; animation: fadeIn 0.5s">
                     <div style="font-size:50px; margin-bottom:10px">🌩️</div>
                     <h3 style="color:var(--red)">DERROTA!</h3>
-                    <p style="font-size:13px; color:white; margin-top:10px">A sorte virou as costas! Como tributo, os deuses levaram:<br>
+                    ${pactText}
+                    <p style="font-size:13px; color:white; margin-top:10px">A sorte virou as costas! Como tributo adicional, os deuses levaram:<br>
                     <b style="color:var(--red); font-size:16px; display:block; margin-top:8px">-${amountLost}x ${itemToLose.name}</b></p>
+                    <button class="btn ghost" style="margin-top:15px; width:100%" onclick="closeModal()">Que azar...</button>
                 </div>`;
             toast('Azar...', 'err');
             if(typeof triggerScreenShake === 'function') triggerScreenShake();
@@ -6699,114 +6926,180 @@ function playGacha() {
                 <div style="text-align:center; animation: fadeIn 0.5s">
                     <div style="font-size:50px; margin-bottom:10px">💨</div>
                     <h3 style="color:var(--stone)">ESCAPOU!</h3>
-                    <p style="font-size:13px; color:white; margin-top:10px">Você perdeu na roleta, mas não possuía nenhum item comum para pagar o tributo. Seus itens raros estão protegidos. Nada foi levado!</p>
+                    ${pactText}
+                    <p style="font-size:13px; color:white; margin-top:10px">Você perdeu na roleta, mas não possuía itens comuns para pagar o tributo da derrota. Seus raros estão a salvo!</p>
+                    <button class="btn ghost" style="margin-top:15px; width:100%" onclick="closeModal()">Ufa!</button>
                 </div>`;
             toast('Sorte na miséria!', 'ok');
         }
     }
-
+    
     if (typeof saveStats === 'function') saveStats();
     
-    // ✨ O seu fechamento original, que abre a tela com apenas UM botão!
-    openModal(`
-        ${resultHtml}
-        <div style="display:flex; justify-content:center; margin-top:20px">
-            <button class="btn ghost" onclick="closeModal()">Aceitar o Destino</button>
-        </div>
-    `);
+    // ✨ CORREÇÃO DO BOTÃO DUPLO: Removemos a "div" de baixo que empurrava o botão extra
+    openModal(resultHtml);
 }
+
+// 📊 FUNÇÃO MÁGICA: Calcula e atualiza a previsão de ganhos na tela de Configuração
+window.atualizarEstimativa = function() {
+    let baseMoedas = 3; 
+    let baseXP = 15; 
+
+    // 🐾 Lê a mente do seu Mascote equipado
+    if (typeof STATS !== 'undefined' && STATS.pets && STATS.pets.active) {
+        let petAtivo = STATS.pets.active;
+        const hasFreeFood = STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_fed';
+        const isFed = (STATS.pets.fedCharges > 0 || hasFreeFood);
+        
+        let petLevel = 1;
+        if (typeof getPetCappedLevel === 'function') petLevel = getPetCappedLevel(petAtivo);
+
+        if (petAtivo === 'coruja') { baseXP += isFed ? (10 + ((petLevel - 1) * 2)) : (2 + Math.floor((petLevel - 1) * 0.5)); } 
+        else if (petAtivo === 'fenix') { baseMoedas += isFed ? (4 + (petLevel - 1)) : (1 + Math.floor((petLevel - 1) * 0.2)); }
+        else if (petAtivo === 'tartaruga') { baseXP += isFed ? (4 + (petLevel - 1)) : (1 + Math.floor((petLevel - 1) * 0.2)); }
+        else if (petAtivo === 'formiga') { baseMoedas += isFed ? (2 + Math.floor((petLevel - 1) * 0.5)) : 0; }
+        else if (petAtivo === 'aguia') { baseMoedas += isFed ? 3 : 1; baseXP += isFed ? 10 : 3; }
+        else if (petAtivo === 'dragao') { baseMoedas += isFed ? (10 + ((petLevel - 1) * 2)) : (3 + Math.floor((petLevel - 1) * 0.5)); baseXP += isFed ? (30 + ((petLevel - 1) * 5)) : (5 + (petLevel - 1)); }
+        else if (petAtivo === 'raposa') { baseMoedas += isFed ? 2 : 0; baseXP += isFed ? 5 : 2; }
+        else if (petAtivo === 'grifo') { baseMoedas += isFed ? (5 + (petLevel - 1)) : 2; baseXP += isFed ? (15 + ((petLevel - 1) * 2)) : 5; }
+    }
+
+    // 👹 Punições dos Hacks
+    let multiplicadorPunicao = 1.0;
+    if (configJogo.dicasInfinitas) multiplicadorPunicao -= 0.50;
+    if (configJogo.vidasInfinitas) multiplicadorPunicao -= 0.30; 
+    if (configJogo.escudosInfinitos) multiplicadorPunicao -= 0.20; 
+    if (configJogo.pularInfinito) multiplicadorPunicao -= 0.40; 
+    if (configJogo.criticoCustom > 0) multiplicadorPunicao -= (configJogo.criticoCustom / 100);
+    if (multiplicadorPunicao < 0.1) multiplicadorPunicao = 0.1;
+
+    if (multiplicadorPunicao < 1.0) {
+        baseMoedas = Math.floor(baseMoedas * multiplicadorPunicao);
+        baseXP = Math.floor(baseXP * multiplicadorPunicao);
+    }
+
+    // ⚖️ Balança da Alquimia (Foco Proporcional)
+    let focoXP = configJogo.focoXP || 0;
+    let focoOuro = configJogo.focoOuro || 0;
+
+    if (focoXP > 0) {
+        baseXP = Math.floor(baseXP * (1 + (focoXP / 100)));
+        baseMoedas = Math.floor(baseMoedas * (1 - (focoXP / 100)));
+    } else if (focoOuro > 0) {
+        baseMoedas = Math.floor(baseMoedas * (1 + (focoOuro / 100)));
+        baseXP = Math.floor(baseXP * (1 - (focoOuro / 100)));
+    }
+
+    // 🎲 Pacto do Gacha
+    let sacrificio = configJogo.sacrificioGacha || 0;
+    if (sacrificio > 0) {
+        let reducao = 1 - (sacrificio / 100);
+        baseMoedas = Math.floor(baseMoedas * reducao);
+        baseXP = Math.floor(baseXP * reducao);
+    }
+
+    // Atualiza a tela!
+    let elM = document.getElementById('estMoedas');
+    let elX = document.getElementById('estXP');
+    if(elM) elM.innerText = baseMoedas + ' 🪙';
+    if(elX) elX.innerText = baseXP + ' ✨';
+};
+
+// 🎮 FUNÇÕES DOS BOTÕES [+] e [-]
+window.changeFoco = function(tipo, val) {
+    if (!configJogo.focoXP) configJogo.focoXP = 0;
+    if (!configJogo.focoOuro) configJogo.focoOuro = 0;
+
+    if (tipo === 'xp') {
+        configJogo.focoXP = Math.max(0, Math.min(100, configJogo.focoXP + val));
+        configJogo.focoOuro = 0; // Zera o ouro se focar em XP
+    } else {
+        configJogo.focoOuro = Math.max(0, Math.min(100, configJogo.focoOuro + val));
+        configJogo.focoXP = 0; // Zera o XP se focar em ouro
+    }
+    
+    document.getElementById('focoXpVal').innerText = configJogo.focoXP + '%';
+    document.getElementById('focoOuroVal').innerText = configJogo.focoOuro + '%';
+    document.getElementById('descFocoXp').innerText = `+${configJogo.focoXP}% XP / -${configJogo.focoXP}% Ouro`;
+    document.getElementById('descFocoOuro').innerText = `+${configJogo.focoOuro}% Ouro / -${configJogo.focoOuro}% XP`;
+    atualizarEstimativa();
+};
+
+window.changePacto = function(val) {
+    if (!configJogo.sacrificioGacha) configJogo.sacrificioGacha = 0;
+    configJogo.sacrificioGacha = Math.max(0, Math.min(100, configJogo.sacrificioGacha + val));
+    localStorage.setItem('config_sacrificioGacha', configJogo.sacrificioGacha);
+    
+    document.getElementById('pactoVal').innerText = configJogo.sacrificioGacha + '%';
+    atualizarEstimativa();
+};
+
+window.changeCritHack = function(val) {
+    if (!configJogo.criticoCustom) configJogo.criticoCustom = 0;
+    configJogo.criticoCustom = Math.max(0, Math.min(100, configJogo.criticoCustom + val));
+    
+    document.getElementById('critHackValue').innerText = configJogo.criticoCustom + '%';
+    document.getElementById('critHackPen').innerText = configJogo.criticoCustom > 0 ? `Penalidade: -${configJogo.criticoCustom}% Ouro e XP` : 'Sem penalidade extra';
+    atualizarEstimativa();
+};
+
 //modal para configuraçao dentro do jogo
 // Abre o modal e carrega os valores atuais
 // ✨ O MENU DE CONFIGURAÇÕES COM O MODO DEUS
+// ✨ O MENU DE CONFIGURAÇÕES (COM PAINEL AO VIVO)
 function abrirConfig() {
     let valorAtual = configJogo.timerMinInterval !== undefined ? configJogo.timerMinInterval : 0;
 
     let html = `
-    <h3 style="margin-bottom:8px; color:var(--gold)">⚙️ Configurações do Jogo</h3>
-    <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Ajuste as engrenagens e a dificuldade do seu treinamento.</p>
+    <h3 style="margin-bottom:8px; color:var(--gold)">⚙️ Configurações e Alquimia</h3>
     
-    <div style="height: 60vh; overflow-y: auto; padding-right:5px">
-        <!-- ✨ SEÇÃO: ACESSIBILIDADE E ÁUDIO -->
-        <div style="font-weight:bold; margin-top:20px; margin-bottom:10px; color:var(--gold2); text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(212, 175, 55, 0.3); padding-bottom:4px">🎧 Acessibilidade & Áudio</div>
-        
-        <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; border: 1px solid var(--border2);">
-            <div style="padding-right: 10px;">
-                <div style="font-size:14px; font-weight:bold; color:var(--gold)">🗣️ Leitor de Tela Completo</div>
-                <div style="font-size:10px; color:var(--stone2); margin-top:4px; line-height:1.4">Lê a pergunta e todas as opções em voz alta automaticamente. Perfeito para usar no trânsito ou academia.</div>
-            </div>
-            <!-- Esse input já salva no localStorage assim que você clica! -->
-            <input type="checkbox" id="leituraCompleta" class="config-cb" ${configJogo.leituraCompleta ? 'checked' : ''} onchange="configJogo.leituraCompleta = this.checked; localStorage.setItem('config_leituraCompleta', this.checked); toast(this.checked ? '🔊 Leitura Completa Ativada' : '🔇 Leitura Completa Desativada', 'gold')" style="transform:scale(1.3); accent-color:var(--gold)">
-        </label>
-        <!-- SEÇÃO: PRESSÃO DE TEMPO -->
-        <div style="font-weight:bold; margin-bottom:10px; color:#ffd700; text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(255, 215, 0, 0.3); padding-bottom:4px">⏱️ Pressão e Recompensas</div>
-        
-        <div style="margin: 15px 0; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border2, #444);">
-            <label style="display:block; margin-bottom:8px; font-weight: bold; color: #fff; font-size: 14px;">
-                Ativar relógio a partir de qual intervalo? (Dias)
-            </label>
-            <input type="number" id="inputTimerInterval" min="0" max="30" value="${valorAtual}" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border2, #555); background:var(--bg3, #1a1a1a); color:white; font-size: 16px;">
-            <p style="color:var(--stone2, #aaa); margin-top:8px; font-size:11px; line-height: 1.4;">
-                Cartões com intervalo menor que este não terão a barra de tempo. Deixe <b>0</b> para pressão total em todas as cartas. 
-            </p>
+    <!-- 📊 O PAINEL DE ESTIMATIVA FIXO NO TOPO -->
+    <div style="background:rgba(212, 175, 55, 0.1); border:1px dashed var(--gold); border-radius:8px; padding:12px; margin-bottom:15px; text-align:center;">
+        <div style="font-size:11px; color:var(--stone2); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px">📊 Estimativa por Acerto Normal</div>
+        <div style="font-size:22px; font-weight:bold;">
+            <span id="estMoedas" style="color:var(--gold)">0 🪙</span> <span style="color:var(--stone); margin: 0 10px;">|</span> <span id="estXP" style="color:#00e5ff">0 ✨</span>
         </div>
-
+        <div style="font-size:10px; color:var(--stone2); margin-top:4px">Calculado com base nos seus Mascotes e Hacks ativos.</div>
+    </div>
+    
+    <div style="height: 50vh; overflow-y: auto; padding-right:5px">
+        
         <!-- 🔥 SEÇÃO: MODO DEUS (HACKS) 🔥 -->
-        <div style="font-weight:bold; margin-top:20px; margin-bottom:10px; color:var(--red); text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(255, 0, 0, 0.3); padding-bottom:4px">🔥 Modo Deus (Hacks)</div>
+        <div style="font-weight:bold; margin-top:10px; margin-bottom:10px; color:var(--red); text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(255, 0, 0, 0.3); padding-bottom:4px">🔥 Modo Deus (Hacks)</div>
         
         <div style="margin: 15px 0; background: rgba(255,0,0,0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,0,0,0.3);">
-            <p style="font-size:11px; color:var(--stone2); margin-top:0; margin-bottom:15px; line-height:1.4">Ativar estas opções facilita o jogo, mas aplica <b style="color:var(--red)">severas penalidades</b> nos seus ganhos finais por resposta!</p>
+            <p style="font-size:11px; color:var(--stone2); margin-top:0; margin-bottom:15px; line-height:1.4">Ativar estas opções facilita o jogo, mas aplica <b style="color:var(--red)">severas penalidades</b>.</p>
             
-            <!-- Dicas Infinitas -->
             <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
-                <div>
-                    <div>✨ Dicas de Atena Infinitas</div>
-                    <div style="font-size:10px; color:var(--red); margin-top:2px">Penalidade: -50% Ouro e XP</div>
-                </div>
-                <input type="checkbox" id="dicasInfinitas" class="config-cb" ${configJogo.dicasInfinitas ? 'checked' : ''} style="transform:scale(1.3); accent-color:var(--gold)">
+                <div>✨ Dicas Infinitas <span style="font-size:10px; color:var(--red); display:block">-50% Ouro e XP</span></div>
+                <input type="checkbox" class="config-cb" ${configJogo.dicasInfinitas ? 'checked' : ''} onchange="configJogo.dicasInfinitas=this.checked; atualizarEstimativa()" style="transform:scale(1.3); accent-color:var(--gold)">
             </label>
             
-            <!-- Vidas Infinitas -->
             <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
-                <div>
-                    <div>❤️ Vidas Infinitas (Imortal)</div>
-                    <div style="font-size:10px; color:var(--red); margin-top:2px">Penalidade: -30% Ouro e XP</div>
-                </div>
-                <input type="checkbox" id="vidasInfinitas" class="config-cb" ${configJogo.vidasInfinitas ? 'checked' : ''} style="transform:scale(1.3); accent-color:var(--red)">
+                <div>❤️ Vidas Infinitas <span style="font-size:10px; color:var(--red); display:block">-30% Ouro e XP</span></div>
+                <input type="checkbox" class="config-cb" ${configJogo.vidasInfinitas ? 'checked' : ''} onchange="configJogo.vidasInfinitas=this.checked; atualizarEstimativa()" style="transform:scale(1.3); accent-color:var(--red)">
             </label>
             
-            <!-- Escudos Infinitos -->
-            <label style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#fff; cursor:pointer">
-                <div>
-                    <div>🛡️ Escudos Menores Infinitos</div>
-                    <div style="font-size:10px; color:var(--red); margin-top:2px">Penalidade: -20% Ouro e XP</div>
-                </div>
-                <input type="checkbox" id="escudosInfinitos" class="config-cb" ${configJogo.escudosInfinitos ? 'checked' : ''} style="transform:scale(1.3); accent-color:var(--blue)">
+            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
+                <div>🛡️ Escudos Infinitos <span style="font-size:10px; color:var(--red); display:block">-20% Ouro e XP</span></div>
+                <input type="checkbox" class="config-cb" ${configJogo.escudosInfinitos ? 'checked' : ''} onchange="configJogo.escudosInfinitos=this.checked; atualizarEstimativa()" style="transform:scale(1.3); accent-color:var(--blue)">
             </label>
-            <!-- Saltos Infinitos -->
-            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;margin-top: 10px; font-size:13px; color:#fff; cursor:pointer">
-                <div>
-                    <div>⏭️ Saltos Infinitos (Pular)</div>
-                    <div style="font-size:10px; color:var(--red); margin-top:2px">Penalidade: -40% Ouro e XP</div>
-                </div>
-                <input type="checkbox" id="pularInfinito" class="config-cb" ${configJogo.pularInfinito ? 'checked' : ''} style="transform:scale(1.3); accent-color:var(--green)">
+
+            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
+                <div>⏭️ Saltos Infinitos <span style="font-size:10px; color:var(--red); display:block">-40% Ouro e XP</span></div>
+                <input type="checkbox" class="config-cb" ${configJogo.pularInfinito ? 'checked' : ''} onchange="configJogo.pularInfinito=this.checked; atualizarEstimativa()" style="transform:scale(1.3); accent-color:var(--green)">
             </label>
-            <!-- Gacha Automático (Auto-Spin) -->
-            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; margin-top: 10px; font-size:13px; color:#fff; cursor:pointer">
-                <div>
-                    <div>🎲 Gacha Automático</div>
-                    <div style="font-size:10px; color:var(--stone2); margin-top:2px">Pula os menus e gira a Roleta na mesma hora!</div>
-                </div>
-                <input type="checkbox" id="autoGacha" class="config-cb" ${configJogo.autoGacha ? 'checked' : ''} style="transform:scale(1.3); accent-color:#e024ff">
+
+            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
+                <div>🎲 Gacha Automático <span style="font-size:10px; color:var(--stone2); display:block">Pula os menus do Yin-Yang</span></div>
+                <input type="checkbox" class="config-cb" ${configJogo.autoGacha ? 'checked' : ''} onchange="configJogo.autoGacha=this.checked;" style="transform:scale(1.3); accent-color:#e024ff">
             </label>
-            <!-- ✨ Controlador de Crítico Customizado -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:13px; color:#fff;">
+
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#fff;">
                 <div>
-                    <div>🎲 Forçar Críticos (0 a 100%)</div>
-                    <div id="critHackPen" style="font-size:10px; color:var(--red); margin-top:2px">
-                        ${configJogo.criticoCustom > 0 ? `Penalidade: -${configJogo.criticoCustom}% Ouro e XP` : 'Sem penalidade extra'}
-                    </div>
+                    <div>🎲 Forçar Críticos</div>
+                    <div id="critHackPen" style="font-size:10px; color:var(--red); margin-top:2px">${configJogo.criticoCustom > 0 ? `Penalidade: -${configJogo.criticoCustom}% Ouro e XP` : 'Sem penalidade'}</div>
                 </div>
-                <!-- Botões de + e - -->
                 <div style="display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:6px; border:1px solid var(--border2)">
                     <button class="btn ghost sm" style="padding:2px 8px; border-color:var(--stone); color:white" onclick="changeCritHack(-10)">-</button>
                     <span id="critHackValue" style="font-weight:bold; color:#ff8c00; width:30px; text-align:center">${configJogo.criticoCustom || 0}%</span>
@@ -6815,6 +7108,61 @@ function abrirConfig() {
             </div>
         </div>
 
+        <!-- ✨ SEÇÃO: ALQUIMIA E TRANSMUTAÇÃO ✨ -->
+        <div style="font-weight:bold; margin-top:20px; margin-bottom:10px; color:var(--gold); text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(212, 175, 55, 0.3); padding-bottom:4px">⚖️ Alquimia: Foco e Transmutação</div>
+        
+        <div style="margin: 15px 0; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border2);">
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff;">
+                <div>
+                    <div>✨ Foco em XP</div>
+                    <div id="descFocoXp" style="font-size:10px; color:var(--stone2); margin-top:2px">+${configJogo.focoXP || 0}% XP / -${configJogo.focoXP || 0}% Ouro</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:6px; border:1px solid var(--border2)">
+                    <button class="btn ghost sm" style="padding:2px 8px; border-color:var(--stone); color:white" onclick="changeFoco('xp', -10)">-</button>
+                    <span id="focoXpVal" style="font-weight:bold; color:#00e5ff; width:30px; text-align:center">${configJogo.focoXP || 0}%</span>
+                    <button class="btn ghost sm" style="padding:2px 8px; border-color:var(--stone); color:white" onclick="changeFoco('xp', 10)">+</button>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff;">
+                <div>
+                    <div>🪙 Foco em Ouro</div>
+                    <div id="descFocoOuro" style="font-size:10px; color:var(--stone2); margin-top:2px">+${configJogo.focoOuro || 0}% Ouro / -${configJogo.focoOuro || 0}% XP</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:6px; border:1px solid var(--border2)">
+                    <button class="btn ghost sm" style="padding:2px 8px; border-color:var(--stone); color:white" onclick="changeFoco('ouro', -10)">-</button>
+                    <span id="focoOuroVal" style="font-weight:bold; color:#ff8c00; width:30px; text-align:center">${configJogo.focoOuro || 0}%</span>
+                    <button class="btn ghost sm" style="padding:2px 8px; border-color:var(--stone); color:white" onclick="changeFoco('ouro', 10)">+</button>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#fff;">
+                <div>
+                    <div>🎲 Pacto da Sorte (Gacha)</div>
+                    <div style="font-size:10px; color:var(--stone2); margin-top:2px">Sacrifica ganhos por sorte!</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:6px; border:1px solid var(--border2)">
+                    <button class="btn ghost sm" style="padding:2px 8px; border-color:var(--stone); color:white" onclick="changePacto(-10)">-</button>
+                    <span id="pactoVal" style="font-weight:bold; color:#e024ff; width:30px; text-align:center">${configJogo.sacrificioGacha || 0}%</span>
+                    <button class="btn ghost sm" style="padding:2px 8px; border-color:var(--stone); color:white" onclick="changePacto(10)">+</button>
+                </div>
+            </div>
+            
+            <!-- Transmutação Direta (Fornalha) -->
+            <div style="font-size:12px; color:#fff; margin-bottom:4px; margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">🔄 Transmutação Direta</div>
+            <div style="font-size:10px; color:var(--stone2); margin-bottom:8px">Câmbio: <span style="color:var(--gold2)">5 XP = 1 Ouro</span>.</div>
+            <div style="display:flex; gap:6px; margin-bottom:8px">
+                <input type="number" id="transmuteAmount" class="inp" placeholder="Quantidade..." style="flex:1; padding:8px; background:rgba(0,0,0,0.5); color:white; border-color:var(--border2)">
+                <select id="transmuteType" class="inp" style="flex:1; padding:8px; background:rgba(0,0,0,0.5); color:white; border-color:var(--border2)">
+                    <option value="xp_to_gold">Queimar XP ➔ Ouro</option>
+                    <option value="gold_to_xp">Queimar Ouro ➔ XP</option>
+                </select>
+            </div>
+            <button class="btn" style="background:rgba(212, 175, 55, 0.2); color:var(--gold); border:1px solid var(--gold); padding:10px; font-weight:bold; width: 100%;" onclick="realizarTransmutacao()">✨ Transmutar</button>
+        </div>
+        
+        <!-- Opcional: Manter configurações de Leitor e Timer aqui embaixo -->
     </div>
     
     <div class="btn-row" style="margin-top:14px">
@@ -6822,6 +7170,43 @@ function abrirConfig() {
     </div>`;
     
     openModal(html);
+    
+    // Assim que a janela abre, ele já calcula e mostra os números!
+    setTimeout(atualizarEstimativa, 100); 
+}
+
+// ✨ A FORNALHA DA ALQUIMIA (Transmutação Direta)
+function realizarTransmutacao() {
+    let amount = parseInt(document.getElementById('transmuteAmount').value);
+    let type = document.getElementById('transmuteType').value;
+    
+    if (isNaN(amount) || amount <= 0) return toast('Digite um valor válido!', 'err');
+    
+    if (type === 'xp_to_gold') {
+        if (!STATS.earnedXP || STATS.earnedXP < amount) return toast('Você não tem todo esse XP para queimar!', 'err');
+        
+        let ganhoOuro = Math.floor(amount / 5); // A cada 5 XP queimados, ganha 1 Moeda
+        if (ganhoOuro < 1) return toast('Mínimo para criar ouro é 5 XP!', 'err');
+
+        STATS.earnedXP -= amount;
+        STATS.moedas += ganhoOuro;
+        toast(`Alquimia: -${amount} XP ➔ +${ganhoOuro} 🪙`, 'gold');
+        
+    } else if (type === 'gold_to_xp') {
+        if (!STATS.moedas || STATS.moedas < amount) return toast('Você não tem todo esse Ouro para queimar!', 'err');
+        
+        let ganhoXP = amount * 5; // A cada 1 Moeda queimada, ganha 5 XP
+        
+        STATS.moedas -= amount;
+        STATS.earnedXP += ganhoXP;
+        toast(`Alquimia: -${amount} 🪙 ➔ +${ganhoXP} XP`, '#00e5ff');
+    }
+    
+    if (typeof saveStats === 'function') saveStats();
+    
+    // Atualiza a tela de trás (para mostrar o nível caindo ou subindo) e reabre o modal para atualizar os saldos
+    if (typeof render === 'function') render(); 
+    abrirConfig(); 
 }
 
 // Fecha o modal sem salvar
@@ -7199,6 +7584,7 @@ function runBulkAction(itemId, actionStr) {
 
     openStoreModal(); 
 }
+
 /* ═══════════════════════════════════════
    🧠 MOTOR DE MEMÓRIA DE INTERFACE E GAVETAS (INTELIGENTE)
 ═══════════════════════════════════════ */
