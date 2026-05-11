@@ -529,33 +529,23 @@ let wordDisplayLimit = 50;
 let confirmCallback = null;
 let autoPlayAudio = false;
 let enableTimer = false;
-//botão de configuraçoes tudo ficará aqui para ser configurado em game
-// ⚙️ Variáveis Globais de Configuração Futuramente você vai adicionar outras aqui:
-let configJogo = {
-    timerMinInterval: 0, 
-    dicasInfinitas: false,   
-    vidasInfinitas: false,   
-    escudosInfinitos: false,  
-    pularInfinito: false,
-    focoXP: 0,       // 0 a 100%
-    focoOuro: 0,     // 0 a 100%
-    sacrificioGacha: 0,
-    criticoCustom: 0,
-    autoGacha: false
-};
-// 🛡️ CARREGAMENTO SEGURO (Impede que o texto "false" ative a máquina)
-if (localStorage.getItem('config_autoGacha') === 'true') {
-    configJogo.autoGacha = true;
-} else {
-    configJogo.autoGacha = false;
-}
 
-if (localStorage.getItem('config_criticoCustom')) {
-    configJogo.criticoCustom = parseInt(localStorage.getItem('config_criticoCustom'));
-}
-if (localStorage.getItem('config_leituraCompleta') === 'true') {
-    configJogo.leituraCompleta = true;
-}
+// ⚙️ Variáveis Globais de Configuração Futuramente você vai adicionar outras aqui:
+// ⚙️ CARREGAMENTO MESTRE DA MEMÓRIA
+let configJogo = {
+    timerMinInterval: parseInt(localStorage.getItem('config_timerMinInterval')) || 0,
+    dicasInfinitas: localStorage.getItem('config_dicasInfinitas') === 'true',
+    vidasInfinitas: localStorage.getItem('config_vidasInfinitas') === 'true',
+    escudosInfinitos: localStorage.getItem('config_escudosInfinitos') === 'true',
+    pularInfinito: localStorage.getItem('config_pularInfinito') === 'true',
+    focoXP: parseInt(localStorage.getItem('config_focoXP')) || 0,
+    focoOuro: parseInt(localStorage.getItem('config_focoOuro')) || 0,
+    sacrificioGacha: parseInt(localStorage.getItem('config_sacrificioGacha')) || 0,
+    criticoCustom: parseInt(localStorage.getItem('config_criticoCustom')) || 0,
+    autoGacha: localStorage.getItem('config_autoGacha') === 'true',
+    leituraCompleta: localStorage.getItem('config_leituraCompleta') === 'true'
+};
+
 // ✨ DETECTOR DE RARIDADE DAS CARTAS (Risco Zero)
 function getCardRarity(card) {
   if (card.isLeech) return { cls: 'rarity-ferro', txtCls: '', label: 'Sanguessuga' };
@@ -565,10 +555,10 @@ function getCardRarity(card) {
   if (card.interval >= 7)  return { cls: 'rarity-bronze', txtCls: 'text-bronze', label: 'Bronze 🥉' };
   return { cls: 'rarity-ferro', txtCls: '', label: 'Ferro 🪨' };
 }
+
 // ✨ MOTOR DE ÁUDIO OFFLINE (Gerador de Frequência para Acerto/Erro)
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-// ✨ MOTOR GAMIFICADO: Áudio, Combos, Críticos e MOEDAS 🪙
 // ✨ A TRAVA GLOBAL ANTI-LOOP (Deve ficar fora da função!)
 let checandoMissoes = false;
 
@@ -1091,6 +1081,7 @@ function checkQuestNotifications() {
     
     return hasReward;
 }
+
 // ✨ ÁUDIO DE LEVEL UP (Toque de Vitória + Salva de Palmas)
 function playLevelUpSfx() {
   if (!audioCtx) return;
@@ -2332,65 +2323,6 @@ function buildBlindMode(card) {
   `;
 }
 
-function checkBlind() {
-  const sess = studySession; if (!sess || sess.blindAnswered) return;
-  const card = sess.queue[sess.current]; const inp = document.getElementById('blindInput'); if (!inp) return;
-  const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  
-  const ans = normalizeTxt(inp.value); 
-  const correctWord = normalizeTxt(card.word);
-  
-  sess.blindCorrect = ans === correctWord || levenshtein(ans, correctWord) <= 1;
-  sess.blindAnswered = true;
-  playSfx(sess.blindCorrect ? 'ok' : 'fail');
-  clearTimeout(sess.timerId); 
-  
-  render(); setTimeout(playAnswerAudio, 100);
-}
-
-function checkBoss() {
-  const sess = studySession; if (!sess || sess.bossAnswered) return;
-  const card = sess.queue[sess.current]; 
-  
-  const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  
-  // Função para checar se o que a pessoa digitou está dentro da lista (separada por vírgula)
-  const checkMatchInList = (ans, targetListString) => {
-      if (!ans || !targetListString) return false;
-      const validOptions = targetListString.split(',').map(s => normalizeTxt(s));
-      return validOptions.some(opt => opt === ans || levenshtein(ans, opt) <= 1);
-  };
-
-  // 1. Checa a Palavra Base
-  const ansWord = normalizeTxt(document.getElementById('bossWord')?.value);
-  const correctWord = normalizeTxt(card.word);
-  let isWordCorrect = (ansWord === correctWord || levenshtein(ansWord, correctWord) <= 1);
-
-  // 2. Checa o Sinônimo (se exigido)
-  let isSynCorrect = true; 
-  if (card.synonyms) {
-      const ansSyn = normalizeTxt(document.getElementById('bossSyn')?.value);
-      isSynCorrect = checkMatchInList(ansSyn, card.synonyms);
-  }
-
-  // 3. Checa o Antônimo (se exigido)
-  let isAntCorrect = true;
-  if (card.antonyms) {
-      const ansAnt = normalizeTxt(document.getElementById('bossAnt')?.value);
-      isAntCorrect = checkMatchInList(ansAnt, card.antonyms);
-  }
-
-  // A pessoa SÓ passa se acertar TUDO que foi exigido!
-  sess.bossCorrect = isWordCorrect && isSynCorrect && isAntCorrect;
-  sess.bossAnswered = true;
-  
-  playSfx(sess.bossCorrect ? 'ok' : 'fail');
-  clearTimeout(sess.timerId); // Para o relógio
-  
-  render(); 
-  setTimeout(playAnswerAudio, 100);
-}
-
 function buildTypeMode(card) {
   const sess = studySession;
   const answered = sess.typeAnswered;
@@ -2739,23 +2671,43 @@ function buildSyntaxMode(card) {
 function buildClozeMode(card) {
   const sess = studySession;
   const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+  
+  // 🛡️ O Normalizador Paranoico (Ignora maiúsculas, acentos e pontuações)
+  const norm = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[.,!?;:"'()]/g, '').toLowerCase().trim();
 
   if (!sess.clozeSetup) {
     let text = "", blanks = [], poolWords = [], isRelList = false;
 
-    if (isRel && !card.example) {
+    let pool = typeof W !== 'undefined' ? W.filter(w => w.id !== card.id) : [];
+    let sameCat = pool.filter(w => w.category === card.category);
+    let langStrict = sameCat.filter(w => w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
+    let langType   = sameCat.filter(w => w.cardType === card.cardType);
+
+    let othersCards = langStrict.length >= 4 ? langStrict : (langType.length >= 4 ? langType : sameCat);
+
+    let isCatEnglish = card.category && (card.category.toLowerCase().includes('inglês') || card.category.toLowerCase().includes('english') || card.category.toLowerCase() === 'en' || card.category.toLowerCase().includes('ingles'));
+    let fakeWordsRel = isCatEnglish ? ["actually", "perhaps", "however", "therefore", "besides"] : ["inefável", "assertivo", "prolixo", "efêmero", "pragmático"];
+    let fakeWordsNormal = isCatEnglish ? ["actually", "nevertheless", "therefore", "although", "furthermore", "meanwhile", "otherwise", "perhaps"] : ["intrínseco", "efêmero", "pragmático", "eloquente", "inefável", "prolixo", "sagaz", "peculiar"];
+
+    const rawValids = typeof getValidAnswers === 'function' ? getValidAnswers(card) : [];
+    const validsLimpos = rawValids.map(v => v.trim()).filter(v => v.length > 0);
+
+    if (isRel && !card.example && !card.contextPhrase) {
       isRelList = true;
-      const valids = getValidAnswers(card);
-      const numBlanks = Math.min(3, valids.length);
-      blanks = valids.sort(() => Math.random() - 0.5).slice(0, numBlanks);
+      const numBlanks = Math.min(3, validsLimpos.length);
+      blanks = validsLimpos.sort(() => Math.random() - 0.5).slice(0, numBlanks);
       text = Array(numBlanks).fill('___').join(' &nbsp;•&nbsp; ');
       
-      let others = W.filter(w => w.id !== card.id).flatMap(w => w.cardType === 'sinônimo' || w.cardType === 'antônimo' ? getValidAnswers(w) : [w.word]);
-      if (others.length < 6) others = [...others, "inefável", "assertivo", "prolixo", "efêmero", "pragmático"];
-      const fakes = [...new Set(others)].filter(opt => !valids.includes(opt)).sort(() => Math.random() - 0.5).slice(0, 5);
+      let others = othersCards.flatMap(w => w.cardType === 'sinônimo' || w.cardType === 'antônimo' ? getValidAnswers(w) : [w.word]);
+      if (others.length < 6) {
+          others = [...others, ...fakeWordsRel]; 
+          if (others.length < 6) others = [...others, ...pool.map(w => w.word)];
+      }
+
+      let fakes = [...new Set(others)].filter(opt => !validsLimpos.map(norm).includes(norm(opt))).sort(() => Math.random() - 0.5).slice(0, 5);
       poolWords = [...blanks, ...fakes];
     } else {
-      text = isRel ? card.example : card.definition; 
+      text = card.contextPhrase || (isRel ? card.example : card.definition); 
       let matches = [...text.matchAll(/\*([^*]+)\*/g)];
       if (matches.length > 0) {
          matches.forEach(m => blanks.push(m[1].trim()));
@@ -2778,30 +2730,66 @@ function buildClozeMode(card) {
          text = newTextArr.join(' ');
       }
       
-      let others = W.filter(w => w.id !== card.id).map(w => w.word);
-      if (others.length < 8) others = [...others, "intrínseco", "efêmero", "pragmático", "eloquente", "inefável", "prolixo", "sagaz", "peculiar"];
+      let others = othersCards.map(w => w.word);
+      if (others.length < 8) {
+          others = [...others, ...fakeWordsNormal]; 
+          if (others.length < 8) others = [...others, ...pool.map(w => w.word)];
+      }
       
       const numFakes = Math.max(4, 7 - blanks.length); 
       const fakes = [...new Set(others)]
-        .filter(opt => !blanks.includes(clean(opt)) && clean(opt) !== clean(card.word))
+        .filter(opt => !blanks.map(norm).includes(norm(opt)) && norm(opt) !== norm(card.word))
         .sort(() => Math.random() - 0.5).slice(0, numFakes);
 
       poolWords = [...blanks, ...fakes];
-
-      if (isRel) {
-         const valids = getValidAnswers(card);
-         const extraSyns = valids.filter(v => !poolWords.includes(v));
-         poolWords = [...poolWords, ...extraSyns];
-      }
     }
+
+    sess.clozeValidAlternatives = {};
+    let extraValids = [];
     
-    sess.clozeText = text; sess.clozeAnswers = blanks; 
-    sess.clozePool = [...new Set(poolWords)].map((w,i)=>({id:i, word:clean(w)})).sort(() => Math.random() - 0.5);
+    blanks.forEach((b, i) => {
+        sess.clozeValidAlternatives[i] = [norm(b)]; 
+        
+        // 🚨 SE FOR SINÔNIMO/ANTÔNIMO: DELETA A PALAVRA ORIGINAL! 🚨
+        if (norm(b) === norm(card.word) && isRel) {
+            sess.clozeValidAlternatives[i] = []; // Esvazia! Só aceita o que vier da lista abaixo!
+            
+            validsLimpos.forEach(v => {
+                let vNorm = norm(v);
+                if (!sess.clozeValidAlternatives[i].includes(vNorm)) {
+                    sess.clozeValidAlternatives[i].push(vNorm);
+                    extraValids.push(v); // Guarda para criar o botão
+                }
+            });
+        }
+    });
+
+    poolWords = [...poolWords, ...extraValids];
+    
+    // 🚨 BANIMENTO VISUAL TOTAL DA PALAVRA ORIGINAL 🚨
+    if (isRel) {
+        poolWords = poolWords.filter(w => norm(w) !== norm(card.word));
+    }
+
+    sess.clozeText = text; 
+    sess.clozeAnswers = blanks; 
+    
+    // Limpa botões duplicados perfeitamente
+    let finalPool = [];
+    let seenNorms = new Set();
+    poolWords.forEach(w => {
+        let n = norm(w);
+        if(!seenNorms.has(n)) {
+            seenNorms.add(n);
+            finalPool.push(w);
+        }
+    });
+    
+    sess.clozePool = finalPool.map((w,i)=>({id:i, word: w.replace(/[.,!?;:"'()]/g, '').trim()})).sort(() => Math.random() - 0.5);
     sess.clozeUserAnswers = []; sess.clozeIsRelList = isRelList; sess.clozeSetup = true;
   }
   
   const answered = sess.clozeAnswered;
-  // ✨ A MÁGICA ACONTECE AQUI! O fundo muda assim que a carta aparece!
   if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
   let displayText = sess.clozeText, slotIndex = 0;
   
@@ -2820,14 +2808,27 @@ function buildClozeMode(card) {
     return `<button class="btn ghost sm" style="padding:6px 12px;font-size:14px;width:auto;border-color:var(--border2);text-transform:none;letter-spacing:normal" onclick="${answered?'':`clozeAdd(${item.id})`}">${esc(item.word)}</button>`;
   }).join('');
 
-  const promptTxt = sess.clozeIsRelList ? `Selecione ${sess.clozeAnswers.length} ${hl(card.cardType + 's')}:` : 'Preencha as lacunas na ordem:';
+  // ✨ TEXTO DINÂMICO
+  let promptTxt = 'Preencha as lacunas na ordem:';
+  if (sess.clozeIsRelList) {
+      promptTxt = `Selecione ${sess.clozeAnswers.length} ${hl(card.cardType + 's')}:`;
+  } else if (isRel) {
+      promptTxt = `Preencha com um ${hl(card.cardType)}:`; 
+  }
+  
+  let contextHtml = '';
+  if (card.contextHint && !sess.clozeIsRelList) {
+      contextHtml = `<div style="font-size:13px; color:var(--stone2); background:rgba(212, 175, 55, 0.1); border:1px dashed var(--gold); padding:8px; border-radius:6px; margin-bottom:12px;"><b>🎭 Situação:</b> ${card.contextHint}</div>`;
+      promptTxt = isRel ? `Complete a situação com um ${hl(card.cardType)}:` : 'Complete a frase para esta situação:';
+  }
 
   return `
     <div class="card" style="margin-bottom:12px">
       <div class="card-body" style="text-align:center">
         <div class="fc-type" style="margin-bottom:8px">${promptTxt}</div>
-        ${renderVisual(card)}
-        ${card.cardType !== 'citação' ? `<div class="fc-word" style="font-size:20px;margin-bottom:12px">${esc(card.word)}</div>` : ''}
+        ${contextHtml}
+        ${typeof renderVisual === 'function' ? renderVisual(card) : ''}
+        ${(card.cardType !== 'citação' && !card.contextHint) ? `<div class="fc-word" style="font-size:20px;margin-bottom:12px">${esc(card.word)}</div>` : ''}
         <div style="font-size:18px;line-height:1.6;color:var(--ink);font-style:italic;margin-bottom:16px;text-align:${sess.clozeIsRelList ? 'center' : 'left'};padding:10px;background:rgba(0,0,0,0.2);border-radius:var(--r)">
           ${sess.clozeIsRelList ? displayText : `"${displayText}"`}
         </div>
@@ -2847,9 +2848,9 @@ function buildClozeMode(card) {
       ${sess.clozeCorrect ? `✓ Excelente!` : `✗ Incorreto.`}
     </div>
     <div class="quote" style="margin-bottom:10px; border-color: ${sess.clozeCorrect ? 'var(--green)' : 'var(--red)'}">
-       ${esc(clean(card.definition))}
+       ${esc(card.definition || '')}
     </div>
-    ${getRatingRowHtml(sess.clozeCorrect, 'Correto ✓')}`}
+    ${typeof getRatingRowHtml === 'function' ? getRatingRowHtml(sess.clozeCorrect, 'Correto ✓') : ''}`}
   `;
 }
 
@@ -3148,6 +3149,7 @@ function skipType() {
   setTimeout(playAnswerAudio, 100); 
   render();
 }
+
 function checkContext() {
   const sess = studySession; if (!sess || sess.contextAnswered) return;
   const card = sess.queue[sess.current]; const inp = document.getElementById('ctxInput'); if (!inp) return;
@@ -3241,33 +3243,112 @@ function checkSyntax() {
 }
 
 function checkCloze() {
-  const sess = studySession; if (!sess || sess.clozeAnswered) return;
+  const sess = studySession; 
+  if (!sess || sess.clozeAnswered) return;
+  
   const card = sess.queue[sess.current];
   const userWords = sess.clozeUserAnswers.map(id => sess.clozePool.find(p=>p.id===id).word);
   const expectedWords = sess.clozeAnswers;
-  const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  
+  // O Normalizador Paranoico trabalha no Corretor também!
+  const norm = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[.,!?;:"'()]/g, '').toLowerCase().trim();
   
   if (sess.clozeIsRelList) {
-    const valids = getValidAnswers(card).map(normalizeTxt);
-    const userClean = userWords.map(normalizeTxt);
+    const valids = (typeof getValidAnswers === 'function' ? getValidAnswers(card) : []).map(norm);
+    const userClean = userWords.map(norm);
     sess.clozeCorrect = userClean.length === expectedWords.length && userClean.every(w => valids.includes(w));
   } else {
-    const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
     let allCorrect = true;
-    if (userWords.length !== expectedWords.length) allCorrect = false;
-    else {
-      const valids = isRel ? [...getValidAnswers(card), card.word].map(normalizeTxt) : [];
+    
+    if (userWords.length !== expectedWords.length) {
+      allCorrect = false;
+    } else {
       for (let i = 0; i < expectedWords.length; i++) {
-        const uW = normalizeTxt(userWords[i]); const eW = normalizeTxt(expectedWords[i]);
-        if (uW === eW || (isRel && valids.includes(eW) && valids.includes(uW))) continue;
-        allCorrect = false; break;
+        const uW = norm(userWords[i]); 
+        
+        // Puxa as regras que a tela de cima criou!
+        let validOptionsParaEstaLacuna = [];
+        if (sess.clozeValidAlternatives && sess.clozeValidAlternatives[i]) {
+            validOptionsParaEstaLacuna = sess.clozeValidAlternatives[i].map(norm);
+        } else {
+            validOptionsParaEstaLacuna = [norm(expectedWords[i])];
+        }
+        
+        // Compara com a lista validada (Onde "perspicaz" foi banido e "sagaz" é a única salvação!)
+        if (validOptionsParaEstaLacuna.includes(uW)) {
+            continue; 
+        }
+        
+        allCorrect = false; 
+        break;
       }
     }
     sess.clozeCorrect = allCorrect;
   }
+  
   sess.clozeAnswered = true; 
-  playSfx(sess.clozeCorrect ? 'ok' : 'fail');
-  setTimeout(playAnswerAudio, 100); render();
+  if (typeof playSfx === 'function') playSfx(sess.clozeCorrect ? 'ok' : 'fail');
+  if (typeof playAnswerAudio === 'function') setTimeout(playAnswerAudio, 100); 
+  if (typeof render === 'function') render();
+}
+
+function checkBlind() {
+  const sess = studySession; if (!sess || sess.blindAnswered) return;
+  const card = sess.queue[sess.current]; const inp = document.getElementById('blindInput'); if (!inp) return;
+  const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  
+  const ans = normalizeTxt(inp.value); 
+  const correctWord = normalizeTxt(card.word);
+  
+  sess.blindCorrect = ans === correctWord || levenshtein(ans, correctWord) <= 1;
+  sess.blindAnswered = true;
+  playSfx(sess.blindCorrect ? 'ok' : 'fail');
+  clearTimeout(sess.timerId); 
+  
+  render(); setTimeout(playAnswerAudio, 100);
+}
+
+function checkBoss() {
+  const sess = studySession; if (!sess || sess.bossAnswered) return;
+  const card = sess.queue[sess.current]; 
+  
+  const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  
+  // Função para checar se o que a pessoa digitou está dentro da lista (separada por vírgula)
+  const checkMatchInList = (ans, targetListString) => {
+      if (!ans || !targetListString) return false;
+      const validOptions = targetListString.split(',').map(s => normalizeTxt(s));
+      return validOptions.some(opt => opt === ans || levenshtein(ans, opt) <= 1);
+  };
+
+  // 1. Checa a Palavra Base
+  const ansWord = normalizeTxt(document.getElementById('bossWord')?.value);
+  const correctWord = normalizeTxt(card.word);
+  let isWordCorrect = (ansWord === correctWord || levenshtein(ansWord, correctWord) <= 1);
+
+  // 2. Checa o Sinônimo (se exigido)
+  let isSynCorrect = true; 
+  if (card.synonyms) {
+      const ansSyn = normalizeTxt(document.getElementById('bossSyn')?.value);
+      isSynCorrect = checkMatchInList(ansSyn, card.synonyms);
+  }
+
+  // 3. Checa o Antônimo (se exigido)
+  let isAntCorrect = true;
+  if (card.antonyms) {
+      const ansAnt = normalizeTxt(document.getElementById('bossAnt')?.value);
+      isAntCorrect = checkMatchInList(ansAnt, card.antonyms);
+  }
+
+  // A pessoa SÓ passa se acertar TUDO que foi exigido!
+  sess.bossCorrect = isWordCorrect && isSynCorrect && isAntCorrect;
+  sess.bossAnswered = true;
+  
+  playSfx(sess.bossCorrect ? 'ok' : 'fail');
+  clearTimeout(sess.timerId); // Para o relógio
+  
+  render(); 
+  setTimeout(playAnswerAudio, 100);
 }
 
 function imgChoiceAnswer(idx) {
@@ -5729,6 +5810,37 @@ function lerTelaCompleta(tempoDoRelogio) {
              falar(`Prova Final. A escuridão exige o seu conhecimento. Ouça o significado e fale ${textoExigencia}:`, langPergunta);
              falar(card.definition, langDef);
         }
+        // ✨ NOVO: MODO CONTEXTO / LACUNAS
+        else if (activeMode === 'cloze') {
+             let promptTxt = 'Preencha as lacunas na ordem:';
+             if (sess.clozeIsRelList) {
+                 promptTxt = `Selecione ${sess.clozeAnswers.length} ${card.cardType}s:`;
+             } else if (isRel) {
+                 promptTxt = `Preencha com um ${card.cardType}:`; 
+             }
+             
+             // Lê a Situação primeiro (se existir)
+             if (card.contextHint && !sess.clozeIsRelList) {
+                 falar(`Situação: ${card.contextHint}`, langPergunta);
+                 promptTxt = isRel ? `Complete a situação com um ${card.cardType}:` : 'Complete a frase para esta situação:';
+             }
+             
+             falar(promptTxt, langPergunta);
+             
+             // Troca visual dos traços por uma palavra falada "lacuna"
+            //  if (sess.clozeText) {
+            //      let textoLido = sess.clozeText.replace(/___/g, "lacuna").replace(/&nbsp;•&nbsp;/g, " e ");
+            //      falar(textoLido, langOpcoes);
+            //  }
+             
+             // Lê as opções dos botões para o jogador
+             if (sess.clozePool && sess.clozePool.length > 0) {
+                 falar("As opções são:", langPergunta);
+                 sess.clozePool.forEach((item) => {
+                     falar(item.word, langOpcoes); // Opções na língua de estudo
+                 });
+             }
+        }
         else {
              falar(card.word, langPalavra);// O Flashcard clássico continua lendo a palavra
         }
@@ -7114,24 +7226,56 @@ window.atualizarEstimativa = function() {
     }
 };
 
-// 🎮 FUNÇÕES DOS BOTÕES [+] e [-]
+// 🎮 FUNÇÕES DOS BOTÕES [+] e [-] COM SALVAMENTO INSTANTÂNEO
 window.changeFoco = function(tipo, val) {
     if (!configJogo.focoXP) configJogo.focoXP = 0;
     if (!configJogo.focoOuro) configJogo.focoOuro = 0;
 
     if (tipo === 'xp') {
         configJogo.focoXP = Math.max(0, Math.min(100, configJogo.focoXP + val));
-        configJogo.focoOuro = 0; // Zera o ouro se focar em XP
+        configJogo.focoOuro = 0; 
     } else {
         configJogo.focoOuro = Math.max(0, Math.min(100, configJogo.focoOuro + val));
-        configJogo.focoXP = 0; // Zera o XP se focar em ouro
+        configJogo.focoXP = 0; 
     }
     
+    // ✨ Salva no HD na hora!
+    localStorage.setItem('config_focoXP', configJogo.focoXP);
+    localStorage.setItem('config_focoOuro', configJogo.focoOuro);
+
     document.getElementById('focoXpVal').innerText = configJogo.focoXP + '%';
     document.getElementById('focoOuroVal').innerText = configJogo.focoOuro + '%';
     document.getElementById('descFocoXp').innerText = `+${configJogo.focoXP}% XP / -${configJogo.focoXP}% Ouro`;
     document.getElementById('descFocoOuro').innerText = `+${configJogo.focoOuro}% Ouro / -${configJogo.focoOuro}% XP`;
     atualizarEstimativa();
+};
+
+window.changePacto = function(val) {
+    if (!configJogo.sacrificioGacha) configJogo.sacrificioGacha = 0;
+    configJogo.sacrificioGacha = Math.max(0, Math.min(100, configJogo.sacrificioGacha + val));
+    
+    // ✨ Salva no HD na hora!
+    localStorage.setItem('config_sacrificioGacha', configJogo.sacrificioGacha);
+    
+    document.getElementById('pactoVal').innerText = configJogo.sacrificioGacha + '%';
+    atualizarEstimativa();
+};
+
+window.changeCritHack = function(val) {
+    if (!configJogo.criticoCustom) configJogo.criticoCustom = 0;
+    
+    // Calcula o novo valor (travando entre 0 e 100)
+    configJogo.criticoCustom = Math.max(0, Math.min(100, configJogo.criticoCustom + val));
+    
+    // ✨ A MÁGICA ACONTECE AQUI: Salva no HD na hora que você clica!
+    localStorage.setItem('config_criticoCustom', configJogo.criticoCustom);
+    
+    // Atualiza os textos na tela
+    document.getElementById('critHackValue').innerText = configJogo.criticoCustom + '%';
+    document.getElementById('critHackPen').innerText = configJogo.criticoCustom > 0 ? `Penalidade: -${configJogo.criticoCustom}% Ouro e XP` : 'Sem penalidade extra';
+    
+    // Recalcula a estimativa do topo
+    if (typeof atualizarEstimativa === 'function') atualizarEstimativa();
 };
 
 window.changePacto = function(val) {
@@ -7143,19 +7287,13 @@ window.changePacto = function(val) {
     atualizarEstimativa();
 };
 
-window.changeCritHack = function(val) {
-    if (!configJogo.criticoCustom) configJogo.criticoCustom = 0;
-    configJogo.criticoCustom = Math.max(0, Math.min(100, configJogo.criticoCustom + val));
-    
-    document.getElementById('critHackValue').innerText = configJogo.criticoCustom + '%';
-    document.getElementById('critHackPen').innerText = configJogo.criticoCustom > 0 ? `Penalidade: -${configJogo.criticoCustom}% Ouro e XP` : 'Sem penalidade extra';
-    atualizarEstimativa();
-};
 
 //modal para configuraçao dentro do jogo
 // Abre o modal e carrega os valores atuais
 // ✨ O MENU DE CONFIGURAÇÕES COM O MODO DEUS
 // ✨ O MENU DE CONFIGURAÇÕES (COM PAINEL AO VIVO)
+// ✨ O MENU DE CONFIGURAÇÕES (COM PAINEL AO VIVO E SALVAMENTO INSTANTÂNEO)
+// ✨ O MENU DE CONFIGURAÇÕES (BLINDADO CONTRA SELEÇÃO DE TEXTO)
 function abrirConfig() {
     let valorAtual = configJogo.timerMinInterval !== undefined ? configJogo.timerMinInterval : 0;
 
@@ -7179,29 +7317,33 @@ function abrirConfig() {
         <div style="margin: 15px 0; background: rgba(255,0,0,0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,0,0,0.3);">
             <p style="font-size:11px; color:var(--stone2); margin-top:0; margin-bottom:15px; line-height:1.4">Ativar estas opções facilita o jogo, mas aplica <b style="color:var(--red)">severas penalidades</b>.</p>
             
-            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
+            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer; user-select:none; -webkit-user-select:none;">
                 <div>✨ Dicas Infinitas <span style="font-size:10px; color:var(--red); display:block">-50% Ouro e XP</span></div>
-                <input type="checkbox" class="config-cb" ${configJogo.dicasInfinitas ? 'checked' : ''} onchange="configJogo.dicasInfinitas=this.checked; atualizarEstimativa()" style="transform:scale(1.3); accent-color:var(--gold)">
+                <!-- ✨ Adicionado id="dicasInfinitas" -->
+                <input type="checkbox" id="dicasInfinitas" class="config-cb" ${configJogo.dicasInfinitas ? 'checked' : ''} onchange="configJogo.dicasInfinitas=this.checked; localStorage.setItem('config_dicasInfinitas', this.checked); atualizarEstimativa()" style="transform:scale(1.3); accent-color:var(--gold)">
             </label>
             
-            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
+            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer; user-select:none; -webkit-user-select:none;">
                 <div>❤️ Vidas Infinitas <span style="font-size:10px; color:var(--red); display:block">-30% Ouro e XP</span></div>
-                <input type="checkbox" class="config-cb" ${configJogo.vidasInfinitas ? 'checked' : ''} onchange="configJogo.vidasInfinitas=this.checked; atualizarEstimativa()" style="transform:scale(1.3); accent-color:var(--red)">
+                <!-- ✨ Adicionado id="vidasInfinitas" -->
+                <input type="checkbox" id="vidasInfinitas" class="config-cb" ${configJogo.vidasInfinitas ? 'checked' : ''} onchange="configJogo.vidasInfinitas=this.checked; localStorage.setItem('config_vidasInfinitas', this.checked); atualizarEstimativa()" style="transform:scale(1.3); accent-color:var(--red)">
             </label>
             
-            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
+            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer; user-select:none; -webkit-user-select:none;">
                 <div>🛡️ Escudos Infinitos <span style="font-size:10px; color:var(--red); display:block">-20% Ouro e XP</span></div>
-                <input type="checkbox" class="config-cb" ${configJogo.escudosInfinitos ? 'checked' : ''} onchange="configJogo.escudosInfinitos=this.checked; atualizarEstimativa()" style="transform:scale(1.3); accent-color:var(--blue)">
+                <!-- ✨ Adicionado id="escudosInfinitos" -->
+                <input type="checkbox" id="escudosInfinitos" class="config-cb" ${configJogo.escudosInfinitos ? 'checked' : ''} onchange="configJogo.escudosInfinitos=this.checked; localStorage.setItem('config_escudosInfinitos', this.checked); atualizarEstimativa()" style="transform:scale(1.3); accent-color:var(--blue)">
             </label>
 
-            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
+            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer; user-select:none; -webkit-user-select:none;">
                 <div>⏭️ Saltos Infinitos <span style="font-size:10px; color:var(--red); display:block">-40% Ouro e XP</span></div>
-                <input type="checkbox" class="config-cb" ${configJogo.pularInfinito ? 'checked' : ''} onchange="configJogo.pularInfinito=this.checked; atualizarEstimativa()" style="transform:scale(1.3); accent-color:var(--green)">
+                <!-- ✨ Adicionado id="pularInfinito" -->
+                <input type="checkbox" id="pularInfinito" class="config-cb" ${configJogo.pularInfinito ? 'checked' : ''} onchange="configJogo.pularInfinito=this.checked; localStorage.setItem('config_pularInfinito', this.checked); atualizarEstimativa()" style="transform:scale(1.3); accent-color:var(--green)">
             </label>
 
-            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
+            <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer; user-select:none; -webkit-user-select:none;">
                 <div>🎲 Gacha Automático <span style="font-size:10px; color:var(--stone2); display:block">Pula os menus do Yin-Yang</span></div>
-                <input type="checkbox" id="autoGacha" class="config-cb" ${configJogo.autoGacha ? 'checked' : ''} onchange="configJogo.autoGacha=this.checked; localStorage.setItem('config_autoGacha', this.checked ? 'true' : 'false');" style="transform:scale(1.3); accent-color:#e024ff">
+                <input type="checkbox" id="autoGacha" class="config-cb" ${configJogo.autoGacha ? 'checked' : ''} onchange="configJogo.autoGacha=this.checked; localStorage.setItem('config_autoGacha', this.checked);" style="transform:scale(1.3); accent-color:#e024ff">
             </label>
 
             <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#fff;">
@@ -7209,7 +7351,7 @@ function abrirConfig() {
                     <div>🎲 Forçar Críticos</div>
                     <div id="critHackPen" style="font-size:10px; color:var(--red); margin-top:2px">${configJogo.criticoCustom > 0 ? `Penalidade: -${configJogo.criticoCustom}% Ouro e XP` : 'Sem penalidade'}</div>
                 </div>
-                <div style="display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:6px; border:1px solid var(--border2)">
+                <div style="display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:6px; border:1px solid var(--border2); user-select:none; -webkit-user-select:none;">
                     <button class="btn ghost sm" style="padding:2px 8px; border-color:var(--stone); color:white" onclick="changeCritHack(-10)">-</button>
                     <span id="critHackValue" style="font-weight:bold; color:#ff8c00; width:30px; text-align:center">${configJogo.criticoCustom || 0}%</span>
                     <button class="btn ghost sm" style="padding:2px 8px; border-color:var(--stone); color:white" onclick="changeCritHack(10)">+</button>
@@ -7220,7 +7362,7 @@ function abrirConfig() {
         <!-- ✨ SEÇÃO: ALQUIMIA E TRANSMUTAÇÃO ✨ -->
         <div style="font-weight:bold; margin-top:20px; margin-bottom:10px; color:var(--gold); text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(212, 175, 55, 0.3); padding-bottom:4px">⚖️ Alquimia: Foco e Transmutação</div>
         
-        <div style="margin: 15px 0; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border2);">
+        <div style="margin: 15px 0; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border2); user-select:none; -webkit-user-select:none;">
             
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff;">
                 <div>
@@ -7271,31 +7413,31 @@ function abrirConfig() {
             <button class="btn" style="background:rgba(212, 175, 55, 0.2); color:var(--gold); border:1px solid var(--gold); padding:10px; font-weight:bold; width: 100%;" onclick="realizarTransmutacao()">✨ Transmutar</button>
         </div>
         <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Ajuste as engrenagens e a dificuldade do seu treinamento.</p>
-    
-    <div style="height: 0vh; overflow-y: auto; padding-right:5px">
+        
         <!-- ✨ SEÇÃO: ACESSIBILIDADE E ÁUDIO -->
         <div style="font-weight:bold; margin-top:20px; margin-bottom:10px; color:var(--gold2); text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(212, 175, 55, 0.3); padding-bottom:4px">🎧 Acessibilidade & Áudio</div>
         
-        <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; border: 1px solid var(--border2);">
+        <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; border: 1px solid var(--border2); user-select:none; -webkit-user-select:none;">
             <div style="padding-right: 10px;">
                 <div style="font-size:14px; font-weight:bold; color:var(--gold)">🗣️ Leitor de Tela Completo</div>
                 <div style="font-size:10px; color:var(--stone2); margin-top:4px; line-height:1.4">Lê a pergunta e todas as opções em voz alta automaticamente. Perfeito para usar no trânsito ou academia.</div>
             </div>
-            <!-- Esse input já salva no localStorage assim que você clica! -->
             <input type="checkbox" id="leituraCompleta" class="config-cb" ${configJogo.leituraCompleta ? 'checked' : ''} onchange="configJogo.leituraCompleta = this.checked; localStorage.setItem('config_leituraCompleta', this.checked); toast(this.checked ? '🔊 Leitura Completa Ativada' : '🔇 Leitura Completa Desativada', 'gold')" style="transform:scale(1.3); accent-color:var(--gold)">
         </label>
+        
         <!-- SEÇÃO: PRESSÃO DE TEMPO -->
         <div style="font-weight:bold; margin-bottom:10px; color:#ffd700; text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(255, 215, 0, 0.3); padding-bottom:4px">⏱️ Pressão e Recompensas</div>
         
-        <div style="margin: 15px 0; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border2, #444);">
+        <div style="margin: 15px 0; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border2, #444); user-select:none; -webkit-user-select:none;">
             <label style="display:block; margin-bottom:8px; font-weight: bold; color: #fff; font-size: 14px;">
                 Ativar relógio a partir de qual intervalo? (Dias)
             </label>
-            <input type="number" id="inputTimerInterval" min="0" max="30" value="${valorAtual}" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border2, #555); background:var(--bg3, #1a1a1a); color:white; font-size: 16px;">
+            <input type="number" id="inputTimerInterval" min="0" max="30" value="${valorAtual}" onchange="configJogo.timerMinInterval = parseInt(this.value) || 0; localStorage.setItem('config_timerMinInterval', configJogo.timerMinInterval);" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border2, #555); background:var(--bg3, #1a1a1a); color:white; font-size: 16px;">
             <p style="color:var(--stone2, #aaa); margin-top:8px; font-size:11px; line-height: 1.4;">
                 Cartões com intervalo menor que este não terão a barra de tempo. Deixe <b>0</b> para pressão total em todas as cartas. 
             </p>
         </div>
+        
     </div>
     
     <div class="btn-row" style="margin-top:14px">
@@ -7304,7 +7446,6 @@ function abrirConfig() {
     
     openModal(html);
     
-    // Assim que a janela abre, ele já calcula e mostra os números!
     setTimeout(atualizarEstimativa, 100); 
 }
 
@@ -7346,35 +7487,6 @@ function realizarTransmutacao() {
 function fecharConfig() {
     document.getElementById('modalConfig').style.display = 'none';
 }
-
-// Salva as configurações e aplica no jogo
-function salvarConfig() {
-    // Pega o valor que você digitou no input
-    let novoIntervalo = parseInt(document.getElementById('inputTimerInterval').value);
-    
-    // Proteção: Se a pessoa digitar besteira, volta pro 0
-    if (isNaN(novoIntervalo) || novoIntervalo < 0) novoIntervalo = 0; 
-
-    // Atualiza a variável global!
-    configJogo.timerMinInterval = novoIntervalo;
-    
-    // (Futuro) Aqui você vai colocar um código para salvar isso no IndexedDB para não perder quando fechar a aba
-    configJogo.autoGacha = document.getElementById('autoGacha') ? document.getElementById('autoGacha').checked : false;
-    localStorage.setItem('config_autoGacha', configJogo.autoGacha);
-
-    toast('⚙️ Configurações aplicadas!', 'ok');
-    fecharConfig();
-}
-
-// Carrega o valor salvo no navegador assim que o jogo abre
-const savedCrit = localStorage.getItem('config_criticoCustom');
-if (savedCrit !== null) configJogo.criticoCustom = parseInt(savedCrit);
-
-const savedAutoGacha = localStorage.getItem('config_autoGacha');
-if (savedAutoGacha !== null) configJogo.autoGacha = (savedAutoGacha === 'true');
-
-const savedLeitura = localStorage.getItem('config_leituraCompleta');
-if (savedLeitura !== null) configJogo.leituraCompleta = savedLeitura === 'true';
 
 // ✨ FUNÇÃO QUE CONTROLA O + E O -
 function changeCritHack(amount) {
@@ -7767,18 +7879,6 @@ const uiObserver = new MutationObserver(() => {
   let needsListUpdate = false;
   let needsImportUpdate = false;
 
-  // ✨ LENDO A MEMÓRIA DOS HACKS
-  document.querySelectorAll('.config-cb').forEach(cb => {
-      if (!cb.dataset.loaded) {
-          const saved = localStorage.getItem('config_' + cb.id);
-          if (saved !== null) {
-              const isChecked = (saved === 'true');
-              cb.checked = isChecked;
-              configJogo[cb.id] = isChecked; // Carrega na memória global
-          }
-          cb.dataset.loaded = 'true';
-      }
-  });
   // --- 1. A SUA LÓGICA ORIGINAL (Selects e Checkboxes) ---
   document.querySelectorAll('select[id]').forEach(sel => {
     if (ignoreList.includes(sel.id)) return; 
