@@ -543,7 +543,19 @@ let configJogo = {
     criticoCustom: 0,
     autoGacha: false
 };
+// 🛡️ CARREGAMENTO SEGURO (Impede que o texto "false" ative a máquina)
+if (localStorage.getItem('config_autoGacha') === 'true') {
+    configJogo.autoGacha = true;
+} else {
+    configJogo.autoGacha = false;
+}
 
+if (localStorage.getItem('config_criticoCustom')) {
+    configJogo.criticoCustom = parseInt(localStorage.getItem('config_criticoCustom'));
+}
+if (localStorage.getItem('config_leituraCompleta') === 'true') {
+    configJogo.leituraCompleta = true;
+}
 // ✨ DETECTOR DE RARIDADE DAS CARTAS (Risco Zero)
 function getCardRarity(card) {
   if (card.isLeech) return { cls: 'rarity-ferro', txtCls: '', label: 'Sanguessuga' };
@@ -816,28 +828,27 @@ function playSfx(type) {
             }
         }
 
-// ⚖️ A BALANÇA DO MODO DEUS (Foco Proporcional 0 a 100%)
-        let focoXP = configJogo.focoXP || 0;
-        let focoOuro = configJogo.focoOuro || 0;
+        // ⚖️ A BALANÇA DO MODO DEUS (Matemática Blindada!)
+        let confFocoXP = (typeof configJogo !== 'undefined' && configJogo.focoXP) ? configJogo.focoXP : 0;
+        let confFocoOuro = (typeof configJogo !== 'undefined' && configJogo.focoOuro) ? configJogo.focoOuro : 0;
+        let confGacha = (typeof configJogo !== 'undefined' && configJogo.sacrificioGacha) ? configJogo.sacrificioGacha : 0;
 
-        if (focoXP > 0) {
-            let inc = 1 + (focoXP / 100); // Ex: 100% vira 2x
-            let dec = 1 - (focoXP / 100); // Ex: 100% vira 0x
+        if (confFocoXP > 0) {
+            let inc = 1 + (confFocoXP / 100); 
+            let dec = 1 - (confFocoXP / 100); 
             ganhoXP = Math.floor(ganhoXP * inc);
             ganhoMoedas = Math.floor(ganhoMoedas * dec);
-            if (focoXP >= 50 && (isCrit || type === 'ok')) setTimeout(() => toast(`✨ Foco em XP ativo!`, '#00e5ff'), 800);
-        } else if (focoOuro > 0) {
-            let inc = 1 + (focoOuro / 100); 
-            let dec = 1 - (focoOuro / 100); 
+            if (confFocoXP >= 50 && (isCrit || type === 'ok')) setTimeout(() => toast(`✨ Foco em XP ativo!`, '#00e5ff'), 800);
+        } else if (confFocoOuro > 0) {
+            let inc = 1 + (confFocoOuro / 100); 
+            let dec = 1 - (confFocoOuro / 100); 
             ganhoMoedas = Math.floor(ganhoMoedas * inc);
             ganhoXP = Math.floor(ganhoXP * dec);
-            if (focoOuro >= 50 && (isCrit || type === 'ok')) setTimeout(() => toast(`🪙 Foco em Ouro ativo!`, '#ff8c00'), 800);
+            if (confFocoOuro >= 50 && (isCrit || type === 'ok')) setTimeout(() => toast(`🪙 Foco em Ouro ativo!`, '#ff8c00'), 800);
         }
 
-        // 🎲 PACTO DO GACHA (Corta os ganhos para alimentar a Sorte da Roleta)
-        let pactoAtual = configJogo.sacrificioGacha || 0;
-        if (pactoAtual > 0) {
-            let reducaoGacha = 1 - (pactoAtual / 100);
+        if (confGacha > 0) {
+            let reducaoGacha = 1 - (confGacha / 100);
             ganhoMoedas = Math.floor(ganhoMoedas * reducaoGacha);
             ganhoXP = Math.floor(ganhoXP * reducaoGacha);
         }
@@ -1419,26 +1430,31 @@ function updateHeader() {
   if (typeof checkQuestNotifications === 'function') checkQuestNotifications();
 }
 
-  // ✨ O FISCAL DE LEVEL UP (Imune a fraudes!)
+// ✨ O FISCAL DA EVOLUÇÃO BLINDADO (Anti-farm e Multi-variável)
 function checkLevelUp(rank) {
+   if (!rank) return; 
+   
+   // Identifica se o seu título usa ".level" ou ".prestige"
+   let nivelAtual = rank.level !== undefined ? rank.level : (rank.prestige !== undefined ? rank.prestige : 0);
+
    if (STATS.highestLevelEver === undefined) {
-       STATS.highestLevelEver = rank.level;
+       STATS.highestLevelEver = nivelAtual;
        return; 
    }
    
-   // Só ganha a vida e bate palma se NÃO estiver travado pelo Prestígio
-   if (rank.level > STATS.highestLevelEver && !rank.isMaxed) {
-       STATS.highestLevelEver = rank.level; 
+   // 🛑 ANTI-FARM: Só ganha a vida se superar o MAIOR nível histórico!
+   if (nivelAtual > STATS.highestLevelEver && !rank.isMaxed) {
+       STATS.highestLevelEver = nivelAtual; 
        
        if (STATS.vidas === undefined) STATS.vidas = 3;
-       STATS.vidas++; 
-       if (typeof saveStats === 'function') saveStats();
+       STATS.vidas += 3; // ✨ O prêmio de 3 corações!
        
+       if (typeof saveStats === 'function') saveStats();
        if (typeof shootConfetti === 'function') shootConfetti();
        
        setTimeout(() => {
-           playLevelUpSfx();
-           showFloatingText(`👑 LEVEL UP! +1 ❤️`, rank.color);
+           if (typeof playLevelUpSfx === 'function') playLevelUpSfx();
+           if (typeof showFloatingText === 'function') showFloatingText(`👑 TÍTULO NOVO! +3 ❤️`, rank.color);
            
            const vidasEl = document.getElementById('hVidas');
            if (vidasEl) vidasEl.textContent = STATS.vidas + '❤️';
@@ -6942,80 +6958,116 @@ function playGacha() {
 
 // 📊 FUNÇÃO MÁGICA: Calcula e atualiza a previsão de ganhos na tela de Configuração
 // 📊 FUNÇÃO MÁGICA ESPELHO: Calcula exatamente o que a playSfx vai dar!
+// 📊 FUNÇÃO MÁGICA ESPELHO: Lê a partida ao vivo e calcula a precisão absoluta!
+// 📊 FUNÇÃO MÁGICA ESPELHO: Lê a partida ao vivo e calcula a precisão absoluta!
 window.atualizarEstimativa = function() {
-    // 1. A Base Real (Assumindo um acerto normal no Modo Smart/Revisão Pendente)
-    let baseMoedas = 3; 
-    let baseXP = 15; 
+    // 1. Descobre em qual modo o jogador está AGORA
+    let isFreeMode = false;
+    let isFlashcard = false;
+    let isModoSmart = true;
+    let timerAtivo = (typeof enableTimer !== 'undefined') ? enableTimer : true;
 
-    // O Modo Smart dobra a base nativamente!
-    baseMoedas *= 2; // Vira 6
-    baseXP *= 2;     // Vira 30
+    // Se o jogo estiver rodando, pega as variáveis reais da partida!
+    if (typeof studySession !== 'undefined' && studySession) {
+        isFreeMode = studySession.isFreeMode;
+        let activeModoJogo = studySession.currentAdaptiveMode || (typeof studyMode !== 'undefined' ? studyMode : '');
+        isFlashcard = (activeModoJogo === 'flash');
+        isModoSmart = (typeof studyMode !== 'undefined' && studyMode === 'adaptive' && !isFreeMode);
+    } else if (typeof studyMode !== 'undefined') {
+        // Tenta adivinhar caso a tela de config seja aberta no menu inicial
+        isFreeMode = (studyMode === 'free');
+        isModoSmart = (studyMode === 'adaptive');
+    }
+
+    // 2. Recompensas Base Iniciais
+    let baseMoedas = isFreeMode ? 1 : 3; 
+    let baseXP = isFreeMode ? 5 : 15; 
+
+    // Penalidade se o relógio estiver desligado globalmente
+    if (!timerAtivo) {
+        baseMoedas = isFreeMode ? 0 : 1; 
+        baseXP = isFreeMode ? 2 : 5;     
+    } else {
+        // ✨ NOVO: Adiciona a "Média" de velocidade do jogador! (Simula um acerto razoável de 1.5x)
+        baseMoedas = Math.floor(baseMoedas * 1.5);
+        baseXP = Math.floor(baseXP * 1.5);
+    }
+
+    // 3. O Grande Incentivo do Modo Smart e Punição do Flashcard
+    if (isModoSmart) {
+        if (isFlashcard) {
+            baseMoedas = 2;
+            baseXP = 10;
+        } else {
+            baseMoedas *= 2;
+            baseXP *= 2;
+        }
+    } else if (isFlashcard) {
+        // Flashcard no treino livre dá ZERO base!
+        baseMoedas = 0;
+        baseXP = 0;
+    }
 
     let ganhoMoedas = baseMoedas;
     let ganhoXP = baseXP;
 
-    // A partir daqui, simulamos a carteira do STATS
+    // 4. A partir daqui, simulamos a carteira do STATS
     if (typeof STATS !== 'undefined') {
         
-        // 2. Eventos Live-Ops (Multiplicam a base)
+        // Eventos Live-Ops
         if (STATS.activeEvent && STATS.activeEvent.id === 'coins_double') ganhoMoedas *= 2;
         if (STATS.activeEvent && STATS.activeEvent.id === 'coins_triple') ganhoMoedas *= 3;
         if (STATS.activeEvent && STATS.activeEvent.id === 'xp_double') ganhoXP *= 2;
         if (STATS.activeEvent && STATS.activeEvent.id === 'xp_triple') ganhoXP *= 3;
 
-        // 3. Inventário / Itens de Consumo
+        // Inventário / Néctar e Água
         if (STATS.inventory && STATS.inventory.doubleCoins > 0) ganhoMoedas *= 2;
         if (STATS.inventory && STATS.inventory.doubleXp > 0) ganhoXP *= 2;
 
-        // 4. Bônus dos Mascotes Equipados
+        // Bônus dos Mascotes Equipados
         if (STATS.pets && STATS.pets.active) {
             let petAtivo = STATS.pets.active;
             const hasFreeFood = STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_fed';
-            const isFed = (STATS.pets.fedCharges > 0 || hasFreeFood); // Assumindo Modo Smart (não free)
+            
+            // Mascotes não comem e não dão poder total no Treino Livre!
+            const isFed = (STATS.pets.fedCharges > 0 || hasFreeFood) && !isFreeMode; 
             
             let petLevel = 1;
             if (typeof getPetCappedLevel === 'function') petLevel = getPetCappedLevel(petAtivo);
 
             if (petAtivo === 'coruja') { 
                 ganhoXP += isFed ? (10 + ((petLevel - 1) * 2)) : (2 + Math.floor((petLevel - 1) * 0.5)); 
-            } 
-            else if (petAtivo === 'fenix') { 
+            } else if (petAtivo === 'fenix') { 
                 ganhoMoedas += isFed ? (4 + (petLevel - 1)) : (1 + Math.floor((petLevel - 1) * 0.2)); 
-            }
-            else if (petAtivo === 'tartaruga') { 
+            } else if (petAtivo === 'tartaruga') { 
                 ganhoXP += isFed ? (4 + (petLevel - 1)) : (1 + Math.floor((petLevel - 1) * 0.2)); 
-            }
-            else if (petAtivo === 'formiga') { 
+            } else if (petAtivo === 'formiga') { 
                 ganhoMoedas += isFed ? (2 + Math.floor((petLevel - 1) * 0.5)) : 0; 
-            }
-            else if (petAtivo === 'aguia') { 
-                ganhoMoedas += isFed ? 3 : 1;
-                ganhoXP += isFed ? 10 : 3;
-            }
-            else if (petAtivo === 'dragao') { 
+            } else if (petAtivo === 'aguia') { 
+                ganhoMoedas += isFed ? 3 : 1; ganhoXP += isFed ? 10 : 3;
+            } else if (petAtivo === 'dragao') { 
                 ganhoMoedas += isFed ? (10 + ((petLevel - 1) * 2)) : (3 + Math.floor((petLevel - 1) * 0.5));
                 ganhoXP += isFed ? (30 + ((petLevel - 1) * 5)) : (5 + (petLevel - 1));
-            }
-            else if (petAtivo === 'raposa') { 
-                ganhoMoedas += isFed ? 2 : 0;
-                ganhoXP += isFed ? 5 : 2;
-            }
-            else if (petAtivo === 'grifo') { 
-                ganhoMoedas += isFed ? (5 + (petLevel - 1)) : 2;
-                ganhoXP += isFed ? (15 + ((petLevel - 1) * 2)) : 5;
+            } else if (petAtivo === 'raposa') { 
+                ganhoMoedas += isFed ? 2 : 0; ganhoXP += isFed ? 5 : 2;
+            } else if (petAtivo === 'grifo') { 
+                ganhoMoedas += isFed ? (5 + (petLevel - 1)) : 2; ganhoXP += isFed ? (15 + ((petLevel - 1) * 2)) : 5;
             }
         }
     }
 
     // 👹 5. Punições dos Hacks
     let multiplicadorPunicao = 1.0;
-    if (configJogo.dicasInfinitas) multiplicadorPunicao -= 0.50;
-    if (configJogo.pularInfinito) multiplicadorPunicao -= 0.40; 
-    if (configJogo.vidasInfinitas) multiplicadorPunicao -= 0.30; 
-    if (configJogo.escudosInfinitos) multiplicadorPunicao -= 0.20; 
-    
-    if (configJogo.criticoCustom > 0) {
-        multiplicadorPunicao -= (configJogo.criticoCustom / 100);
+    let confFocoXP = (typeof configJogo !== 'undefined' && configJogo.focoXP) ? configJogo.focoXP : 0;
+    let confFocoOuro = (typeof configJogo !== 'undefined' && configJogo.focoOuro) ? configJogo.focoOuro : 0;
+    let confGacha = (typeof configJogo !== 'undefined' && configJogo.sacrificioGacha) ? configJogo.sacrificioGacha : 0;
+
+    if (typeof configJogo !== 'undefined') {
+        if (configJogo.dicasInfinitas) multiplicadorPunicao -= 0.50;
+        if (configJogo.pularInfinito) multiplicadorPunicao -= 0.40; 
+        if (configJogo.vidasInfinitas) multiplicadorPunicao -= 0.30; 
+        if (configJogo.escudosInfinitos) multiplicadorPunicao -= 0.20; 
+        if (configJogo.criticoCustom > 0) multiplicadorPunicao -= (configJogo.criticoCustom / 100);
     }
     
     if (multiplicadorPunicao < 0.1) multiplicadorPunicao = 0.1;
@@ -7025,26 +7077,18 @@ window.atualizarEstimativa = function() {
         ganhoXP = Math.floor(ganhoXP * multiplicadorPunicao);
     }
 
-    // ⚖️ 6. A Balança do Modo Deus (Foco Proporcional 0 a 100%)
-    let focoXP = configJogo.focoXP || 0;
-    let focoOuro = configJogo.focoOuro || 0;
-
-    if (focoXP > 0) {
-        let inc = 1 + (focoXP / 100); 
-        let dec = 1 - (focoXP / 100); 
-        ganhoXP = Math.floor(ganhoXP * inc);
-        ganhoMoedas = Math.floor(ganhoMoedas * dec);
-    } else if (focoOuro > 0) {
-        let inc = 1 + (focoOuro / 100); 
-        let dec = 1 - (focoOuro / 100); 
-        ganhoMoedas = Math.floor(ganhoMoedas * inc);
-        ganhoXP = Math.floor(ganhoXP * dec);
+    // ⚖️ 6. A Balança do Modo Deus
+    if (confFocoXP > 0) {
+        ganhoXP = Math.floor(ganhoXP * (1 + (confFocoXP / 100)));
+        ganhoMoedas = Math.floor(ganhoMoedas * (1 - (confFocoXP / 100)));
+    } else if (confFocoOuro > 0) {
+        ganhoMoedas = Math.floor(ganhoMoedas * (1 + (confFocoOuro / 100)));
+        ganhoXP = Math.floor(ganhoXP * (1 - (confFocoOuro / 100)));
     }
 
     // 🎲 7. Pacto do Gacha
-    let pactoAtual = configJogo.sacrificioGacha || 0;
-    if (pactoAtual > 0) {
-        let reducaoGacha = 1 - (pactoAtual / 100);
+    if (confGacha > 0) {
+        let reducaoGacha = 1 - (confGacha / 100);
         ganhoMoedas = Math.floor(ganhoMoedas * reducaoGacha);
         ganhoXP = Math.floor(ganhoXP * reducaoGacha);
     }
@@ -7054,6 +7098,20 @@ window.atualizarEstimativa = function() {
     let elX = document.getElementById('estXP');
     if(elM) elM.innerText = ganhoMoedas + ' 🪙';
     if(elX) elX.innerText = ganhoXP + ' ✨';
+
+    // 9. ✨ O CONSERTO DO NOME: Lê exatamente onde o jogador está!
+    let elModo = document.getElementById('estModoNome');
+    if(elModo) {
+        let nomeModo = '';
+        if (typeof studySession !== 'undefined' && studySession) {
+            nomeModo = isModoSmart ? (isFlashcard ? 'Modo Smart (Flashcard)' : 'Modo Smart (Questão)') : (isFlashcard ? 'Treino Livre (Flashcard)' : 'Treino Livre (Questão)');
+        } else {
+            nomeModo = isModoSmart ? 'Modo Smart (Pré-Jogo)' : 'Modo Livre (Pré-Jogo)';
+        }
+        
+        let notaTempo = timerAtivo ? ' ⚡' : ''; // Avisa se o bônus de relógio está sendo calculado
+        elModo.innerText = '📊 Estimativa: ' + nomeModo + notaTempo;
+    }
 };
 
 // 🎮 FUNÇÕES DOS BOTÕES [+] e [-]
@@ -7106,8 +7164,8 @@ function abrirConfig() {
     
     <!-- 📊 O PAINEL DE ESTIMATIVA FIXO NO TOPO -->
     <div style="background:rgba(212, 175, 55, 0.1); border:1px dashed var(--gold); border-radius:8px; padding:12px; margin-bottom:15px; text-align:center;">
-        <div style="font-size:11px; color:var(--stone2); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px">📊 Estimativa por Acerto Normal</div>
-        <div style="font-size:22px; font-weight:bold;">
+      <div id="estModoNome" style="font-size:11px; color:var(--stone2); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px">📊 Estimativa: Calculando...</div>
+      <div style="font-size:22px; font-weight:bold;">
             <span id="estMoedas" style="color:var(--gold)">0 🪙</span> <span style="color:var(--stone); margin: 0 10px;">|</span> <span id="estXP" style="color:#00e5ff">0 ✨</span>
         </div>
         <div style="font-size:10px; color:var(--stone2); margin-top:4px">Calculado com base nos seus Mascotes e Hacks ativos.</div>
@@ -7143,7 +7201,7 @@ function abrirConfig() {
 
             <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:13px; color:#fff; cursor:pointer">
                 <div>🎲 Gacha Automático <span style="font-size:10px; color:var(--stone2); display:block">Pula os menus do Yin-Yang</span></div>
-                <input type="checkbox" class="config-cb" ${configJogo.autoGacha ? 'checked' : ''} onchange="configJogo.autoGacha=this.checked;" style="transform:scale(1.3); accent-color:#e024ff">
+                <input type="checkbox" id="autoGacha" class="config-cb" ${configJogo.autoGacha ? 'checked' : ''} onchange="configJogo.autoGacha=this.checked; localStorage.setItem('config_autoGacha', this.checked ? 'true' : 'false');" style="transform:scale(1.3); accent-color:#e024ff">
             </label>
 
             <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#fff;">
@@ -7214,7 +7272,7 @@ function abrirConfig() {
         </div>
         <p style="font-size:12px; color:var(--stone2); margin-bottom:15px">Ajuste as engrenagens e a dificuldade do seu treinamento.</p>
     
-    <div style="height: 60vh; overflow-y: auto; padding-right:5px">
+    <div style="height: 0vh; overflow-y: auto; padding-right:5px">
         <!-- ✨ SEÇÃO: ACESSIBILIDADE E ÁUDIO -->
         <div style="font-weight:bold; margin-top:20px; margin-bottom:10px; color:var(--gold2); text-transform:uppercase; font-size:12px; border-bottom:1px solid rgba(212, 175, 55, 0.3); padding-bottom:4px">🎧 Acessibilidade & Áudio</div>
         
