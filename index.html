@@ -1612,7 +1612,7 @@ function buildStudyTab() {
     <style>@keyframes shine { 100% { left: 200%; } }</style>`;
   }
   
-  if (W.length > 0) {
+  
     html += `
     <div class="card" style="border-color:var(--blue); cursor:pointer; background:rgba(41, 128, 185, 0.05); margin-top: 10px" onclick="openBackupModal()">
        <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding: 12px 16px">
@@ -1626,7 +1626,7 @@ function buildStudyTab() {
           <div style="color:var(--blue); font-weight:bold; font-size:18px">⇄</div>
        </div>
     </div>`;
-  }
+  
   
   const quotes = [
     '"Nada é mais fácil do que enganar a si mesmo." — Demóstenes',
@@ -4100,6 +4100,7 @@ async function importWords() {
   document.getElementById('importTA').value = '';
   render(); 
 }
+
 function previewImport() {
   const raw = document.getElementById('importTA')?.value || '';
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
@@ -6025,12 +6026,20 @@ function openBackupModal() {
       </div>
     </div>
 
-    <div class="card" style="border-color:var(--green); margin-bottom:0">
+    <div class="card" style="border-color:var(--green); margin-bottom:10px">
       <div class="card-body">
          <div style="font-weight:bold; color:var(--green)">📥 Continuar Progresso (Importar)</div>
          <div style="font-size:11px; margin-bottom:12px; color:var(--stone2)">Carrega um arquivo anterior para continuar sua jornada de onde parou.</div>
          <input type="file" id="backupInput" style="display:none" accept=".json" onchange="importBackup(event)">
          <button class="btn success" style="width:100%; background:var(--green); color:white" onclick="document.getElementById('backupInput').click()">Carregar Arquivo</button>
+      </div>
+    </div>
+    
+    <div class="card" style="border-color:var(--red); margin-bottom:0">
+      <div class="card-body">
+         <div style="font-weight:bold; color:var(--red)">🗑️ Zerar o Console (Apagar Tudo)</div>
+         <div style="font-size:11px; margin-bottom:12px; color:var(--stone2)">Apaga as palavras, o XP, o Ouro e os Pets do aplicativo. Use isso para "limpar a máquina" antes de carregar um perfil diferente.</div>
+         <button class="btn" style="width:100%; background:var(--red); color:white; border:none" onclick="factoryReset()">⚠️ APAGAR ABSOLUTAMENTE TUDO</button>
       </div>
     </div>
     
@@ -7829,7 +7838,47 @@ function runBulkAction(itemId, actionStr) {
 
     openStoreModal(); 
 }
+async function factoryReset() {
+    // 🛡️ Travas de Segurança
+    if (!confirm("⚠️ ATENÇÃO EXTREMA: Isso vai apagar TODAS as palavras, Moedas, Pets e Nível do aplicativo! Tem certeza?")) return;
+    if (!confirm("Último aviso! Você já fez o backup (Exportar) desse perfil para não perder?")) return;
 
+    try {
+        const db = await openDB();
+        
+        // Entra no banco de dados com poder de edição
+        const tx = db.transaction([STORE_APP, STORE_WORDS], 'readwrite');
+        
+        // 💣 Joga a bomba atômica nas gavetas do IndexedDB
+        tx.objectStore(STORE_APP).clear();
+        tx.objectStore(STORE_WORDS).clear();
+        
+        tx.oncomplete = () => {
+            // Limpa as variáveis da memória
+            W = [];
+            STATS = {};
+            
+            // Limpa o LocalStorage (onde ficam configurações como tema escuro, etc)
+            localStorage.clear(); 
+            
+            if (typeof toast === 'function') toast("Tudo apagado! Reiniciando...", "err");
+            
+            // Dá o F5 automático na página após 1 segundo para começar do zero
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        };
+        
+        tx.onerror = () => {
+            console.error("Erro ao apagar banco:", tx.error);
+            if (typeof toast === 'function') toast("Erro ao apagar o banco de dados.", "err");
+        };
+
+    } catch (e) { 
+        console.error("Falha no Reset:", e); 
+        alert("Erro ao formatar. Limpe o histórico do navegador manualmente.");
+    }
+}
 /* ═══════════════════════════════════════
    🧠 MOTOR DE MEMÓRIA DE INTERFACE E GAVETAS (INTELIGENTE)
 ═══════════════════════════════════════ */
