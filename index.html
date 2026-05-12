@@ -3643,7 +3643,11 @@ function buildAddTab() {
   const defaultCats = ['geral','retórica','filosofia','literatura','erudição','dialética','jurídico','política','ciência','cotidiano'];
   const existingCats = W.map(x => x.category).filter(Boolean);
   const cats = [...new Set([...defaultCats, ...existingCats])].sort();
-  
+  const catCounts = {};
+
+W.forEach(w => {
+  catCounts[w.category] = (catCounts[w.category] || 0) + 1;
+});
   return `
   <h3 onclick="toggleSection('sec-manual')" style="cursor:pointer;padding: 5px;border-radius: 10px; border: solid 2px #302e29;background: #1c1a16; display:flex; justify-content: space-between; align-items:center; user-select:none;">
         <span>✦ Nova Palavra (Manual)</span>
@@ -3680,21 +3684,23 @@ function buildAddTab() {
           
           <div style="margin-bottom:8px">
             <span style="color:var(--stone2);font-size:12px;line-height:1.4;display:block">
-            <b>2. Geração Automática:</b> O Demóstenes lê as colunas e <b>cria as mecânicas sozinho</b>! Se você preencher sinônimos ou antônimos, ele criará as cartas normais e também as cartas secundárias dos jogos. Para pular um dado, basta deixar vazio. Ex: <i>quente | muito calor | | | frio, gelado | clima</i>
+            <b>2. Geração Automática:</b> O Demóstenes lê as colunas e <b>cria as mecânicas sozinho !</b><br>
+            <span>Se você preencher sinônimos ou antônimos, ele criará as cartas normais e também as cartas secundárias dos jogos. Para pular um dado, basta deixar vazio. Ex: <i>quente | muito calor | | | frio, gelado | clima</i>
             </span>
           </div>
 
           <div>
             <span style="color:var(--stone2);font-size:12px;line-height:1.4;display:block">
             <b>3. Tags de Sotaque Específico (~):</b> Os selects abaixo definem o idioma "padrão" da importação. Porém, se você quiser forçar um sotaque diferente em um campo específico, use as tags (<code>~en</code>, <code>~es</code>, <code>~pt</code>, <code>~fr</code>).<br>
-            <i>Ex: ~en Reckless | ~pt Agir sem pensar | ~en He is reckless | ~en careless | ~en careful | inglês</i>
+            <i>Ex: ~en Reckless | ~pt Agir sem pensar | ~en He is reckless | ~en careless | ~en careful | inglês | emoji</i>
             </span>
           </div>
         </div>
         
         <div class="form-group">
-          <textarea class="ta" id="importTA" rows="8" placeholder="abnegar | renunciar por *altruísmo* | Ele decidiu abnegar seus privilégios | abdicar, ceder | aceitar, abraçar | retórica
-eloquência | arte de falar bem | | fluência, oratória | | comunicação | 🗣️" style="border-color:var(--gold2)"></textarea>
+          <textarea class="ta" id="importTA" rows="8" placeholder="abnegar | renunciar por *altruísmo* | Ele decidiu abnegar seus privilégios | abdicar, ceder | aceitar, abraçar | retórica | 🫥
+          
+eloquência | arte de falar bem | | fluência, oratória | | comunicação | Icone 🗣️ envolva a palavra com * * ela será a lacuna no modo de jogo lacunas" style="border-color:var(--gold2)"></textarea>
         </div>
         
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
@@ -3735,10 +3741,14 @@ eloquência | arte de falar bem | | fluência, oratória | | comunicação | �
         <div class="btn-row">
           <div class="form-group" style="margin-bottom:10px; width:100%">
             <label class="lbl">Export Específico?</label>
-            <select class="inp" id="exportFilter">
-              <option value="">Todo o Léxico</option>
-              ${cats.map(c => `<option value="${esc(c)}">Categoria: ${esc(c)}</option>`).join('')}
-            </select>
+<select class="inp" id="exportFilter">
+  <option value="">Todo o Léxico (${W.length})</option>
+  ${cats.map(c => `
+    <option value="${esc(c)}">
+      Categoria: ${esc(c)} (${catCounts[c]})
+    </option>
+  `).join('')}
+</select>
           </div>
         </div>
         <div class="btn-row">
@@ -4124,11 +4134,24 @@ function exportJSON() {
   
   if (filter) {
      toExport = W.filter(w => w.category === filter);
-     if(toExport.length === 0) { toast('Nenhum card nesta categoria!', 'err'); return; }
+
+     if (toExport.length === 0) {
+        toast('Nenhum card nesta categoria!', 'err');
+        return;
+     }
   }
   
-  const data = JSON.stringify({words: toExport, stats: filter ? {} : STATS, exportedAt: new Date().toISOString()}, null, 2);
-  download(`demostenes_${filter ? filter : 'backup'}.json`, data, 'application/json');
+  const data = JSON.stringify({
+    words: toExport,
+    exportedAt: new Date().toISOString()
+  }, null, 2);
+
+  download(
+    `demostenes_${filter ? filter : 'backup'}.json`,
+    data,
+    'application/json'
+  );
+
   toast(`Exportado ${toExport.length} cards!`, 'ok');
 }
 
