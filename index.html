@@ -1425,7 +1425,7 @@ function updateHeader() {
   if (subtitleEl) {
       // Se estiver travado, faz o botão piscar e ficar vermelho!
       const xpStyle = rank.isMaxed ? 'color:#ff2424; text-shadow:0 0 8px rgba(255,0,0,0.8); animation: pulse 1.5s infinite;' : 'color:var(--stone2);';
-      const xpText = rank.isMaxed ? '⚡ LIMITE! CLIQUE PARA ASCENDER' : `XP: ${rank.currentXP.toLocaleString()} / ${rank.nextXP.toLocaleString()} ✨`;
+      const xpText = rank.isMaxed ? '⚡ASCENDER' : `XP: ${rank.currentXP.toLocaleString()} / ${rank.nextXP.toLocaleString()} ✨`;
 
       subtitleEl.innerHTML = `
          <div onclick="openPlayerAscensionModal()" style="cursor:pointer; transition: transform 0.2s" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
