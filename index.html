@@ -1386,8 +1386,12 @@ function setTab(t) {
 }
 
 function render() {
+  // 🧹 Cancela vozes fantasmas ANTES de desenhar a tela nova!
+  window.speechSynthesis.cancel(); 
+  
   updateHeader();
   const body = document.getElementById('body');
+  
   if (currentTab === 'study') body.innerHTML = buildStudyTab();
   else if (currentTab === 'words') body.innerHTML = buildWordsTab();
   else if (currentTab === 'add') {
@@ -1396,8 +1400,8 @@ function render() {
     setTimeout(() => { handleTypeChange(); }, 50); 
   }
   else if (currentTab === 'stats') body.innerHTML = buildStatsTab();
+  
   attachListeners();
-  window.speechSynthesis.cancel();
 }
 // ✨ O CABEÇALHO DO JOGO (COM A BOLINHA CLICÁVEL)
 function updateHeader() {
@@ -1456,7 +1460,6 @@ function updateHeader() {
 function checkLevelUp(rank) {
    if (!rank) return; 
    
-   // Identifica se o seu título usa ".level" ou ".prestige"
    let nivelAtual = rank.level !== undefined ? rank.level : (rank.prestige !== undefined ? rank.prestige : 0);
 
    if (STATS.highestLevelEver === undefined) {
@@ -1464,22 +1467,31 @@ function checkLevelUp(rank) {
        return; 
    }
    
-   // 🛑 ANTI-FARM: Só ganha a vida se superar o MAIOR nível histórico!
    if (nivelAtual > STATS.highestLevelEver && !rank.isMaxed) {
        STATS.highestLevelEver = nivelAtual; 
        
        if (STATS.vidas === undefined) STATS.vidas = 3;
-       STATS.vidas += 3; // ✨ O prêmio de 3 corações!
+       if (STATS.moedas === undefined) STATS.moedas = 0;
+
+       // ✅ FÓRMULA: (100 + nível * 50) * prestígio
+       // P1 título 0 = 100 moedas | P1 título 49 = 2.550 | P2 título 0 = 200 | e assim infinitamente
+       const prestige = rank.prestige || 1;
+       const moedasGanhas = (100 + nivelAtual * 50) * prestige;
+
+       STATS.vidas += 3;
+       STATS.moedas += moedasGanhas;
        
        if (typeof saveStats === 'function') saveStats();
        if (typeof shootConfetti === 'function') shootConfetti();
        
        setTimeout(() => {
            if (typeof playLevelUpSfx === 'function') playLevelUpSfx();
-           if (typeof showFloatingText === 'function') showFloatingText(`👑 TÍTULO NOVO! +3 ❤️`, rank.color);
+           if (typeof showFloatingText === 'function') showFloatingText(`👑 TÍTULO NOVO! +3 ❤️ +${moedasGanhas.toLocaleString()}🪙`, rank.color);
            
            const vidasEl = document.getElementById('hVidas');
            if (vidasEl) vidasEl.textContent = STATS.vidas + '❤️';
+           const moedasEl = document.getElementById('hMoedas');
+           if (moedasEl) moedasEl.textContent = STATS.moedas.toLocaleString() + '🪙';
        }, 1000); 
    }
 }
@@ -4377,7 +4389,7 @@ function openStoreModal() {
         <p style="font-size:10px; color:var(--stone2); margin-top:-2px; margin-bottom:4px; line-height:1.2">Compre em massa ou abra as caixas que você guardou no estoque.</p>
         
         <!-- ÂNFORA DE BRONZE -->
-        <div class="card" style="border-color:${freeBronze ? '#cd7f32' : 'var(--stone)'}; margin-bottom:0">
+        <div class="card" style="border-color:${freeBronze ? '#cd7f32' : 'var(--stone)'}; margin:3px">
           <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
              <div style="text-align:left; flex:1; padding-right:8px">
                 <div style="font-weight:bold; font-size:14px">📦 Ânfora de Bronze</div>
@@ -4394,7 +4406,7 @@ function openStoreModal() {
         </div>
 
         <!-- CAIXA DE PANDORA -->
-        <div class="card" style="border-color:${freePrata ? '#c0c0c0' : 'var(--stone)'}; margin-bottom:0">
+        <div class="card" style="border-color:${freePrata ? '#c0c0c0' : 'var(--stone)'}; margin:3px">
           <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
              <div style="text-align:left; flex:1; padding-right:8px">
                 <div style="font-weight:bold; font-size:14px">📦 Caixa de Pandora</div>
@@ -4409,7 +4421,7 @@ function openStoreModal() {
         </div>
 
         <!-- BAÚ DO OLIMPO -->
-        <div class="card" style="border-color:#ffcc00; box-shadow: ${freeOuro ? '0 0 15px rgba(255,204,0,0.6)' : '0 0 10px rgba(255,204,0,0.2)'}; margin-bottom:0">
+        <div class="card" style="border-color:#ffcc00; box-shadow: ${freeOuro ? '0 0 15px rgba(255,204,0,0.6)' : '0 0 10px rgba(255,204,0,0.2)'}; margin:3px">
           <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
              <div style="text-align:left; flex:1; padding-right:8px">
                 <div style="font-weight:bold; font-size:14px; color:#ffcc00">🎁 Baú do Olimpo</div>
@@ -4432,7 +4444,7 @@ function openStoreModal() {
                 <span>🎒 Itens e Consumíveis</span> <span id="sec-store-items-icon">▼</span>
             </div>
             <div id="sec-store-items-content" style="display:block; padding-top:8px; display:flex; flex-direction:column; gap:8px">
-                <div class="card" style="border-color:var(--gold2); margin-bottom:0">
+                <div class="card" style="border-color:var(--gold2); margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">✨ Dica de Atena</div>
@@ -4442,7 +4454,7 @@ function openStoreModal() {
                      ${getItemBtn(`buyItem('magicHints', 100)`, 100, 0, 'var(--gold2)', false, 'magicHints')}
                   </div>
                 </div>
-                <div class="card" style="border-color:var(--green); margin-bottom:0">
+                <div class="card" style="border-color:var(--green); margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">⏭️ Salto de Cronos</div>
@@ -4452,7 +4464,7 @@ function openStoreModal() {
                      ${getItemBtn(`buyItem('skips', 100)`, 100, 0, 'var(--green)', false, 'skips')}
                   </div>
                 </div>
-                <div class="card" style="border-color:var(--stone); margin-bottom:0">
+                <div class="card" style="border-color:var(--stone); margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🛡️ Égide Menor</div>
@@ -4462,7 +4474,7 @@ function openStoreModal() {
                      ${getItemBtn(`buyItem('miniShields', 100)`, 100, 0, 'var(--stone)', false, 'miniShields')}
                   </div>
                 </div>
-                <div class="card" style="border-color:#00e5ff; margin-bottom:0">
+                <div class="card" style="border-color:#00e5ff; margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">💧 Água de Mnemósine</div>
@@ -4472,7 +4484,7 @@ function openStoreModal() {
                      ${getItemBtn(`buyItem('doubleXp', 250, 20)`, 250, 5, '#00e5ff', false, 'doubleXp')}
                   </div>
                 </div>
-                <div class="card" style="border-color:#e024ff; margin-bottom:0">
+                <div class="card" style="border-color:#e024ff; margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🍷 Néctar dos Deuses</div>
@@ -4482,7 +4494,7 @@ function openStoreModal() {
                      ${getItemBtn(`buyItem('doubleCoins', 250, 20)`, 250, 0, '#e024ff', false, 'doubleCoins')}
                   </div>
                 </div>
-                <div class="card" style="border-color:var(--blue2); margin-bottom:0">
+                <div class="card" style="border-color:var(--blue2); margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🏺 Escudo de Esparta</div>
@@ -4495,7 +4507,7 @@ function openStoreModal() {
                      </div>
                   </div>
                 </div>
-                <div class="card" style="border-color:var(--red); margin-bottom:0">
+                <div class="card" style="border-color:var(--red); margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">❤️ Poção de Vida</div>
@@ -4507,7 +4519,7 @@ function openStoreModal() {
                      </div>
                   </div>
                 </div>
-                <div class="card" style="border-color:var(--red); margin-bottom:0">
+                <div class="card" style="border-color:var(--red); margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🌫️ Névoa de Lete</div>
@@ -4526,7 +4538,7 @@ function openStoreModal() {
             </div>
             <div id="sec-store-pets-content" style="display:block; padding-top:8px; display:flex; flex-direction:column; gap:8px">
                 
-                <div class="card" style="border-color:#27ae60; margin-bottom:0">
+                <div class="card" style="border-color:#27ae60; margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🐢 Tartaruga de Esopo <span style="font-size:10px; background:#27ae60; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlTartaruga}</span></div>
@@ -4540,7 +4552,7 @@ function openStoreModal() {
                   </div>
                 </div>
 
-                <div class="card" style="border-color:#d35400; margin-bottom:0">
+                <div class="card" style="border-color:#d35400; margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🐜 Formiga Mirmidão <span style="font-size:10px; background:#d35400; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlFormiga}</span></div>
@@ -4554,7 +4566,7 @@ function openStoreModal() {
                   </div>
                 </div>
 
-                <div class="card" style="border-color:#b4a7d6; margin-bottom:0">
+                <div class="card" style="border-color:#b4a7d6; margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🦉 Coruja de Atena <span style="font-size:10px; background:#b4a7d6; color:#000; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlCoruja}</span></div>
@@ -4568,7 +4580,7 @@ function openStoreModal() {
                   </div>
                 </div>
 
-                <div class="card" style="border-color:#ff5e00; margin-bottom:0">
+                <div class="card" style="border-color:#ff5e00; margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🔥 Fênix de Apolo <span style="font-size:10px; background:#ff5e00; color:#000; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlFenix}</span></div>
@@ -4582,7 +4594,7 @@ function openStoreModal() {
                   </div>
                 </div>
                 <!-- O NOVO PET: ÁGUIA DE ZEUS -->
-                <div class="card" style="border-color:#3498db; margin-bottom:0">
+                <div class="card" style="border-color:#3498db; margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🦅 Águia de Zeus <span style="font-size:10px; background:#3498db; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlAguia}</span></div>
@@ -4596,7 +4608,7 @@ function openStoreModal() {
                   </div>
                 </div>
                 <!-- O NOVO PET: RAPOSA DE NOVE CAUDAS (Foco em Sorte/Drop Rate) -->
-                <div class="card" style="border-color:#e67e22; margin-bottom:0">
+                <div class="card" style="border-color:#e67e22; margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🦊 Raposa Mística <span style="font-size:10px; background:#e67e22; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlRaposa}</span></div>
@@ -4611,7 +4623,7 @@ function openStoreModal() {
                 </div>
 
                 <!-- O NOVO PET: GRIFO DOURADO (Mestre do Farm: Crítico + Drop Rate) -->
-                <div class="card" style="border-color:#ff4757; border-width: 2px; box-shadow: 0 0 10px rgba(255, 71, 87, 0.2); margin-bottom:0">
+                <div class="card" style="border-color:#ff4757; border-width: 2px; box-shadow: 0 0 10px rgba(255, 71, 87, 0.2); margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🦁 Grifo Dourado <span style="font-size:10px; background:#ff4757; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlGrifo}</span></div>
@@ -4625,7 +4637,7 @@ function openStoreModal() {
                   </div>
                 </div>
                 <!-- DRAGÃO (AGORA MOSTRA O CRÍTICO) -->
-                <div class="card" style="border: 2px solid #e024ff; box-shadow: 0 0 15px rgba(224, 36, 255, 0.2); margin-bottom:0">
+                <div class="card" style="border: 2px solid #e024ff; box-shadow: 0 0 15px rgba(224, 36, 255, 0.2); margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px; color:#e024ff; text-shadow: 0 0 5px rgba(224,36,255,0.5)">🐉 Dragão de Ladão <span style="font-size:10px; background:#e024ff; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px; text-shadow:none">Nv. ${lvlDragao}</span></div>
@@ -4649,7 +4661,7 @@ function openStoreModal() {
             </div>
             <div id="sec-store-food-content" style="display:block; padding-top:8px; display:flex; flex-direction:column; gap:8px">
                 <div style="font-size:12px; color:var(--stone2); text-align:right; margin-bottom:4px">Cargas na Barriga: <span style="color:#ffcc00; font-weight:bold">${STATS.pets.fedCharges || 0}</span></div>
-                <div class="card" style="border-color:#8e44ad; margin-bottom:0">
+                <div class="card" style="border-color:#8e44ad; margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🌱 Sementes de Romã</div>
@@ -4658,7 +4670,7 @@ function openStoreModal() {
                      ${getItemBtn(`feedPet(40, 5)`, 40, 0, '#8e44ad', false, null)}
                   </div>
                 </div>
-                <div class="card" style="border-color:#9b59b6; margin-bottom:0">
+                <div class="card" style="border-color:#9b59b6; margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🍇 Uvas de Dionísio</div>
@@ -4667,7 +4679,7 @@ function openStoreModal() {
                      ${getItemBtn(`feedPet(80, 10)`, 80, 10, '#9b59b6', false, null)}
                   </div>
                 </div>
-                <div class="card" style="border-color:#ffcc00; margin-bottom:0">
+                <div class="card" style="border-color:#ffcc00; margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px">🍎 Maçã das Hespérides</div>
@@ -4689,7 +4701,7 @@ function openStoreModal() {
                 <p style="font-size:10px; color:var(--stone2); margin-top:-2px; margin-bottom:4px; line-height:1.2">Compre materiais raros para quebrar o limite de nível dos seus Pets e da sua Bolinha (Personagem).</p>
 
                 <!-- Item 1: Cristal de Evolução de Pet -->
-                <div class="card" style="border-color:#2ecc71; box-shadow: 0 0 10px rgba(46, 204, 113, 0.2); margin-bottom:0">
+                <div class="card" style="border-color:#2ecc71; box-shadow: 0 0 10px rgba(46, 204, 113, 0.2); margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px; color:#2ecc71">💎 Cristal de Quíron</div>
@@ -4701,7 +4713,7 @@ function openStoreModal() {
                 </div>
 
                 <!-- Item 2: Centelha da Bolinha (Prestígio do Personagem) -->
-                <div class="card" style="border-color:#00f5ff; box-shadow: 0 0 10px rgba(0, 245, 255, 0.2); margin-bottom:0">
+                <div class="card" style="border-color:#00f5ff; box-shadow: 0 0 10px rgba(0, 245, 255, 0.2); margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
                         <div style="font-weight:bold; font-size:14px; color:#00f5ff">⚡ Centelha do Olimpo</div>
@@ -4964,8 +4976,17 @@ function useSkipItem() {
     // 2. ✨ O FAXINEIRO: Limpa a memória das perguntas para a próxima carta nascer "virgem"
     sess.currentAdaptiveMode = null; 
     sess.currentCardId = null; // Força o relógio e os construtores a resetarem
+    sess.leituraLidaNoIndex = null; // 🗣️ DESTRANCA O ÁUDIO! Faz o robô saber que é uma carta nova!
     
-    // Reseta as flags e iscas de todos os modos de jogo!
+    // Reseta as dicas, escudos e magia
+    sess.hintUsed = false;
+    sess.hintText = '';
+    sess.magicHintUsed = false;
+    sess.magicHintVisible = false;
+    sess.magicHintsActive = 0;
+    sess.miniShieldActive = false;
+
+    // ✨ AQUI ESTÁ A MÁGICA DA CORREÇÃO: Limpa as variáveis de "Setup" de TODOS os modos!
     sess.choices = null;
     sess.validChoices = null;
     sess.choiceAnswered = false;
@@ -4978,28 +4999,46 @@ function useSkipItem() {
     sess.revChoicePrompt = null;
     sess.revChoiceAnswered = false;
     
-    sess.flipped = false;
     sess.typeAnswered = false;
-    sess.scrambleAnswered = false;
-    sess.spellAnswered = false;
-    sess.syntaxAnswered = false;
-    sess.clozeAnswered = false;
     sess.contextAnswered = false;
-    sess.imgChoiceAnswered = false;
-    sess.bossAnswered = false;
-    sess.blindAnswered = false;
 
-    // 3. Limpa relógios e dicas
+    // 👇 OS MODOS QUE ESTAVAM BUGANDO FORAM CORRIGIDOS AQUI 👇
+    sess.scrambleSetup = false; 
+    sess.scrambledWord = null; 
+    sess.scrambleAnswered = false;
+    
+    sess.spellSetup = false; 
+    sess.spellAnswered = false;
+    
+    sess.syntaxSetup = false; 
+    sess.syntaxAnswered = false;
+    
+    sess.clozeSetup = false; 
+    sess.clozeAnswered = false;
+    
+    sess.imgChoices = null; 
+    sess.imgChoiceAnswered = false;
+    
+    sess.blindAnswered = false;
+    sess.blindAudioPlayed = false;
+    
+    sess.bossAnswered = false;
+    sess.bossAudioPlayed = false;
+
+    sess.flipped = false;
+
+    // 3. Limpa relógios
     clearTimeout(sess.timerId);
     clearInterval(sess.timerId);
-    sess.hintUsed = false;
-    sess.magicHintUsed = false;
-    
     // Mensagem personalizada para o Hacker
     if (configJogo.pularInfinito) {
         toast('⏭️ Salto do Modo Deus!', 'var(--red)');
     } else {
         toast('⏭️ Salto Temporal! Card pulado sem punição.', 'ok');
+    }
+    // ✨ A PEÇA QUE FALTAVA: Acorda o leitor para a nova carta!
+    if (typeof playQuestionAudio === 'function') {
+        setTimeout(playQuestionAudio, 200);
     }
     
     // 4. Redesenha a tela limpíssima com a nova carta
@@ -5454,7 +5493,8 @@ function getUserTitle() {
       nextXP: nextXP,
       isMaxed: isMaxed, 
       totalXpAccumulated: totalXpAccumulated,
-      totalXpToAscend: totalXpToAscend
+      totalXpToAscend: totalXpToAscend,
+      totalXP: totalXP
   };
 }
 
@@ -6101,8 +6141,8 @@ function openBackupModal() {
     
     <div class="card" style="border-color:var(--red); margin-bottom:0">
       <div class="card-body">
-         <div style="font-weight:bold; color:var(--red)">🗑️ Zerar o Console (Apagar Tudo)</div>
-         <div style="font-size:11px; margin-bottom:12px; color:var(--stone2)">Apaga as palavras, o XP, o Ouro e os Pets do aplicativo. Use isso para "limpar a máquina" antes de carregar um perfil diferente.</div>
+         <div style="text-align:center; font-weight:bold; color:var(--red)">🗑️ Zerar o Console (Apagar Tudo)</div>
+         <div style="text-align: center;font-size:11px; margin-bottom:12px; color:var(--stone2)">Apaga as palavras, o XP, o Ouro e os Pets do aplicativo. Use isso para "limpar a máquina" antes de carregar um perfil diferente.</div>
          <button class="btn" style="width:100%; background:var(--red); color:white; border:none" onclick="factoryReset()">⚠️ APAGAR ABSOLUTAMENTE TUDO</button>
       </div>
     </div>
@@ -6377,7 +6417,6 @@ window.toggleQuestBox = function(id, btnId) {
     }
 };
 
-// ✨ INTERFACE: O Mural Triplo Otimizado (Com Raio-X do Detetive 🕵️‍♂️)
 // ✨ INTERFACE: O Mural Triplo Otimizado (Integrado ao Observer Global)
 function openQuestsModal() {
     generateDailyQuests(); 
@@ -6680,9 +6719,6 @@ openModal(`
     `);
 }
 
-// ✨ A MÁQUINA DA SORTE COM RARIDADE E BLINDAGEM
-// ✨ A MÁQUINA DA SORTE COM PACTO DE ALQUIMIA
-// ✨ A MÁQUINA DA SORTE COM PACTO DE ALQUIMIA (BLINDADA)
 // ✨ A MÁQUINA DA SORTE COM PACTO DE ALQUIMIA (BLINDAGEM ABSOLUTA)
 function playGacha() {
     if (!STATS.inventory) STATS.inventory = {};
@@ -7710,11 +7746,13 @@ function openPlayerAscensionModal() {
     const hasAcertos = acertosAtuais >= reqAcertos;
     const hasAcertosRelogio = acertosRelogioAtuais >= reqAcertosRelogio;
     const currentXP = rank.totalXpAccumulated;
-  const maxXP = rank.totalXpToAscend;
-  const remainingXP = Math.max(0, maxXP - currentXP);
-  const xpPercent = Math.min(100, (currentXP / maxXP) * 100);
-  let isXpMaxed = rank.isMaxed;
-
+    const maxXP = rank.totalXpToAscend;
+    const remainingXP = Math.max(0, maxXP - currentXP);
+    const xpPercent = Math.min(100, (currentXP / maxXP) * 100);
+    let isXpMaxed = rank.isMaxed;
+    // ✅ para mostrar o xp exedente no modal
+    const xpReal = rank.totalXP;
+    const xpExcedente = Math.max(0, xpReal - maxXP);
     // Tem que ter TUDO para poder subir
     const canAscend = isXpMaxed && hasMoedas && hasCentelhas && hasAcertos && hasAcertosRelogio;
 
@@ -7729,17 +7767,17 @@ function openPlayerAscensionModal() {
     <span>XP</span>
     
     <span>
-      ${isXpMaxed 
-        ? `MAX (${currentXP}/${maxXP})`
-        : `${currentXP}/${maxXP} • Restam ${remainingXP}`
-      }
-    </span>
+  ${isXpMaxed 
+    ? `MAX (${xpReal.toLocaleString()} / ${maxXP.toLocaleString()})${xpExcedente > 0 ? ` <span style="color:#ffd700; font-size:11px">+${xpExcedente.toLocaleString()} excedente</span>` : ``}`
+    : `${currentXP.toLocaleString()} / ${maxXP.toLocaleString()} • Restam ${remainingXP.toLocaleString()}`
+  }
+</span>
   </div>
 
   <div class="xpBar">
     <div class="xpFill" style="width:${xpPercent}%"></div>
   </div>
-</div>
+  </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px">
             <span>✨ Nível Máximo Atingido:</span>
             <span style="color:${isXpMaxed ? 'var(--green)' : 'var(--red)'}; font-weight:bold">${isXpMaxed ? 'Sim' : 'Não'}</span>
@@ -7780,6 +7818,9 @@ function confirmPlayerAscension(moedas, centelhas) {
     STATS.moedas -= moedas;
     STATS.inventory.playerSparks -= centelhas;
     STATS.achievements.currentPrestige++; 
+    
+    // ✅ RESETA o histórico para que todos os títulos deem prêmio novamente!
+    STATS.highestLevelEver = -1;
     
     if (typeof saveStats === 'function') saveStats();
     
