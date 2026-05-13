@@ -2534,6 +2534,8 @@ function buildBossMode(card) {
   if (card.synonyms) exigencias.push('um <b>sinônimo</b>');
   if (card.antonyms) exigencias.push('um <b>antônimo</b>');
   let textoExigencia = exigencias.join(', ').replace(/,([^,]*)$/, ' e$1'); 
+if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
+  const typeText = card.cardType === 'sinônimo' ? `Tem como ${hl('sinônimo')}:` : (card.cardType === 'antônimo' ? `Tem como ${hl('antônimo')}:` : 'Significa:');
 
   let html = `
     <div class="card" style="margin-bottom:12px; background: #0a0a0a; border: 2px solid var(--red); box-shadow: 0 0 15px rgba(231,76,60,0.3)">
@@ -2617,9 +2619,12 @@ function buildBlindMode(card) {
   const defLang = card.langDef || 'pt-BR';  
 
   if (!answered && !sess.blindAudioPlayed) {
-      setTimeout(() => ouvirPalavra(clean(card.definition), defLang), 300);
+      // setTimeout(() => ouvirPalavra(clean(card.definition), defLang), 300);
       sess.blindAudioPlayed = true;
   }
+// ✨ A MÁGICA DA COR: (Removi a duplicação que existia na função anterior)
+  if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
+  const typeText = card.cardType === 'sinônimo' ? `Tem como ${hl('sinônimo')}:` : (card.cardType === 'antônimo' ? `Tem como ${hl('antônimo')}:` : 'Significa:');
 
   return `
     <div class="card" style="margin-bottom:12px; background: #1a1a1a; border: 1px solid var(--gold2);">
@@ -6408,7 +6413,7 @@ function playQuestionAudio() {
   const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
 
   // 1. A MORDAÇA: Modos de adivinhação onde ele SÓ PODE LER A DEFINIÇÃO (Nunca a palavra!)
-const modosDeAdivinhar = ['type', 'spell', 'scramble', 'context', 'syntax'];  
+const modosDeAdivinhar = ['type', 'spell', 'scramble', 'context', 'syntax', 'blind'];  
   if (!isRel && modosDeAdivinhar.includes(mode)) {
     // Usa o clean() para a voz nunca ler os *asteriscos* em voz alta
     ouvirPalavra(clean(card.definition), card.langDef || 'pt-BR');
