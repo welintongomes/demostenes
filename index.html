@@ -587,6 +587,61 @@ function getCardRarity(card) {
   return { cls: 'rarity-ferro', txtCls: '', label: 'Ferro 🪨' };
 }
 
+// ✨ DESENHA O BOTÃO DE DUPLA MOEDA (Versão Blindada contra erros de Escopo)
+function getEliteItemBtn(id, custaMoeda, custaPontos, color, isPet, botaoAntigoHtml = '') {
+    // Se for um Pet e já possui, usamos a "encomenda" (o botão antigo de equipar que funciona perfeitamente!)
+    if (isPet && STATS.pets && STATS.pets.owned && STATS.pets.owned.includes(id)) {
+        return botaoAntigoHtml; 
+    }
+
+    // Se ainda não comprou (ou não for pet), mostra o botão de Dupla Moeda
+    return `
+    <button class="btn" style="background:transparent; border:1px solid ${color}; color:${color}; display:flex; flex-direction:column; align-items:center; padding:6px 12px; gap:4px; transition: 0.2s; min-width: 90px;" 
+        onclick="buyElite('${id}', ${custaMoeda}, ${custaPontos}, ${isPet})" 
+        onmouseover="this.style.background='${color}20'" 
+        onmouseout="this.style.background='transparent'">
+       <span style="font-size:11px; font-weight:bold; letter-spacing:1px">COMPRAR</span>
+       <div style="display:flex; gap:6px; font-size:10px; font-weight:bold">
+           <span>🪙 ${custaMoeda}</span>
+           <span>🏆 ${custaPontos}</span>
+       </div>
+    </button>`;
+}
+
+// ⚔️ FUNÇÃO DE COMPRA DOS ITENS DE ELITE (Cobra Ouro e Pontos do Coliseu)
+function buyElite(id, custoMoeda, custoPontos, isPet) {
+    if (!STATS.moedas || STATS.moedas < custoMoeda) {
+        toast(`Faltam moedas! Você precisa de 🪙 ${custoMoeda}.`, 'err');
+        return;
+    }
+    if (!STATS.coliseuPoints || STATS.coliseuPoints < custoPontos) {
+        toast(`Falta Glória! Você precisa de 🏆 ${custoPontos} Pontos do Coliseu. Lute na arena!`, 'err');
+        return;
+    }
+
+    // Cobra o preço duplo
+    STATS.moedas -= custoMoeda;
+    STATS.coliseuPoints -= custoPontos;
+
+    // Entrega a mercadoria
+    if (isPet) {
+        if (!STATS.pets) STATS.pets = { owned: [], active: null };
+        if (!STATS.pets.owned.includes(id)) STATS.pets.owned.push(id);
+        toast(`Mascote Épico adquirido!`, 'var(--gold)');
+    } else {
+        if (!STATS.inventory) STATS.inventory = {};
+        STATS.inventory[id] = (STATS.inventory[id] || 0) + 1;
+        toast(`Item de Elite adquirido com sucesso!`, 'var(--gold)');
+    }
+
+    if (typeof saveStats === 'function') saveStats();
+    if (typeof updateHeader === 'function') updateHeader();
+    
+    // Atualiza a tela da loja
+    if (typeof openStoreModal === 'function') openStoreModal();
+    else if (typeof render === 'function') render();
+}
+
 // ✨ MOTOR DE ÁUDIO OFFLINE (Gerador de Frequência para Acerto/Erro)
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -1344,6 +1399,7 @@ function getAdaptiveMode(card) {
 }
 //filtra o estudo inteligente por categoria ou todos
 // ✨ INTELIGÊNCIA DE TREINO LIVRE E TAGS
+// ✨ INTELIGÊNCIA DE TREINO LIVRE E TAGS (AGORA COM ENCONTROS SELVAGENS DE RPG)
 function startSession(mode, filterVal = '', customArray = null, isFreeMode = false) {
   let pool = isFreeMode ? [...W] : dueCards();
   
@@ -1362,16 +1418,92 @@ function startSession(mode, filterVal = '', customArray = null, isFreeMode = fal
   }
 
   studyMode = mode || studyMode;
+  
+  // 🐉 O DADO DO MESTRE (D20): Sorteia se um Monstro vai invadir a sua revisão!
+  // Regra: Só aparece nas revisões normais (SM-2), e se tiver pelo menos 3 cartas. Tem 25% de chance de acontecer.
+  let bossIndex = -1;
+  if (!isFreeMode && pool.length >= 3 && Math.random() <= 0.90) {
+      // Escolhe em qual turno o monstro vai pular na tela!
+      bossIndex = Math.floor(Math.random() * pool.length);
+  }
+
   studySession = {
     queue: [...pool].sort(() => Math.random() - 0.5),
     current: 0, answered: 0, correct: 0,
     startTime: Date.now(), flipped: false,
     filterCategory: filterVal, customModes: customArray,
-    isFreeMode: isFreeMode // Marca se é Treino Livre!
+    isFreeMode: isFreeMode,
+    
+    // ⚔️ O MOTOR DE RPG DO COLISEU DEMÓSTENES
+    bossCardIndex: bossIndex, // Onde o monstro está escondido na fila
+    bossActive: false,        // O monstro está lutando agora?
+    bossMaxHp: 3,             // Vida total do monstro (3 Golpes)
+    bossHp: 3,                // Vida atual do monstro
+    playerMaxHp: 3,           // Sua vida no duelo
+    playerHp: 3,              // Sua vida atual (Corações de Batalha)
+    bossTurn: 0               // Controla os combos do monstro
   };
   
   setTimeout(playQuestionAudio, 200); 
-  renderStudy();
+  
+  // Se a primeira carta do baralho já for o monstro, emite o alerta!
+  if (studySession.bossCardIndex === 0) {
+      toast("⚠️ UM MONSTRO SELVAGEM APARECEU!", "var(--red)");
+  }
+  
+  // Certifique-se de que a função abaixo é a que chama os cards para a tela no seu código!
+  if (typeof renderStudy === 'function') {
+      renderStudy();
+  } else {
+      render();
+  }
+}
+
+// 🎁 O GRANDE BAÚ DO COLISEU (ATUALIZADO COM PONTOS E DROP DE TICKETS)
+function darLootDoChefe() {
+    // 1. Ouro Explosivo
+    const goldGain = Math.floor(Math.random() * 150) + 100; 
+    if (!STATS.moedas) STATS.moedas = 0;
+    STATS.moedas += goldGain;
+    
+    // 2. XP Mítico para o Pet 
+    let petMsg = '';
+    if (STATS.pets && STATS.pets.active) {
+        const pet = STATS.pets.active;
+        if (!STATS.pets.affinity) STATS.pets.affinity = {};
+        STATS.pets.affinity[pet] = (STATS.pets.affinity[pet] || 0) + 20; 
+        petMsg = ` e o seu ${pet.toUpperCase()} ganhou +20 XP!`;
+    }
+
+    // 🏆 3. PONTOS DO COLISEU (NOVIDADE!)
+    // Você ganha entre 10 e 25 pontos de prestígio por vitória
+    const pontosGanhos = Math.floor(Math.random() * 16) + 10; 
+    if (!STATS.coliseuPoints) STATS.coliseuPoints = 0;
+    STATS.coliseuPoints += pontosGanhos;
+    
+    // 🎁 4. Drop de Itens (Incluindo a chance de vir o Ticket!)
+    if (!STATS.inventory) STATS.inventory = {};
+    let itemMsg = '';
+    const rolagem = Math.random();
+    
+    if (rolagem > 0.85) { // 15% de chance de cair um Ticket de volta
+        STATS.inventory.bossTickets = (STATS.inventory.bossTickets || 0) + 1;
+        itemMsg = '🎟️ O Baú continha 1x Ticket do Coliseu!';
+    } else if (rolagem > 0.5) {
+        STATS.inventory.skips = (STATS.inventory.skips || 0) + 1;
+        itemMsg = '🎁 O Baú continha 1x Salto de Cronos!';
+    } else if (rolagem > 0.2) {
+        STATS.inventory.miniShields = (STATS.inventory.miniShields || 0) + 1;
+        itemMsg = '🛡️ O Baú continha 1x Bloqueio Menor!';
+    }
+    
+    // Anuncia a sequência épica de prêmios na tela
+    if (itemMsg) setTimeout(() => toast(itemMsg, 'var(--blue)'), 1500);
+    setTimeout(() => toast(`🏆 +${pontosGanhos} Pontos do Coliseu conquistados!`, '#ff6b6b'), 2500);
+    setTimeout(() => toast(`💰 O Baú jorrou ${goldGain} Moedas${petMsg}`, 'var(--gold)'), 4000);
+    
+    if (typeof shootConfetti === 'function') shootConfetti(); 
+    if (typeof saveStats === 'function') saveStats();
 }
 
 /* ═══════════════════════════════════════
@@ -1629,7 +1761,30 @@ function buildStudyTab() {
        </div>
     </div>`;
   }
-  
+// ✨ BANNER DO COLISEU DOS TITÃS (Agora com Tickets e Pontos de Prestígio!)
+  if (W.length >= 5) {
+    if (!STATS.inventory) STATS.inventory = {};
+    const tickets = STATS.inventory.bossTickets || 0;
+    const pts = STATS.coliseuPoints || 0;
+
+    html += `
+    <div class="card" style="border-color:#ff4444; cursor:pointer; background:rgba(255, 0, 0, 0.05); margin-top: 10px" onclick="startBossMode()">
+       <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding: 12px 16px">
+          <div style="display:flex; align-items:center; gap:12px">
+             <div style="font-size:28px">🐉</div>
+             <div>
+                <div style="font-weight:bold; color:#ff4444; font-size:14px; text-transform:uppercase; letter-spacing:1px">Coliseu dos Titãs</div>
+                <div style="font-size:11px; color:var(--stone2); margin-top:2px">Aposte sua vida por Glória e Ouro!</div>
+                <div style="display:flex; gap:10px; margin-top:6px; font-size:11px; font-weight:bold">
+                   <span style="color:#ff6b6b">🏆 ${pts} Pontos</span>
+                   <span style="color:var(--gold)">🎟️ ${tickets} Tickets</span>
+                </div>
+             </div>
+          </div>
+          <div style="color:#ff4444; font-weight:bold; font-size:18px">⚔️</div>
+       </div>
+    </div>`;
+  }
   if (STATS.activeEvent) {
     const timeLeftMinutes = Math.max(0, Math.ceil((STATS.activeEvent.endTime - Date.now()) / 60000));
     
@@ -1703,9 +1858,9 @@ function buildStudyCard() {
 
   if (activeMode === 'imgchoice' && !card.image) activeMode = 'choice';
 
-  // ✨ O GUARDIÃO DO SILÊNCIO: Intercepta o jogo se o áudio estiver desligado!
+  // ✨ O GUARDIÃO DO SILÊNCIO
   if ((activeMode === 'blind' || activeMode === 'boss') && !autoPlayAudio) {
-     clearTimeout(sess.timerId); // Impede o relógio da morte de rodar aqui
+     clearTimeout(sess.timerId); 
      let isBoss = activeMode === 'boss';
      let color = isBoss ? 'var(--red)' : 'var(--gold2)';
      
@@ -1729,7 +1884,6 @@ function buildStudyCard() {
        </div>`;
   }
 
-  // Se o áudio estiver ligado, o código continua normalmente
   if (activeMode === 'flash') inner = buildFlashMode(card, intervals);
   else if (activeMode === 'choice') inner = buildChoiceMode(card);
   else if (activeMode === 'type') inner = buildTypeMode(card);
@@ -1745,28 +1899,21 @@ function buildStudyCard() {
   else if (activeMode === 'boss') inner = buildBossMode(card); 
 
   const isAns = sess.typeAnswered || sess.choiceAnswered || sess.tfAnswered || sess.revChoiceAnswered || sess.scrambleAnswered || sess.spellAnswered || sess.syntaxAnswered || sess.clozeAnswered || sess.contextAnswered || sess.imgChoiceAnswered || sess.bossAnswered || sess.blindAnswered || sess.flipped;
-  // ✨ O GATILHO DA LEITURA CONTÍNUA (Blindado e fora do cronômetro)
+  
   if (!isAns && sess.ultimoLidoId !== card.id) {
-      sess.ultimoLidoId = card.id; // Marca que já agendou a leitura desta carta
-      
-      // Se o Leitor Completo e o Áudio Geral do jogo estiverem ligados:
+      sess.ultimoLidoId = card.id; 
       if (configJogo.leituraCompleta && typeof autoPlayAudio !== 'undefined' && autoPlayAudio) {
-          setTimeout(lerTelaCompleta, 200); // Dá 200ms para a tela carregar
+          setTimeout(lerTelaCompleta, 200); 
       }
   }
-  // ✨ SISTEMA UNIFICADO DE ÁUDIO E RELÓGIO
+
   let timerHtml = '';
-  
-  // Verifica se esta carta específica precisa de relógio
   let hasTimer = enableTimer && card.interval >= configJogo.timerMinInterval && activeMode !== 'flash';
-  
-  // Define o limite de tempo
   let timeLimit = 20; 
   if (card.interval >= 21) timeLimit = 12; 
   if (activeMode === 'boss') timeLimit = 15; 
 
   if (!isAns) {
-      // 1. Desenha a barra apenas se o relógio estiver ativado
       if (hasTimer) {
           timerHtml = `
           <div style="width:100%; height:6px; background:var(--bg4); margin-bottom:10px; border-radius:4px; overflow:hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);">
@@ -1774,26 +1921,21 @@ function buildStudyCard() {
           </div>`;
       }
 
-      // 2. Dispara os eventos da Carta Nova UMA ÚNICA VEZ
       if (sess.currentCardId !== card.id) {
           sess.currentCardId = card.id;
           sess.maxTimeLimit = hasTimer ? timeLimit : 0;
           
-          // Se o "Mãos Livres" (Leitura Completa) estiver ligado
           if (configJogo.leituraCompleta && typeof autoPlayAudio !== 'undefined' && autoPlayAudio) {
-              // Manda ler. Se tiver relógio, passa o 'timeLimit' para segurar a barra. Se não tiver, passa 'null'.
               setTimeout(() => lerTelaCompleta(hasTimer ? timeLimit : null), 200);
           } 
-          // Se o Mãos Livres estiver desligado, mas o relógio existir, liga o relógio direto!
           else if (hasTimer) {
               setTimeout(() => startSurvivalTimer(timeLimit), 50);
           }
       }
   } else {
-      clearInterval(sess.timerId); // Desliga o relógio quando você responde
+      clearInterval(sess.timerId);
   }
 
-  // ✨ BARRA DE ITENS MÁGICOS (AGORA COM MODO DEUS)
   let toolsHtml = '';
   const noHintModes = ['flash', 'choice', 'tf', 'revchoice', 'imgchoice', 'blind', 'boss'];
   const canHint = !noHintModes.includes(activeMode);
@@ -1802,20 +1944,17 @@ function buildStudyCard() {
       if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0 };
       const inv = STATS.inventory;
       
-      // ✨ Checa se o Modo Deus está ativo
       const dicasHacked = configJogo.dicasInfinitas;
       const escudosHacked = configJogo.escudosInfinitos;
       const pularHacked = configJogo.pularInfinito;
-      // Monta os textos e bloqueios
-      // Monta o botão dicas
+      
       const dicaLabel = dicasHacked ? '✨ Dica (∞)' : `✨ Dica (${inv.magicHints || 0})`;
       const dicaDisabled = (!dicasHacked && inv.magicHints <= 0) ? 'disabled style="opacity:0.3"' : '';
-      // ✨ Monta o botão de mini escudo
       const escudoLabel = escudosHacked ? '🛡️ Bloqueio (∞)' : `🛡️ Bloqueio (${inv.miniShields || 0})`;
       const escudoDisabled = (!escudosHacked && inv.miniShields <= 0 && !sess.miniShieldActive) ? 'disabled style="opacity:0.3"' : '';
-      // ✨ Monta o botão de Pular
       const pularLabel = pularHacked ? '⏭️ Pular (∞)' : `⏭️ Pular (${inv.skips || 0})`;
       const pularDisabled = (!pularHacked && inv.skips <= 0) ? 'disabled style="opacity:0.3"' : '';
+      
       toolsHtml = `
       <div style="display:flex; gap:6px; justify-content:center; margin-bottom:12px; margin-top:4px; flex-wrap:wrap">
          ${canHint ? `
@@ -1831,33 +1970,66 @@ function buildStudyCard() {
       </div>`;
   }
 
-  
+  const rarity = getCardRarity(card); 
 
-  const rarity = getCardRarity(card); // Calcula o brilho da carta atual
+  // ✨ O PAINEL DE SANGUE: Desenha a interface do Chefão se for o turno dele
+  let bossUiHtml = '';
+  if (sess.bossCardIndex === sess.current) {
+      sess.bossActive = true;
+      // Constrói os corações vermelhos, azuis e pretos (vidas perdidas)
+      const bossHearts = '❤️'.repeat(sess.bossHp) + '🖤'.repeat(sess.bossMaxHp - sess.bossHp);
+      const playerHearts = '💙'.repeat(sess.playerHp) + '🖤'.repeat(sess.playerMaxHp - sess.playerHp);
+
+      bossUiHtml = `
+      <div style="background: linear-gradient(135deg, #2a0000, #4d0000); border: 2px solid #ff4444; border-radius: 12px; padding: 15px; text-align: center; margin-bottom: 15px; box-shadow: 0 0 20px rgba(255, 0, 0, 0.6); position: relative; overflow: hidden;">
+          <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,0,0,0.1) 0%, transparent 60%); animation: spin 10s linear infinite;"></div>
+          <div style="position: relative; z-index: 1;">
+              <div style="font-size: 20px; font-weight: 900; color: #ff6b6b; letter-spacing: 3px; text-transform: uppercase; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); font-family: 'Cinzel', serif;">⚔️ Monstro Selvagem ⚔️</div>
+              <div style="font-size: 12px; color: var(--stone2); font-style: italic; margin-bottom: 12px;">Derrote a palavra para abrir o Baú do Coliseu!</div>
+              <div style="display: flex; justify-content: space-around; align-items: center; background: rgba(0,0,0,0.6); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,0,0,0.3);">
+                  <div style="text-align:center">
+                      <div style="font-size:10px; color:#ff6b6b; font-weight:bold; letter-spacing:1px; margin-bottom:4px">HP DO MONSTRO</div>
+                      <div style="font-size:16px; letter-spacing: 2px;">${bossHearts}</div>
+                  </div>
+                  <div style="font-size:24px; text-shadow: 0 0 10px #ff0000;">🆚</div>
+                  <div style="text-align:center">
+                      <div style="font-size:10px; color:#4dabf7; font-weight:bold; letter-spacing:1px; margin-bottom:4px">SEU HP</div>
+                      <div style="font-size:16px; letter-spacing: 2px;">${playerHearts}</div>
+                  </div>
+              </div>
+          </div>
+      </div>
+      <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>`;
+  } else {
+      sess.bossActive = false;
+  }
+
+  // ✨ A aura sangrenta da carta: se for o Boss, a carta fica escura e com borda vermelha!
+  const cardBossStyle = sess.bossActive ? 'border: 2px solid #ff4444; box-shadow: inset 0 0 30px rgba(255,0,0,0.2); background: rgba(40,0,0,0.3);' : '';
 
   return `
+    ${bossUiHtml}
+    
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--stone);letter-spacing:1px;text-transform:uppercase">${sess.current + 1} / ${tot}</span>
       <div style="display:flex;gap:8px;align-items:center">
-        <!-- ✨ A ETIQUETA COM O NOME DA RARIDADE -->
         <span class="badge ${rarity.txtCls}" style="background:transparent; border:1px solid currentColor; font-family:'Cinzel',serif">${rarity.label}</span>
         <span class="badge ${getStatus(card)}">${statusLabel(getStatus(card))}</span>
         <button class="btn ghost sm" onclick="window.speechSynthesis.cancel(); clearTimeout(studySession?.timerId); studySession=null; if(typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo('normal'); render()">✕ Sair</button>
-        </div>
+      </div>
     </div>
     
-    ${card.isLeech ? `<div style="background:rgba(231,76,60,0.1); border:1px solid var(--red); color:var(--red); padding:6px; border-radius:var(--r); font-size:12px; margin-bottom:10px; text-align:center;"><b>🩸 Sanguessuga:</b> Você tem errado muito esta palavra. Cuidado!</div>` : ''}
+    ${card.isLeech && !sess.bossActive ? `<div style="background:rgba(231,76,60,0.1); border:1px solid var(--red); color:var(--red); padding:6px; border-radius:var(--r); font-size:12px; margin-bottom:10px; text-align:center;"><b>🩸 Sanguessuga:</b> Você tem errado muito esta palavra. Cuidado!</div>` : ''}
 
     <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
     
     ${timerHtml}
     ${toolsHtml} 
     
-  <!-- ✨ O ENVELOPE MÁGICO QUE ABRAÇA A CARTA INTEIRA -->
-    <div class="physical-card ${rarity.cls}">
+    <!-- ✨ A CARTA EM SI (Pode ter Aura Vermelha) -->
+    <div class="physical-card ${rarity.cls}" style="${cardBossStyle}">
        ${inner}
        
-       <!-- ✨ CAIXA GLOBAL DE DICAS (Imune a bugs e sempre no lugar certo!) -->
        ${(sess.hintUsed || sess.magicHintVisible) && !isAns ? `
        <div style="padding:12px; background:rgba(212,175,55,0.08); border:1px dashed var(--gold); color:var(--gold2); border-radius:var(--r); text-align:center; margin-top:14px; font-size:14px; font-weight:bold;">
           ${sess.magicHintVisible ? '✨ Dica de Atena:' : '💡 Dica Padrão:'} <span style="color:var(--gold)">${esc(sess.hintText)}</span>
@@ -1925,6 +2097,77 @@ function buildFlashMode(card, intervals) {
         <span class="rating-days">${q===0?'1d':intervals[q]+'d'}</span>
       </button>`).join('')}
     </div>` : `<button class="btn" style="margin-top:14px" onclick="flipCard()">↩ Revelar resposta</button>`}`;
+}
+
+// ⚔️ FUNÇÃO DE INVOCAÇÃO DO CHEFÃO MANUAL (SISTEMA DE TICKETS)
+function startBossMode() {
+    const DIRECT_COST = 150; // O preço absurdo para entrar sem ingresso!
+
+    if (W.length < 5) {
+        toast('Você precisa de pelo menos 5 cartas no léxico para duelar!', 'err');
+        return;
+    }
+
+    if (!STATS.inventory) STATS.inventory = {};
+    let hasTicket = (STATS.inventory.bossTickets > 0);
+
+    // Barrado na porta!
+    if (!hasTicket) {
+        if (!STATS.moedas || STATS.moedas < DIRECT_COST) {
+            toast(`Você precisa de 🎟️ 1 Ticket ou ${DIRECT_COST} moedas de suborno para entrar! Você está pobre!`, 'err');
+            return;
+        }
+    }
+
+    // ⚠️ A CONFIRMAÇÃO DO MEDO
+    let msg = hasTicket 
+        ? "⚔️ Você usará 🎟️ 1 Ticket do Coliseu para entrar na arena. Deseja enfrentar suas piores palavras?" 
+        : `⚔️ Sem Tickets! O Guarda exige um suborno de ${DIRECT_COST} moedas. Deseja pagar o absurdo e entrar na arena?`;
+
+    if (!confirm(msg)) {
+        return;
+    }
+
+    // 💸 COBRANÇA: Gasta o Ticket ou esvazia seus bolsos
+    if (hasTicket) {
+        STATS.inventory.bossTickets--;
+    } else {
+        STATS.moedas -= DIRECT_COST;
+    }
+
+    if (typeof saveStats === 'function') saveStats();
+    if (typeof updateHeader === 'function') updateHeader();
+
+    // 🕵️‍♂️ Sorteia o monstro final
+    let bossPool = W.filter(w => w.isLeech || (w.correctStreak || 0) < 2);
+    if (bossPool.length === 0) {
+        bossPool = [...W].sort(() => Math.random() - 0.5).slice(0, 5);
+    }
+    const monstro = bossPool[Math.floor(Math.random() * bossPool.length)];
+
+    // ⚔️ MONTA A SESSÃO EXCLUSIVA DO CHEFÃO
+    studyMode = 'adaptive';
+    studySession = {
+        queue: [monstro], 
+        current: 0, answered: 0, correct: 0,
+        startTime: Date.now(), flipped: false,
+        filterCategory: '', customModes: null,
+        isFreeMode: true, 
+        
+        bossCardIndex: 0, 
+        bossActive: true,        
+        bossMaxHp: 3,             
+        bossHp: 3,                
+        playerMaxHp: 3,           
+        playerHp: 3,              
+        bossTurn: 0               
+    };
+    
+    setTimeout(playQuestionAudio, 200); 
+    if (typeof toast === 'function') toast("🔥 OS PORTÕES SE FECHARAM! LUTE PELA SUA VIDA!", "var(--red)");
+    
+    if (typeof renderStudy === 'function') renderStudy();
+    else render();
 }
 
 function buildChoiceMode(card) {
@@ -3023,72 +3266,156 @@ function rateCard(quality) {
   const card = sess.queue[sess.current];
   if (!card) return;
 
-  // ✨ BLINDAGEM: Garante que as vidas existem no momento exato do clique!
   if (STATS.vidas === undefined || isNaN(STATS.vidas)) STATS.vidas = 3;
 
-if (!sess.isFreeMode) {
-    
-    // ✨ SISTEMA DE PROTEÇÃO TOTAL: Verifica Eventos, depois Escudos, depois Vidas!
-    const hasInfLives = STATS.activeEvent && STATS.activeEvent.id === 'lives_inf';
-    const hasInfShield = STATS.activeEvent && STATS.activeEvent.id === 'shields_inf';
+  // Descobre qual é o modo atual para o Pet não dar erro!
+  const modoAtualDaCarta = sess.currentAdaptiveMode || studyMode;
 
-    if (quality === 0 && hasInfShield) {
-        // Evento da Égide Divina: O erro é perdoado de graça!
-        toast('🛡️ Égide Divina Ativa! Nenhuma penalidade no SM-2.', 'blue');
-        sess.queue.push(card);
-    } 
-    else if (quality === 0 && sess.miniShieldActive) {
-        sess.miniShieldActive = false; // Consome o escudo da loja
-        toast('🛡️ Égide Menor ativada! O card foi protegido.', 'gold');
-        sess.queue.push(card);
-    } 
-    else if (quality === 0 && hasInfLives) {
-        // Evento de Imortalidade: Protege a carta sem gastar os ❤️ Corações
-        toast('❤️‍🔥 Imortalidade Ativa! Sua vida não foi consumida.', 'red');
-        sess.queue.push(card);
-    } 
-    else if (quality === 0 && STATS.vidas > 0) {
-        if (!configJogo.vidasInfinitas) {
-        STATS.vidas--;// Consome a vida normal
-        } 
-        toast('❤️ Vida consumida! O card foi protegido.', 'gold');
-        sess.queue.push(card);
-        if (typeof saveStats === 'function') saveStats();
-    } 
-    else {
-        // --- LÓGICA NORMAL (Acertou, ou errou sem ter nenhuma defesa) ---
-        if (quality === 0) {
-            toast('💔 Sem defesas! Penalidade aplicada.', 'err');
-            sess.queue.push(card); 
-        }
+  // 🧹 Função Faxineira: Empacotou todas as variáveis que você apagou do final!
+  const limparTela = () => {
+      sess.hintUsed = false; sess.hintText = '';
+      sess.magicHintUsed = false; sess.magicHintVisible = false; sess.magicHintsActive = 0; 
+      sess.miniShieldActive = false;
+      sess.choices = null; sess.choiceAnswered = false;
+      sess.typeAnswered = false; sess.contextAnswered = false;
+      sess.tfSetup = false; sess.tfAnswered = false;
+      sess.revChoices = null; sess.revChoiceAnswered = false;
+      sess.scrambleSetup = false; sess.scrambledWord = null; sess.scrambleAnswered = false; 
+      sess.spellSetup = false; sess.spellAnswered = false;
+      sess.syntaxSetup = false; sess.syntaxAnswered = false;
+      sess.clozeSetup = false; sess.clozeAnswered = false;
+      sess.imgChoices = null; sess.imgChoiceAnswered = false;
+      sess.blindAnswered = false; sess.blindAudioPlayed = false; 
+      sess.bossAnswered = false; sess.bossAudioPlayed = false; 
+      sess.flipped = false;
+  };
 
-        const result = sm2(card, quality);
-        const idx = W.findIndex(w => w.id === card.id);
-        if (idx >= 0) {
-          Object.assign(W[idx], result);
-          W[idx].lastReview = Date.now();
-          W[idx].totalReviews = (W[idx].totalReviews || 0) + 1;
-          
-          if (quality >= 2) {
-             W[idx].correctStreak = (W[idx].correctStreak || 0) + 1;
-             W[idx].consecutiveFails = 0; 
-             W[idx].isLeech = false;
+  // ⚔️ O MOTOR DE BATALHA DO CHEFÃO
+  if (sess.bossActive) {
+      if (quality >= 2) {
+          sess.bossHp--;
+          if (sess.bossHp > 0) {
+              // ACERTOU MAS O MONSTRO NÃO MORREU (O Monstro prepara o contra-ataque!)
+              if (typeof toast === 'function') toast('🗡️ Acerto Crítico! O Monstro sangra! (-1 HP)', 'var(--green)');
+              
+              sess.bossTurn++;
+              const bossAttacks = ['cloze', 'blind', 'spell', 'type', 'revchoice'];
+              sess.currentAdaptiveMode = bossAttacks[sess.bossTurn % bossAttacks.length];
+              
+              limparTela(); // Limpa a tela para o contra-ataque
+              setTimeout(playQuestionAudio, 200);
+              render();
+              return; 
           } else {
-             W[idx].correctStreak = 0;
-             W[idx].consecutiveFails = (W[idx].consecutiveFails || 0) + 1;
-             if (W[idx].consecutiveFails >= 4) {
-                 W[idx].isLeech = true; 
-             }
+              // MATOU O MONSTRO!
+              if (typeof toast === 'function') toast('👑 MONSTRO DERROTADO! Você saqueou o Baú!', 'var(--gold)');
+              darLootDoChefe(); 
+              sess.bossActive = false; 
           }
-          
-          const cardToSave = W.find(w => w.id === card.id);
-          if (cardToSave) saveCard(cardToSave);
-        }
-        if (typeof saveStats === 'function') saveStats();
-    }
+      } else {
+          // ERROU! O MONSTRO TE ATACA!
+          const hasInfShield = STATS.activeEvent && STATS.activeEvent.id === 'shields_inf';
+          if (hasInfShield || sess.miniShieldActive) {
+              sess.miniShieldActive = false; 
+              if (typeof toast === 'function') toast('🛡️ O Escudo bloqueou as garras do Monstro!', 'var(--blue)');
+          } else {
+              sess.playerHp--;
+              if (typeof toast === 'function') toast('🩸 O Monstro te feriu! (-1 HP)', 'var(--red)');
+          }
+
+          if (sess.playerHp > 0) {
+              // SOBREVIVEU! A pergunta reseta para tentar de novo!
+              limparTela();
+              setTimeout(playQuestionAudio, 200);
+              render();
+              return; 
+          } else {
+              // MORREU
+              if (typeof toast === 'function') toast('💀 Você foi engolido pelo Monstro... A carta fugiu.', 'var(--red)');
+              sess.bossActive = false; 
+          }
+      }
+  }
+
+  // --- LÓGICA NORMAL DO APLICATIVO (SM-2 E VIDAS) ---
+  if (!sess.isFreeMode) {
+      const hasInfLives = STATS.activeEvent && STATS.activeEvent.id === 'lives_inf';
+      const hasInfShield = STATS.activeEvent && STATS.activeEvent.id === 'shields_inf';
+
+      if (quality === 0 && hasInfShield) {
+          toast('🛡️ Égide Divina Ativa! Nenhuma penalidade no SM-2.', 'blue');
+          sess.queue.push(card);
+      } 
+      else if (quality === 0 && sess.miniShieldActive) {
+          sess.miniShieldActive = false; 
+          toast('🛡️ Égide Menor ativada! O card foi protegido.', 'gold');
+          sess.queue.push(card);
+      } 
+      else if (quality === 0 && hasInfLives) {
+          toast('❤️‍🔥 Imortalidade Ativa! Sua vida não foi consumida.', 'red');
+          sess.queue.push(card);
+      } 
+      else if (quality === 0 && STATS.vidas > 0) {
+          if (!configJogo.vidasInfinitas) STATS.vidas--;
+          toast('❤️ Vida consumida! O card foi protegido.', 'gold');
+          sess.queue.push(card);
+          if (typeof saveStats === 'function') saveStats();
+      } 
+      else {
+          if (quality === 0) {
+              toast('💔 Sem defesas! Penalidade aplicada.', 'err');
+              sess.queue.push(card); 
+          }
+
+          const result = sm2(card, quality);
+          const idx = W.findIndex(w => w.id === card.id);
+          if (idx >= 0) {
+              Object.assign(W[idx], result);
+              W[idx].lastReview = Date.now();
+              W[idx].totalReviews = (W[idx].totalReviews || 0) + 1;
+              
+              if (quality >= 2) {
+                 W[idx].correctStreak = (W[idx].correctStreak || 0) + 1;
+                 W[idx].consecutiveFails = 0; 
+                 W[idx].isLeech = false;
+              } else {
+                 W[idx].correctStreak = 0;
+                 W[idx].consecutiveFails = (W[idx].consecutiveFails || 0) + 1;
+                 if (W[idx].consecutiveFails >= 4) W[idx].isLeech = true; 
+              }
+              
+              const cardToSave = W.find(w => w.id === card.id);
+              if (cardToSave) saveCard(cardToSave);
+          }
+          if (typeof saveStats === 'function') saveStats();
+      }
   } else {
-    // Modo Treino Livre
-    if (quality === 0) sess.queue.push(card);
+      if (quality === 0) sess.queue.push(card);
+  }
+
+  // BÔNUS DOS MASCOTES
+  if (STATS.pets && STATS.pets.active) {
+      const activePet = STATS.pets.active;
+      const hasFreeFood = STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_fed';
+      const isFed = (STATS.pets.fedCharges > 0 || hasFreeFood) && !sess.isFreeMode;
+      
+      if (!STATS.pets.affinity) STATS.pets.affinity = {};
+      if (STATS.pets.affinity[activePet] === undefined) STATS.pets.affinity[activePet] = 0;
+      
+      let ganhoAfin = (STATS.activeEvent && STATS.activeEvent.id === 'ev_pet_aff') ? 3 : 1;
+      
+      // ✨ A variável corrigida está sendo usada aqui!
+      if (modoAtualDaCarta === 'flash' && sess.isFreeMode) {
+          ganhoAfin = 0;
+      }
+      
+      STATS.pets.affinity[activePet] += ganhoAfin;
+
+      if (typeof isPetCapped === 'function' && isPetCapped(activePet)) {
+          if (Math.random() < 0.15) {
+              toast(`⚠️ Poder do ${activePet.toUpperCase()} estagnou! XP salvo em 2º plano. Evolua-o!`, 'var(--red)');
+          }
+      }
   }
 
   setTimeout(playQuestionAudio, 200);
@@ -3096,28 +3423,11 @@ if (!sess.isFreeMode) {
   sess.answered++;
   if (quality >= 2) sess.correct++;
   sess.current++;
-  sess.flipped = false;
-
-  sess.hintUsed = false; sess.hintText = '';
-  sess.magicHintUsed = false;
-  sess.magicHintVisible = false; // ✨ Garante que a caixa suma na próxima carta
-  sess.magicHintsActive = 0;     // ✨ Zera o contador de letras reveladas
-  sess.miniShieldActive = false;
   
-  sess.choices = null; sess.choiceAnswered = false;
-  sess.typeAnswered = false; sess.contextAnswered = false;
-  sess.tfSetup = false; sess.tfAnswered = false;
-  sess.revChoices = null; sess.revChoiceAnswered = false;
-  sess.scrambleSetup = false; sess.scrambledWord = null; sess.scrambleAnswered = false; 
-  sess.spellSetup = false; sess.spellAnswered = false;
-  sess.syntaxSetup = false; sess.syntaxAnswered = false;
-  sess.clozeSetup = false; sess.clozeAnswered = false;
-  sess.imgChoices = null; sess.imgChoiceAnswered = false;
-  sess.blindAnswered = false; sess.blindAudioPlayed = false; 
-  sess.bossAnswered = false; sess.bossAudioPlayed = false; 
-  
+  // Limpa a tela para a PRÓXIMA carta vir limpinha
+  limparTela(); 
   sess.currentAdaptiveMode = null;
-  render(); // Isso vai forçar o cabeçalho a mostrar o ❤️ sumindo na mesma hora!
+  render(); 
 }
 
 function choiceAnswer(idx) {
@@ -4259,7 +4569,8 @@ function openStoreModal() {
       STATS.inventory = { 
           magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, 
           doubleXp: 0, petCrystals: 0, playerSparks: 0,
-          boxBronze: 0, boxPrata: 0, boxOuro: 0 // As caixas gacha!
+          boxBronze: 0, boxPrata: 0, boxOuro: 0, // As caixas gacha!
+          bossTickets: 0 // 🎟️ NOVO: O passe de entrada do Coliseu!
       };
   }
 
@@ -4454,6 +4765,18 @@ function openStoreModal() {
                      ${getItemBtn(`buyItem('magicHints', 100)`, 100, 0, 'var(--gold2)', false, 'magicHints')}
                   </div>
                 </div>
+                <!-- O NOVO TICKET DO COLISEU (Pode comprar com moedas) -->
+                <div class="card" style="border-color:#ff4444; margin:3px">
+                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
+                    <div style="text-align:left; flex:1; padding-right:8px">
+                      <div style="font-weight:bold; font-size:14px; color:#ff4444">🎟️ Ticket do Coliseu</div>
+                      <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Entrada para a Arena dos Titãs. Pule o suborno do guarda!</div>
+                      <div style="font-size:11px; margin-top:4px; color:#ff4444;">Estoque: ${STATS.inventory.bossTickets || 0}</div>
+                    </div>
+                    <!-- Custa apenas 150 moedas, usa o sistema padrão -->
+                    ${getItemBtn(`buyItem('bossTickets', 150)`, 150, 0, '#ff4444', false, 'bossTickets')}
+                  </div>
+                </div>
                 <div class="card" style="border-color:var(--green); margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
                      <div style="text-align:left; flex:1; padding-right:8px">
@@ -4593,49 +4916,75 @@ function openStoreModal() {
                      ${getPetBtn('fenix', 2500, 25, '#ff5e00')}
                   </div>
                 </div>
-                <!-- O NOVO PET: ÁGUIA DE ZEUS -->
+                <!-- O NOVO PET: ÁGUIA DE ZEUS (Exige 10 Pontos do Coliseu) -->
                 <div class="card" style="border-color:#3498db; margin:3px">
-                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-                     <div style="text-align:left; flex:1; padding-right:8px">
-                        <div style="font-weight:bold; font-size:14px">🦅 Águia de Zeus <span style="font-size:10px; background:#3498db; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlAguia}</span></div>
-                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A ave dos raios. Alimentada dá: <span style="color:#3498db; font-weight:bold">+${powAguiaCrit}% de Chance CRÍTICA</span>.</div>
-                        ${capAguia 
-                            ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('aguia', '🦅 Águia')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxAguia})</button></div>`
-                            : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextAguia} acertos</div>`
-                        }
-                     </div>
-                     ${getPetBtn('aguia', 4500, 30, '#3498db')}
+                  <div class="card-body" style="flex-direction: column;display:flex; justify-content:space-between; align-items:center; padding:12px">
+                    <div style="text-align:left; flex:1; padding-right:8px">
+                      <div style="font-weight:bold; font-size:14px">🦅 Águia de Zeus <span
+                          style="font-size:10px; background:#3498db; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv.
+                          ${lvlAguia}</span></div>
+                      <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A ave dos raios. Alimentada dá: <span
+                          style="color:#3498db; font-weight:bold">+${powAguiaCrit}% de Chance CRÍTICA</span>.</div>
+                      ${capAguia
+                      ? `<div style="margin-top:6px"><button class="btn danger sm"
+                          style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)"
+                          onclick="openPetEvolutionModal('aguia', '🦅 Águia')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxAguia})</button></div>`
+                      : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextAguia}
+                        acertos</div>`
+                      }
+                    </div>
+                    <!-- ✨ Botão Misto: 4500 Moedas + 10 Pontos, isPet=true -->
+                    <!-- ✨ Botão Misto da Águia -->
+                  ${getEliteItemBtn('aguia', 4500, 10, '#3498db', true, getPetBtn('aguia', 4500, 30, '#3498db'))}
                   </div>
                 </div>
-                <!-- O NOVO PET: RAPOSA DE NOVE CAUDAS (Foco em Sorte/Drop Rate) -->
+                <!-- O NOVO PET: RAPOSA DE NOVE CAUDAS (Exige 15 Pontos do Coliseu) -->
                 <div class="card" style="border-color:#e67e22; margin:3px">
-                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-                     <div style="text-align:left; flex:1; padding-right:8px">
-                        <div style="font-weight:bold; font-size:14px">🦊 Raposa Mística <span style="font-size:10px; background:#e67e22; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlRaposa}</span></div>
-                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A mascote da fortuna. Alimentada dá: <span style="color:#e67e22; font-weight:bold">+${powRaposaDrop}% de Chance de Vitória no Gacha</span>.</div>
-                        ${capRaposa 
-                            ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('raposa', '🦊 Raposa')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxRaposa})</button></div>`
-                            : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextRaposa} acertos</div>`
-                        }
-                     </div>
-                     ${getPetBtn('raposa', 5500, 35, '#e67e22')}
+                  <div class="card-body" style="flex-direction: column;display:flex; justify-content:space-between; align-items:center; padding:12px">
+                    <div style="text-align:left; flex:1; padding-right:8px">
+                      <div style="font-weight:bold; font-size:14px">🦊 Raposa Mística <span
+                          style="font-size:10px; background:#e67e22; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv.
+                          ${lvlRaposa}</span></div>
+                      <div style="font-size:11px; color:var(--stone2); margin-top:2px;">A mascote da fortuna. Alimentada dá: <span
+                          style="color:#e67e22; font-weight:bold">+${powRaposaDrop}% de Chance de Vitória no Gacha</span>.</div>
+                      ${capRaposa
+                      ? `<div style="margin-top:6px"><button class="btn danger sm"
+                          style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)"
+                          onclick="openPetEvolutionModal('raposa', '🦊 Raposa')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxRaposa})</button></div>`
+                      : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextRaposa}
+                        acertos</div>`
+                      }
+                    </div>
+                    <!-- ✨ Botão Misto: 5500 Moedas + 15 Pontos, isPet=true -->
+                    <!-- ✨ Botão Misto da Raposa -->
+                    ${getEliteItemBtn('raposa', 5500, 15, '#e67e22', true, getPetBtn('raposa', 5500, 35, '#e67e22'))}
                   </div>
                 </div>
 
-                <!-- O NOVO PET: GRIFO DOURADO (Mestre do Farm: Crítico + Drop Rate) -->
-                <div class="card" style="border-color:#ff4757; border-width: 2px; box-shadow: 0 0 10px rgba(255, 71, 87, 0.2); margin:3px">
-                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-                     <div style="text-align:left; flex:1; padding-right:8px">
-                        <div style="font-weight:bold; font-size:14px">🦁 Grifo Dourado <span style="font-size:10px; background:#ff4757; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv. ${lvlGrifo}</span></div>
-                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">O Mestre do Farm. Alimentado dá: <span style="color:#ff4757; font-weight:bold">+${powGrifoCrit}% de Crítico e +${powGrifoDrop}% de Vitória no Gacha</span>.</div>
-                        ${capGrifo 
-                            ? `<div style="margin-top:6px"><button class="btn danger sm" style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)" onclick="openPetEvolutionModal('grifo', '🦁 Grifo')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxGrifo})</button></div>`
-                            : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextGrifo} acertos</div>`
+                <!-- O NOVO PET: GRIFO DOURADO (Exige 30 Pontos do Coliseu) -->
+                  <div class="card"
+                    style="border-color:#ff4757; border-width: 2px; box-shadow: 0 0 10px rgba(255, 71, 87, 0.2); margin:3px">
+                    <div class="card-body" style="flex-direction: column;display:flex; justify-content:space-between; align-items:center; padding:12px">
+                      <div style="text-align:left; flex:1; padding-right:8px">
+                        <div style="font-weight:bold; font-size:14px">🦁 Grifo Dourado <span
+                            style="font-size:10px; background:#ff4757; color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px">Nv.
+                            ${lvlGrifo}</span></div>
+                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">O Mestre do Farm. Alimentado dá: <span
+                            style="color:#ff4757; font-weight:bold">+${powGrifoCrit}% de Crítico e +${powGrifoDrop}% de Vitória no
+                            Gacha</span>.</div>
+                        ${capGrifo
+                        ? `<div style="margin-top:6px"><button class="btn danger sm"
+                            style="padding:4px 8px; font-weight:bold; box-shadow: 0 0 10px rgba(255,0,0,0.5)"
+                            onclick="openPetEvolutionModal('grifo', '🦁 Grifo')">⬆️ REQUER EVOLUÇÃO (Nv. ${maxGrifo})</button></div>`
+                        : `<div style="font-size:10px; margin-top:4px; color:var(--stone2); font-style:italic">Faltam ${nextGrifo}
+                          acertos</div>`
                         }
-                     </div>
-                     ${getPetBtn('grifo', 8000, 40, '#ff4757')}
+                      </div>
+                      <!-- ✨ Botão Misto: 8000 Moedas + 30 Pontos, isPet=true -->
+                      <!-- ✨ Botão Misto do Grifo -->
+                      ${getEliteItemBtn('grifo', 8000, 30, '#ff4757', true, getPetBtn('grifo', 8000, 40, '#ff4757'))}
+                    </div>
                   </div>
-                </div>
                 <!-- DRAGÃO (AGORA MOSTRA O CRÍTICO) -->
                 <div class="card" style="border: 2px solid #e024ff; box-shadow: 0 0 15px rgba(224, 36, 255, 0.2); margin:3px">
                   <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
@@ -4700,27 +5049,31 @@ function openStoreModal() {
                 
                 <p style="font-size:10px; color:var(--stone2); margin-top:-2px; margin-bottom:4px; line-height:1.2">Compre materiais raros para quebrar o limite de nível dos seus Pets e da sua Bolinha (Personagem).</p>
 
-                <!-- Item 1: Cristal de Evolução de Pet -->
+                <!-- Item 1: Cristal de Evolução de Pet (Exige 5 Pontos do Coliseu) -->
                 <div class="card" style="border-color:#2ecc71; box-shadow: 0 0 10px rgba(46, 204, 113, 0.2); margin:3px">
-                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-                     <div style="text-align:left; flex:1; padding-right:8px">
-                        <div style="font-weight:bold; font-size:14px; color:#2ecc71">💎 Cristal de Quíron</div>
-                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Material necessário para evoluir Pets travados nos Níveis 10, 20, 30...</div>
-                        <div style="font-size:11px; margin-top:4px; color:#2ecc71;">Estoque: ${STATS.inventory.petCrystals || 0}</div>
-                     </div>
-                     ${getItemBtn(`buyItem('petCrystals', 5000)`, 5000, 10, '#2ecc71', false, 'petCrystals')}
+                  <div class="card-body" style="flex-direction: column;display:flex; justify-content:space-between; align-items:center; padding:12px">
+                    <div style="text-align:left; flex:1; padding-right:8px">
+                      <div style="font-weight:bold; font-size:14px; color:#2ecc71">💎 Cristal de Quíron</div>
+                      <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Material necessário para evoluir Pets travados
+                        nos Níveis 10, 20, 30...</div>
+                      <div style="font-size:11px; margin-top:4px; color:#2ecc71;">Estoque: ${STATS.inventory.petCrystals || 0}</div>
+                    </div>
+                    <!-- ✨ Botão Misto: 5000 Moedas + 5 Pontos, isPet=false -->
+                    ${getEliteItemBtn('petCrystals', 5000, 5, '#2ecc71', false)}
                   </div>
                 </div>
 
-                <!-- Item 2: Centelha da Bolinha (Prestígio do Personagem) -->
+                <!-- Item 2: Centelha da Bolinha (Exige 15 Pontos do Coliseu) -->
                 <div class="card" style="border-color:#00f5ff; box-shadow: 0 0 10px rgba(0, 245, 255, 0.2); margin:3px">
-                  <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; padding:12px">
-                     <div style="text-align:left; flex:1; padding-right:8px">
-                        <div style="font-weight:bold; font-size:14px; color:#00f5ff">⚡ Centelha do Olimpo</div>
-                        <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Material supremo. Necessário para a Bolinha principal subir de Prestígio.</div>
-                        <div style="font-size:11px; margin-top:4px; color:#00f5ff;">Estoque: ${STATS.inventory.playerSparks || 0}</div>
-                     </div>
-                     ${getItemBtn(`buyItem('playerSparks', 15000)`, 15000, 20, '#00f5ff', false, 'playerSparks')}
+                  <div class="card-body" style="flex-direction: column;display:flex; justify-content:space-between; align-items:center; padding:12px">
+                    <div style="text-align:left; flex:1; padding-right:8px">
+                      <div style="font-weight:bold; font-size:14px; color:#00f5ff">⚡ Centelha do Olimpo</div>
+                      <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Material supremo. Necessário para a Bolinha
+                        principal subir de Prestígio.</div>
+                      <div style="font-size:11px; margin-top:4px; color:#00f5ff;">Estoque: ${STATS.inventory.playerSparks || 0}</div>
+                    </div>
+                    <!-- ✨ Botão Misto: 15000 Moedas + 15 Pontos, isPet=false -->
+                    ${getEliteItemBtn('playerSparks', 15000, 15, '#00f5ff', false)}
                   </div>
                 </div>
 
@@ -4974,6 +5327,10 @@ function useSkipItem() {
     sess.queue.splice(sess.current, 1);
     
     // 2. ✨ O FAXINEIRO: Limpa a memória das perguntas para a próxima carta nascer "virgem"
+    //para nao fugir do boss usando skipiten
+    sess.bossActive = false;
+    sess.bossCardIndex = -1;
+
     sess.currentAdaptiveMode = null; 
     sess.currentCardId = null; // Força o relógio e os construtores a resetarem
     sess.leituraLidaNoIndex = null; // 🗣️ DESTRANCA O ÁUDIO! Faz o robô saber que é uma carta nova!
@@ -5819,7 +6176,7 @@ function ouvirPalavra(texto, lang) {
 window.vozesMaoLivre = [];
 window.leituraDebounce = null;
 
-// ✨ MOTOR DO LEITOR MÃOS LIVRES (MÉTODO CLÁSSICO COM ANTI-ECO)
+// ✨ MOTOR DO LEITOR MÃOS LIVRES (MÉTODO CLÁSSICO COM ANTI-ECO BLINDADO)
 function lerTelaCompleta(tempoDoRelogio) {
     if (!configJogo.leituraCompleta || typeof studySession === 'undefined' || !studySession) return;
     
@@ -5974,6 +6331,7 @@ function lerTelaCompleta(tempoDoRelogio) {
     }, 150); // Fôlego de 150ms para juntar e eliminar chamadas fantasmas
 }
 
+
 function toggleAudio() {
   autoPlayAudio = !autoPlayAudio;
   toast(autoPlayAudio ? '🔊 Áudio: ON' : '🔈 Áudio: OFF', autoPlayAudio ? 'gold' : 'err');
@@ -5997,9 +6355,9 @@ function playQuestionAudio() {
   const mode = studySession.currentAdaptiveMode || studyMode;
   const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
 
-  // 1. Modos onde a DICA (Pergunta) que está na tela é a DEFINIÇÃO
-  // Isso só acontece para cartas normais nos jogos de adivinhar a palavra
-  if (!isRel && (mode === 'type' || mode === 'spell' || mode === 'scramble' || mode === 'context')) {
+  // 1. A MORDAÇA: Modos de adivinhação onde ele SÓ PODE LER A DEFINIÇÃO (Nunca a palavra!)
+const modosDeAdivinhar = ['type', 'spell', 'scramble', 'context', 'syntax'];  
+  if (!isRel && modosDeAdivinhar.includes(mode)) {
     // Usa o clean() para a voz nunca ler os *asteriscos* em voz alta
     ouvirPalavra(clean(card.definition), card.langDef || 'pt-BR');
   }
@@ -6007,8 +6365,7 @@ function playQuestionAudio() {
   else if (mode === 'revchoice') {
     ouvirPalavra(clean(studySession.revChoicePrompt || card.definition), card.langDef || 'pt-BR');
   }
-  // 2. Modos onde a DICA que está na tela é a PALAVRA (Flash, Lacunas, Sintaxe...)
-  // E também todos os jogos de Sinônimos/Antônimos (pois a palavra base fica no topo!)
+  // 2. Modos onde ele deve ler a palavra (Flash, Lacunas...)
   else {
     ouvirPalavra(card.word, card.langWord || 'pt-BR');
   }
@@ -8005,6 +8362,7 @@ async function factoryReset() {
         alert("Erro ao formatar. Limpe o histórico do navegador manualmente.");
     }
 }
+
 /* ═══════════════════════════════════════
    🧠 MOTOR DE MEMÓRIA DE INTERFACE E GAVETAS (INTELIGENTE)
 ═══════════════════════════════════════ */
