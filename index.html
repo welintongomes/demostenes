@@ -2016,12 +2016,12 @@ function buildStudyCard() {
               <div style="font-size: 12px; color: var(--stone2); font-style: italic; margin-bottom: 12px;">Derrote a palavra para abrir o Baú do Coliseu!</div>
               <div style="display: flex; justify-content: space-around; align-items: center; background: rgba(0,0,0,0.6); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,0,0,0.3);">
                   <div style="text-align:center">
-                      <div style="font-size:10px; color:#ff6b6b; font-weight:bold; letter-spacing:1px; margin-bottom:4px">HP DO MONSTRO</div>
+                      <div style="font-size:10px; color:#ff6b6b; font-weight:bold; letter-spacing:1px; margin-bottom:4px">HP MONSTRO</div>
                       <div style="font-size:16px; letter-spacing: 2px;">${bossHearts}</div>
                   </div>
                   <div style="font-size:24px; text-shadow: 0 0 10px #ff0000;">🆚</div>
                   <div style="text-align:center">
-                      <div style="font-size:10px; color:#4dabf7; font-weight:bold; letter-spacing:1px; margin-bottom:4px">SEU HP</div>
+                      <div style="font-size:10px; color:#4dabf7; font-weight:bold; letter-spacing:1px; margin-bottom:4px">A SUA VIDA</div>
                       <div style="font-size:16px; letter-spacing: 2px;">${playerHearts}</div>
                   </div>
               </div>
@@ -2128,58 +2128,79 @@ function buildFlashMode(card, intervals) {
 }
 
 // ⚔️ FUNÇÃO DE INVOCAÇÃO DO CHEFÃO MANUAL (SISTEMA DE TICKETS)
-function startBossMode() {
-    const DIRECT_COST = 150; // O preço absurdo para entrar sem ingresso!
+// ⚔️ FUNÇÃO DE INVOCAÇÃO DO CHEFÃO MANUAL (Agora respeita categorias!)
+function startBossMode(categoriaFiltro = null) {
+    const DIRECT_COST = 150; 
 
-    if (W.length < 5) {
-        toast('Você precisa de pelo menos 5 cartas no léxico para duelar!', 'err');
+    // Se a categoria não veio pelo modal, tenta pegar do dropdown da tela inicial (pro Banner funcionar)
+    if (categoriaFiltro === null) {
+        categoriaFiltro = document.getElementById('studyCatFilter')?.value || '';
+    }
+
+    // 🕵️‍♂️ FILTRA O SEU LÉXICO PELA CATEGORIA ESCOLHIDA
+    let poolBase = W;
+    if (categoriaFiltro && categoriaFiltro !== '') {
+        poolBase = W.filter(w => w.category === categoriaFiltro);
+    }
+
+    // Trava de segurança da categoria
+    if (poolBase.length < 5) {
+        let msg = categoriaFiltro 
+            ? `A categoria "${categoriaFiltro}" precisa de pelo menos 5 cartas para suportar uma arena!` 
+            : 'Você precisa de pelo menos 5 cartas no léxico para duelar!';
+        toast(msg, 'err');
         return;
     }
 
     if (!STATS.inventory) STATS.inventory = {};
     let hasTicket = (STATS.inventory.bossTickets > 0);
 
-    // Barrado na porta!
     if (!hasTicket) {
         if (!STATS.moedas || STATS.moedas < DIRECT_COST) {
-            toast(`Você precisa de 🎟️ 1 Ticket ou ${DIRECT_COST} moedas de suborno para entrar! Você está pobre!`, 'err');
+            toast(`Você precisa de 🎟️ 1 Ticket ou ${DIRECT_COST} moedas de suborno para entrar!`, 'err');
             return;
         }
     }
 
-    // ⚠️ A CONFIRMAÇÃO DO MEDO
-    let msg = hasTicket 
+    let msgConfirm = hasTicket 
         ? "⚔️ Você usará 🎟️ 1 Ticket do Coliseu para entrar na arena. Deseja enfrentar suas piores palavras?" 
         : `⚔️ Sem Tickets! O Guarda exige um suborno de ${DIRECT_COST} moedas. Deseja pagar o absurdo e entrar na arena?`;
 
-    if (!confirm(msg)) {
+    // Mostra na confirmação qual categoria você está invadindo!
+    if (categoriaFiltro) {
+        msgConfirm = `[Domínio: ${categoriaFiltro}]\n\n` + msgConfirm;
+    }
+
+    if (!confirm(msgConfirm)) {
         return;
     }
 
-    // 💸 COBRANÇA: Gasta o Ticket ou esvazia seus bolsos
-    if (hasTicket) {
-        STATS.inventory.bossTickets--;
-    } else {
-        STATS.moedas -= DIRECT_COST;
-    }
+    if (hasTicket) STATS.inventory.bossTickets--;
+    else STATS.moedas -= DIRECT_COST;
 
     if (typeof saveStats === 'function') saveStats();
     if (typeof updateHeader === 'function') updateHeader();
 
-    // 🕵️‍♂️ Sorteia o monstro final
-    let bossPool = W.filter(w => w.isLeech || (w.correctStreak || 0) < 2);
+    // 🧠 INTELIGÊNCIA REFINADA: Busca sanguessugas SOMENTE dentro do pool da categoria!
+    let bossPool = poolBase.filter(w => w.isLeech || (w.correctStreak || 0) < 2);
+    
+    // Se você não tiver erros nessa categoria, pega 5 cartas aleatórias dela
     if (bossPool.length === 0) {
-        bossPool = [...W].sort(() => Math.random() - 0.5).slice(0, 5);
+        bossPool = [...poolBase].sort(() => Math.random() - 0.5).slice(0, 5);
     }
     const monstro = bossPool[Math.floor(Math.random() * bossPool.length)];
 
-    // ⚔️ MONTA A SESSÃO EXCLUSIVA DO CHEFÃO
+    // Fecha a janela de Modos Customizados se estiver aberta
+    if (typeof closeModal === 'function') closeModal();
+
+    // ⚔️ MONTA A SESSÃO
     studyMode = 'adaptive';
     studySession = {
         queue: [monstro], 
         current: 0, answered: 0, correct: 0,
         startTime: Date.now(), flipped: false,
-        filterCategory: '', customModes: null,
+        filterCategory: categoriaFiltro, // Salva para registrar o histórico
+        customModes: null,
         isFreeMode: true, 
         
         bossCardIndex: 0, 
@@ -5542,24 +5563,20 @@ function openCustomModal(isFreeMode = false) {
     {id:'boss', lbl:'🔥 Prova Final'}   
   ];
   
-  // ✨ LÊ OS MODOS SALVOS NA MEMÓRIA
   let savedModes = [];
   const savedStr = localStorage.getItem('savedCustomModes');
   if (savedStr) {
       savedModes = JSON.parse(savedStr);
   } else {
-      // Se for a primeira vez jogando, deixa alguns ativados por padrão
       savedModes = ['flash', 'choice', 'tf']; 
   }
   
   openModal(`
     <h3>🎛️ Modos Aleatórios</h3>
-    <div style="font-size:13px;color:var(--stone2);margin-bottom:12px;line-height:1.5">Selecione os modos que deseja incluir na rotação:</div>
+    <div style="text-align:center; font-size:13px;color:var(--stone2);margin-bottom:12px;line-height:1.5">Selecione os modos normais ou entre no Coliseu:</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
       ${modes.map(m => {
         let baseColor = m.id === 'boss' ? 'var(--red)' : (m.id === 'blind' ? 'var(--gold2)' : 'var(--border2)');
-        
-        // ✨ Verifica se o modo está na memória para já vir com o "checked"
         let isChecked = savedModes.includes(m.id) ? 'checked' : '';
         let activeColor = isChecked ? 'var(--gold)' : baseColor;
         
@@ -5567,8 +5584,6 @@ function openCustomModal(isFreeMode = false) {
         <label style="display:flex;align-items:center;gap:8px;background:var(--bg3);padding:10px;border:1px solid ${activeColor};border-radius:var(--r);cursor:pointer;transition:all 0.2s" 
         onclick="setTimeout(() => { 
             this.style.borderColor = this.querySelector('input').checked ? 'var(--gold)' : '${baseColor}';
-            
-            // ✨ MAGIA: Salva na memória no exato milissegundo em que você marca a caixinha!
             const checkedList = Array.from(document.querySelectorAll('.custom-mode-cb:checked')).map(cb => cb.value);
             localStorage.setItem('savedCustomModes', JSON.stringify(checkedList));
         }, 50)">
@@ -5576,10 +5591,14 @@ function openCustomModal(isFreeMode = false) {
           <span style="font-size:12px;font-family:'Cinzel',serif;font-weight:600">${m.lbl}</span>
         </label>
       `}).join('')}
+      <button class="btn danger" style="flex:1; min-width: 140px; box-shadow: 0 0 10px rgba(255,0,0,0.3)" onclick="startBossMode('${esc(cat)}')">⚔️ Entrar no Coliseu</button>
     </div>
-    <div class="btn-row">
-      <button class="btn gold" onclick="startCustomSession('${esc(cat)}', ${isFreeMode})">Iniciar Sessão</button>
-      <button class="btn ghost sm" onclick="closeModal()">Cancelar</button>
+    
+    <!-- ✨ NOVO BOTÃO DE ACESSO AO COLISEU (Lado a lado com a Sessão Normal) -->
+    <div class="btn-row" style="flex-wrap: wrap; justify-content: center; gap: 8px;">
+      <button class="btn gold" style="flex:1; min-width: 140px" onclick="startCustomSession('${esc(cat)}', ${isFreeMode})">Iniciar Sessão</button>
+      
+      <button class="btn ghost sm" style="width: 100%" onclick="closeModal()">Cancelar</button>
     </div>
   `);
 }
@@ -6044,6 +6063,7 @@ function getRatingRowHtml(isCorrect, correctLabel = 'Correto ✓') {
   </div>`;
 }
 // ✨ SISTEMA DE IMERSÃO DE COR (Verde para Sinônimo, Vermelho para Antônimo)
+
 // Variável na memória para controlar o tempo do "Flash" de cor
 let timerCorDeFundo;
 
@@ -6072,23 +6092,30 @@ function atualizarCorDeFundo(cardType) {
 function hl(txt) {
   return `<strong style="color:#e024ff; font-size:1.15em; text-transform:uppercase; text-shadow: 0px 0px 8px rgba(224,36,255,0.6);">${txt}</strong>`;
 }
+
 // Remove os asteriscos para exibição visual
 function clean(s) {
   return (s || '').replace(/\*/g, '');
 }
+
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
 function escReg(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
 function gv(id) { return (document.getElementById(id)?.value||'').trim(); }
+
 function today() {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0,10);
 }
+
 function statusLabel(s) {
   return {new:'Novo',learning:'Aprendendo',review:'Revisão',due:'Para revisar',mastered:'Dominado'}[s]||s;
 }
+
 // Atualize a modeLabel:
 function modeLabel(m) {
   return {
@@ -6097,12 +6124,14 @@ function modeLabel(m) {
     syntax:'Sintaxe', cloze:'Lacunas', imgchoice:'Escolha Visual', blind:'Ditado Cego', boss:'Prova Final' // ✨ Novidade
   }[m]||m;
 }
+
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
   const dp = Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i||j));
   for(let i=1;i<=m;i++) for(let j=1;j<=n;j++) dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
   return dp[m][n];
 }
+
 function toast(msg, type) {
   document.querySelectorAll('.toast').forEach(e => e.remove());
   const t = document.createElement('div');
@@ -6111,6 +6140,7 @@ function toast(msg, type) {
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2800);
 }
+
 function download(name, content, type) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([content], {type}));
@@ -6142,6 +6172,7 @@ function updateStreak() {
   STATS.lastStudy = Date.now();
   if (typeof saveStats === 'function') saveStats();
 }
+
 // ✨ CHAVE MESTRA DO ÁUDIO (Blindagem para iOS e Android)
 let isAudioUnlocked = false;
 
@@ -6170,6 +6201,7 @@ function attachListeners() {
   document.addEventListener('touchstart', unlockAudio, { once: true });
   document.addEventListener('click', unlockAudio, { once: true });
 }
+
 function renderStudy() {
   currentTab = 'study';
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('on', el.dataset.tab === 'study'));
@@ -6193,13 +6225,6 @@ function ouvirPalavra(texto, lang) {
   window.speechSynthesis.speak(u);
 }
 
-// ✨ MOTOR DO LEITOR MÃOS LIVRES (MULTILÍNGUE)
-// ✨ MOTOR DO LEITOR MÃOS LIVRES (MULTILÍNGUE ANTI-BUG)
-// ✨ MOTOR DO LEITOR MÃOS LIVRES (SEGURA O TEMPO ATÉ TERMINAR!)
-// ✨ MOTOR DO LEITOR MÃOS LIVRES (COM CADEADO ANTI-REPETIÇÃO)
-// ✨ CAIXA FORTE GLOBAL (Impede o navegador de apagar o áudio da memória)
-
-// ✨ MOTOR DO LEITOR MÃOS LIVRES (COM CADEADO E RELÓGIO BLINDADO)
 // ✨ VARIÁVEIS GLOBAIS DE SEGURANÇA (Para o navegador não esquecer o relógio)
 window.vozesMaoLivre = [];
 window.leituraDebounce = null;
@@ -6359,7 +6384,6 @@ function lerTelaCompleta(tempoDoRelogio) {
     }, 150); // Fôlego de 150ms para juntar e eliminar chamadas fantasmas
 }
 
-
 function toggleAudio() {
   autoPlayAudio = !autoPlayAudio;
   toast(autoPlayAudio ? '🔊 Áudio: ON' : '🔈 Áudio: OFF', autoPlayAudio ? 'gold' : 'err');
@@ -6468,6 +6492,7 @@ function resizeImage(file, callback) {
   }
   reader.readAsDataURL(file);
 }
+
 // ✨ PROCESSA O UPLOAD OU EMOJI NO FORMULÁRIO
 function handleImageUpload(e) {
   const file = e.target.files[0];
@@ -6478,6 +6503,7 @@ function handleImageUpload(e) {
     document.getElementById('imgPreview').innerHTML = '';
   });
 }
+
 function handleEmojiUpload(e) {
   const val = e.target.value;
   // ✨ Removido o "if(val)". Assim, se você apagar o emoji da caixinha, ele apaga a imagem salva no banco.
@@ -6797,7 +6823,6 @@ function manageAchievements() {
     }
 }
 
-// ✨ INTERFACE: O Mural Triplo (Diárias, Semanais e Conquistas)
 // ✨ FUNÇÃO AUXILIAR: Abre e fecha as gavetas dentro do Modal
 window.toggleQuestBox = function(id, btnId) {
     const box = document.getElementById(id);
@@ -6952,7 +6977,7 @@ function claimAchievement(index) {
         openQuestsModal(); 
     }
 }
-// ✨ MOTOR UNIVERSAL DE PAGAMENTO
+
 // ✨ MOTOR UNIVERSAL DE PAGAMENTO (Agora suporta Tickets Variáveis e Épicos)
 function claimQuest(index, type = 'daily') {
     const qList = type === 'weekly' ? STATS.weeklyQuests : STATS.quests;
@@ -7148,150 +7173,10 @@ openModal(`
     `);
 }
 
-// ✨ A MÁQUINA DA SORTE COM PACTO DE ALQUIMIA (BLINDAGEM ABSOLUTA)
-function playGacha() {
-    if (!STATS.inventory) STATS.inventory = {};
-    if (!STATS.pets) STATS.pets = {};
-    
-    // 🛡️ GARRA DE FERRO: Busca o sacrifício na memória profunda do navegador!
-    let memoriaPacto = localStorage.getItem('config_sacrificioGacha');
-    let sacrificio = 0;
-    
-    if (memoriaPacto !== null && memoriaPacto !== '') {
-        sacrificio = parseInt(memoriaPacto);
-    } else if (typeof configJogo !== 'undefined' && configJogo.sacrificioGacha) {
-        sacrificio = parseInt(configJogo.sacrificioGacha);
-    }
-
-    // 🎲 CÁLCULO DA SORTE
-    let baseWinChance = 0.50; // Base: 50%
-    let bonusChance = sacrificio / 200; // Ex: 100% sacrifício = +0.50 bônus
-    let finalWinChance = baseWinChance + bonusChance;
-    
-    // ✨ O MARTELO DOS DEUSES: Se a chance for igual ou maior que 1.0 (100%), Vitória Absoluta e inegável!
-    const win = (finalWinChance >= 1.0) ? true : (Math.random() <= finalWinChance); 
-    
-    // 🏆 PISCINA DE PRÊMIOS (Peso maior = Mais fácil de sair)
-    const winPool = [
-        { id: 'magicHints', name: 'Dica de Atena ✨', weight: 25, qty: 1, type: 'inv', color: 'var(--gold2)' },
-        { id: 'skips', name: 'Salto de Cronos ⏭️', weight: 25, qty: 1, type: 'inv', color: 'var(--green)' },
-        { id: 'miniShields', name: 'Égide Menor 🛡️', weight: 20, qty: 1, type: 'inv', color: 'var(--stone)' },
-        { id: 'fedCharges', name: 'Sementes de Romã 🌱', weight: 15, qty: 5, type: 'pet', color: '#8e44ad' },
-        { id: 'doubleCoins', name: 'Cargas de Néctar 🍷', weight: 12, qty: 5, type: 'inv', color: '#e024ff' },
-        { id: 'doubleXp', name: 'Cargas de Mnemósine 💧', weight: 12, qty: 5, type: 'inv', color: '#00e5ff' },
-        { id: 'boxBronze', name: 'Ânfora de Bronze 📦', weight: 8, qty: 1, type: 'inv', color: '#cd7f32' },
-        { id: 'bossTickets', name: 'Ticket do Coliseu 🎟️', weight: 5, qty: 1, type: 'inv', color: '#ff4444' },
-        { id: 'boxPrata', name: 'Caixa de Pandora 📦', weight: 3, qty: 1, type: 'inv', color: '#c0c0c0' }, // Raro
-        { id: 'boxOuro', name: 'Baú do Olimpo 🎁', weight: 1, qty: 1, type: 'inv', color: '#ffcc00' },    // Épico
-        { id: 'petCrystals', name: 'Cristal de Quíron 💎', weight: 1, qty: 1, type: 'inv', color: '#2ecc71' } // Épico
-    ];
-    
-    // 🌩️ PISCINA DE PERDAS
-    const losePool = [
-        { id: 'magicHints', name: 'Dica de Atena ✨' },
-        { id: 'skips', name: 'Salto de Cronos ⏭️' },
-        { id: 'miniShields', name: 'Égide Menor 🛡️' },
-        { id: 'doubleCoins', name: 'Cargas de Néctar 🍷' },
-        { id: 'doubleXp', name: 'Cargas de Mnemósine 💧' }
-    ];
-
-    let resultHtml = '';
-    
-    // ✨ TEXTO DE AVISO (Para você ter a prova visual de que o código leu os 100%)
-    let pactText = '';
-    let chanceExibida = Math.min(Math.round(finalWinChance * 100), 100);
-    
-    if (sacrificio > 0) {
-        pactText = `<div style="font-size:11px; color:#e024ff; margin-bottom:15px; font-style:italic; font-weight:bold;">🎲 Pacto Ativo: Sua chance de vitória foi para ${chanceExibida}%!</div>`;
-    }
-    
-    if (win) {
-        // 🎉 LÓGICA DE VITÓRIA
-        let totalWeight = winPool.reduce((acc, item) => acc + item.weight, 0);
-        let randomNum = Math.random() * totalWeight;
-        let selectedPrize = null;
-        
-        for (let item of winPool) {
-            if (randomNum < item.weight) {
-                selectedPrize = item;
-                break;
-            }
-            randomNum -= item.weight;
-        }
-
-        if (selectedPrize.type === 'pet') {
-            STATS.pets.fedCharges = (STATS.pets.fedCharges || 0) + selectedPrize.qty;
-        } else {
-            STATS.inventory[selectedPrize.id] = (STATS.inventory[selectedPrize.id] || 0) + selectedPrize.qty;
-        }
-        
-        if (typeof saveStats === 'function') saveStats();
-
-        resultHtml = `
-            <div style="text-align:center; animation: fadeIn 0.5s">
-                <div style="font-size:50px; margin-bottom:10px">🎉</div>
-                <h3 style="color:var(--gold)">VITÓRIA!</h3>
-                ${pactText}
-                <p style="font-size:13px; color:white; margin-top:10px">A roleta parou e os deuses sorriram! Você ganhou:<br>
-                <b style="color:${selectedPrize.color}; font-size:18px; display:block; margin-top:8px">+${selectedPrize.qty}x ${selectedPrize.name}</b></p>
-                <button class="btn ghost" style="margin-top:15px" onclick="closeModal()">Incrível!</button>
-            </div>`;
-        
-        toast('Sorte Grande!', 'gold');
-        if (typeof shootConfetti === 'function') shootConfetti();
-        
-    } else {
-        // 🌩️ LÓGICA DE DERROTA
-        const ownedItems = losePool.filter(i => STATS.inventory[i.id] > 0);
-        
-        if (ownedItems.length > 0) {
-            const itemToLose = ownedItems[Math.floor(Math.random() * ownedItems.length)];
-            
-            let amountLost = 1;
-            if (itemToLose.id === 'doubleCoins' || itemToLose.id === 'doubleXp') {
-                amountLost = Math.min(5, STATS.inventory[itemToLose.id]);
-            }
-            
-            STATS.inventory[itemToLose.id] -= amountLost;
-            if (typeof saveStats === 'function') saveStats();
-
-            resultHtml = `
-                <div style="text-align:center; animation: fadeIn 0.5s">
-                    <div style="font-size:50px; margin-bottom:10px">🌩️</div>
-                    <h3 style="color:var(--red)">DERROTA!</h3>
-                    ${pactText}
-                    <p style="font-size:13px; color:white; margin-top:10px">A sorte virou as costas! Como tributo, os deuses levaram:<br>
-                    <b style="color:var(--red); font-size:16px; display:block; margin-top:8px">-${amountLost}x ${itemToLose.name}</b></p>
-                    <button class="btn ghost" style="margin-top:15px" onclick="closeModal()">Que azar...</button>
-                </div>`;
-            toast('Azar...', 'err');
-            if(typeof triggerScreenShake === 'function') triggerScreenShake();
-            
-        } else {
-            resultHtml = `
-                <div style="text-align:center; animation: fadeIn 0.5s">
-                    <div style="font-size:50px; margin-bottom:10px">💨</div>
-                    <h3 style="color:var(--stone)">ESCAPOU!</h3>
-                    ${pactText}
-                    <p style="font-size:13px; color:white; margin-top:10px">Você perdeu na roleta, mas não possuía nenhum item comum para pagar o tributo. Nada foi levado!</p>
-                    <button class="btn ghost" style="margin-top:15px" onclick="closeModal()">Ufa!</button>
-                </div>`;
-            toast('Sorte na miséria!', 'ok');
-        }
-    }
-    
-    if (typeof saveStats === 'function') saveStats();
-    
-    openModal(`
-        ${resultHtml}
-        <div style="display:flex; justify-content:center; margin-top:20px">
-            <button class="btn ghost" onclick="closeModal()">Aceitar o Destino</button>
-        </div>
-    `);
-}
-// ✨ SISTEMA GACHA DA LOJA (Loot Boxes com Som!)
+// ✨ SISTEMA GACHA DA LOJA (BLINDAGEM ABSOLUTA Loot Boxes com Som!)
+// ✨ ABRIR CAIXA GACHA (AGORA COM CHANCE DE DROP DE TICKETS DO COLISEU!)
 function buyGachaBox(boxType, price) {
-    if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, doubleXp: 0 };
+    if (!STATS.inventory) STATS.inventory = { magicHints: 0, skips: 0, shields: 0, doubleCoins: 0, miniShields: 0, doubleXp: 0, bossTickets: 0 };
     
     if ((STATS.moedas || 0) < price) { 
         toast('Moedas insuficientes para apostar!', 'err'); 
@@ -7306,29 +7191,38 @@ function buyGachaBox(boxType, price) {
     let rewardHtml = '';
     let boxName = '';
     let soundType = 'loss'; // O som padrão é o de tristeza kkkk
+    let bonusTickets = 0;   // 🎟️ Variável mágica dos tickets!
 
+    // ✨ ROLAGEM DOS PRÊMIOS E DOS TICKETS
     if (boxType === 'bronze') {
         boxName = 'Ânfora de Bronze';
+        // 🎲 Rola um dado de 100 lados. Só ganha ticket se cair menor que 5 (5% de chance!)
+        bonusTickets = (Math.random() < 0.05) ? Math.floor(Math.random() * 3) + 1 : 0;
+
         if (roll < 0.60) {
             STATS.moedas += 50; STATS.earnedXP += 50;
             rewardHtml = `<b>50 🪙</b> e <b>50 XP ✨</b><br><span style="color:var(--stone2); font-size:10px">(Ficou no prejuízo...)</span>`;
         } else if (roll < 0.90) {
-            STATS.inventory.doubleXp += 20;
+            STATS.inventory.doubleXp = (STATS.inventory.doubleXp || 0) + 20;
             rewardHtml = `<b style="color:#00e5ff">20x Água de Mnemósine 💧</b><br><span style="color:var(--green); font-size:10px">(Boa Vale 250 🪙!)</span>`;
             soundType = 'win';
         } else {
-            STATS.inventory.doubleCoins += 10; STATS.inventory.doubleXp += 10;
+            STATS.inventory.doubleCoins = (STATS.inventory.doubleCoins || 0) + 10; 
+            STATS.inventory.doubleXp = (STATS.inventory.doubleXp || 0) + 10;
             rewardHtml = `<b style="color:var(--gold)">20x Néctar 🍷 + 20x Água 💧</b><br><span style="color:var(--gold); font-size:10px">(Boa! Vale 500 🪙)</span>`;
             soundType = 'jackpot';
         }
     } 
     else if (boxType === 'prata') {
         boxName = 'Caixa de Pandora';
+        // 🎲 10% de chance de vir a recompensa extra!
+        bonusTickets = (Math.random() < 0.10) ? Math.floor(Math.random() * 6) + 1 : 0;
+
         if (roll < 0.50) {
             STATS.moedas += 100; STATS.earnedXP += 100;
             rewardHtml = `<b>100 🪙</b> e <b>100 XP ✨</b><br><span style="color:var(--stone2); font-size:10px">(A esperança foi a última a morrer...)</span>`;
         } else if (roll < 0.85) {
-            STATS.inventory.doubleCoins += 60;
+            STATS.inventory.doubleCoins = (STATS.inventory.doubleCoins || 0) + 60;
             rewardHtml = `<b style="color:var(--gold)">60x Néctar dos Deuses 🍷</b><br><span style="color:var(--green); font-size:10px">(Boa Vale 750 🪙!)</span>`;
             soundType = 'win';
         } else {
@@ -7339,11 +7233,14 @@ function buyGachaBox(boxType, price) {
     }
     else if (boxType === 'ouro') {
         boxName = 'Baú do Olimpo';
+        bonusTickets = Math.floor(Math.random() * 9) + 4; // Sorteia de 4 até 12 (Sempre ganha pelo menos 4!)
+
         if (roll < 0.50) {
-            STATS.inventory.doubleXp += 40;
+            STATS.inventory.doubleXp = (STATS.inventory.doubleXp || 0) + 40;
             rewardHtml = `<b style="color:#00e5ff">40x Água de Mnemósine 💧</b><br><span style="color:var(--stone2); font-size:10px">(Vale 500 🪙. Você perdeu dinheiro...)</span>`;
         } else if (roll < 0.85) {
-            STATS.inventory.doubleCoins += 100; STATS.inventory.doubleXp += 100;
+            STATS.inventory.doubleCoins = (STATS.inventory.doubleCoins || 0) + 100; 
+            STATS.inventory.doubleXp = (STATS.inventory.doubleXp || 0) + 100;
             rewardHtml = `<b style="color:var(--gold)">100x Néctar 🍷 e 100x Água 💧</b><br><span style="color:var(--green); font-size:10px">(Vale 2.500 🪙! Lucrou absurdo!)</span>`;
             soundType = 'win';
         } else {
@@ -7354,11 +7251,25 @@ function buyGachaBox(boxType, price) {
         }
     }
 
+    // 🎟️ ADICIONA OS TICKETS E O EFEITO VISUAL SE TIVER DADO SORTE
+    if (bonusTickets > 0) {
+        STATS.inventory.bossTickets = (STATS.inventory.bossTickets || 0) + bonusTickets;
+        
+        // Adiciona a caixinha vermelha embaixo do prêmio normal!
+        rewardHtml += `
+        <div style="margin-top:15px; background:rgba(255, 68, 68, 0.1); padding:10px; border-radius:8px; border:1px solid #ff4444; animation: fadeIn 0.8s ease-in-out;">
+            <div style="font-size:12px; color:var(--stone2); margin-bottom:4px">Achado no fundo do baú:</div>
+            <b style="color:#ff4444; font-size:16px">🎟️ +${bonusTickets} Ticket(s) do Coliseu!</b>
+        </div>`;
+        
+        // Se a rolagem normal foi ruim (loss), mas você achou tickets, vamos tocar som de vitória pra animar!
+        if (soundType === 'loss') soundType = 'win';
+    }
+
     if (typeof saveStats === 'function') saveStats();
     if (soundType !== 'loss' && typeof shootConfetti === 'function') shootConfetti();
 
-    // Toca o som exato que combina com a sua sorte antes de abrir a tela!
-    playGachaSound(soundType);
+    if (typeof playGachaSound === 'function') playGachaSound(soundType);
 
     openModal(`
         <div style="text-align:center; padding:10px">
@@ -7371,7 +7282,7 @@ function buyGachaBox(boxType, price) {
         </div>
     `);
 }
-// ✨ SINTETIZADOR RETRÔ DE ÁUDIO PARA O GACHA
+
 // ✨ SINTETIZADOR RETRÔ DE ÁUDIO PARA O GACHA
 function playGachaSound(soundType) {
     // Verifica se o áudio do jogo está ativado/disponível
@@ -7420,8 +7331,6 @@ function playGachaSound(soundType) {
     }
 }
 
-// ✨ A MÁQUINA DA SORTE COM PACTO DE ALQUIMIA (AGORA VAI!)
-// ✨ A MÁQUINA DA SORTE (AGORA COM O TRIBUTO DE SANGUE BALANÇEADO)
 // ✨ A MÁQUINA DA SORTE (BALANÇEAMENTO JUSTO E SEM BUGS)
 function playGacha() {
     if (!STATS.inventory) STATS.inventory = {};
@@ -7498,6 +7407,7 @@ function playGacha() {
         { id: 'doubleCoins', name: 'Cargas de Néctar 🍷', weight: 12, qty: 5, type: 'inv', color: '#e024ff' },
         { id: 'doubleXp', name: 'Cargas de Mnemósine 💧', weight: 12, qty: 5, type: 'inv', color: '#00e5ff' },
         { id: 'boxBronze', name: 'Ânfora de Bronze 📦', weight: 8, qty: 1, type: 'inv', color: '#cd7f32' },
+        { id: 'bossTickets', name: 'Ticket do Coliseu 🎟️', weight: 5, qty: 1, type: 'inv', color: '#ff4444' },
         { id: 'boxPrata', name: 'Caixa de Pandora 📦', weight: 3, qty: 1, type: 'inv', color: '#c0c0c0' }, 
         { id: 'boxOuro', name: 'Baú do Olimpo 🎁', weight: 1, qty: 1, type: 'inv', color: '#ffcc00' },    
         { id: 'petCrystals', name: 'Cristal de Quíron 💎', weight: 1, qty: 1, type: 'inv', color: '#2ecc71' } 
@@ -7607,10 +7517,7 @@ function playGacha() {
     openModal(resultHtml);
 }
 
-// 📊 FUNÇÃO MÁGICA: Calcula e atualiza a previsão de ganhos na tela de Configuração
 // 📊 FUNÇÃO MÁGICA ESPELHO: Calcula exatamente o que a playSfx vai dar!
-// 📊 FUNÇÃO MÁGICA ESPELHO: Lê a partida ao vivo e calcula a precisão absoluta!
-// 📊 FUNÇÃO MÁGICA ESPELHO: Lê a partida ao vivo e calcula a precisão absoluta!
 window.atualizarEstimativa = function() {
     // 1. Descobre em qual modo o jogador está AGORA
     let isFreeMode = false;
@@ -7789,17 +7696,6 @@ window.changeFoco = function(tipo, val) {
     atualizarEstimativa();
 };
 
-window.changePacto = function(val) {
-    if (!configJogo.sacrificioGacha) configJogo.sacrificioGacha = 0;
-    configJogo.sacrificioGacha = Math.max(0, Math.min(100, configJogo.sacrificioGacha + val));
-    
-    // ✨ Salva no HD na hora!
-    localStorage.setItem('config_sacrificioGacha', configJogo.sacrificioGacha);
-    
-    document.getElementById('pactoVal').innerText = configJogo.sacrificioGacha + '%';
-    atualizarEstimativa();
-};
-
 window.changeCritHack = function(val) {
     if (!configJogo.criticoCustom) configJogo.criticoCustom = 0;
     
@@ -7826,13 +7722,8 @@ window.changePacto = function(val) {
     atualizarEstimativa();
 };
 
-
 //modal para configuraçao dentro do jogo
-// Abre o modal e carrega os valores atuais
-// ✨ O MENU DE CONFIGURAÇÕES COM O MODO DEUS
-// ✨ O MENU DE CONFIGURAÇÕES (COM PAINEL AO VIVO)
 // ✨ O MENU DE CONFIGURAÇÕES (COM PAINEL AO VIVO E SALVAMENTO INSTANTÂNEO)
-// ✨ O MENU DE CONFIGURAÇÕES (BLINDADO CONTRA SELEÇÃO DE TEXTO)
 function abrirConfig() {
     let valorAtual = configJogo.timerMinInterval !== undefined ? configJogo.timerMinInterval : 0;
 
@@ -7988,6 +7879,27 @@ function abrirConfig() {
     setTimeout(atualizarEstimativa, 100); 
 }
 
+// Fecha o modal sem salvar
+function fecharConfig() {
+    document.getElementById('modalConfig').style.display = 'none';
+}
+
+// ✨ FUNÇÃO QUE CONTROLA O + E O -
+function changeCritHack(amount) {
+    let val = (configJogo.criticoCustom || 0) + amount;
+    if (val < 0) val = 0; // Não deixa ser menor que zero
+    if (val > 100) val = 100; // Não deixa ser maior que 100%
+    
+    configJogo.criticoCustom = val;
+    localStorage.setItem('config_criticoCustom', val);
+
+    // Atualiza os números na tela na mesma hora
+    const span = document.getElementById('critHackValue');
+    const pen = document.getElementById('critHackPen');
+    if (span) span.innerText = val + '%';
+    if (pen) pen.innerText = val > 0 ? `Penalidade: -${val}% Ouro e XP` : `Sem penalidade extra`;
+}
+
 // ✨ A FORNALHA DA ALQUIMIA (Transmutação Direta)
 function realizarTransmutacao() {
     let amount = parseInt(document.getElementById('transmuteAmount').value);
@@ -8020,27 +7932,6 @@ function realizarTransmutacao() {
     // Atualiza a tela de trás (para mostrar o nível caindo ou subindo) e reabre o modal para atualizar os saldos
     if (typeof render === 'function') render(); 
     abrirConfig(); 
-}
-
-// Fecha o modal sem salvar
-function fecharConfig() {
-    document.getElementById('modalConfig').style.display = 'none';
-}
-
-// ✨ FUNÇÃO QUE CONTROLA O + E O -
-function changeCritHack(amount) {
-    let val = (configJogo.criticoCustom || 0) + amount;
-    if (val < 0) val = 0; // Não deixa ser menor que zero
-    if (val > 100) val = 100; // Não deixa ser maior que 100%
-    
-    configJogo.criticoCustom = val;
-    localStorage.setItem('config_criticoCustom', val);
-
-    // Atualiza os números na tela na mesma hora
-    const span = document.getElementById('critHackValue');
-    const pen = document.getElementById('critHackPen');
-    if (span) span.innerText = val + '%';
-    if (pen) pen.innerText = val > 0 ? `Penalidade: -${val}% Ouro e XP` : `Sem penalidade extra`;
 }
 
 //capturar da camera ou da galeria
@@ -8078,16 +7969,7 @@ function abrirModalEscolhaImagem() {
     // 3. Adiciona na tela preservando tudo o que já existe (Edição ou Criação)
     document.body.appendChild(bg);
 }
-/* ═══════════════════════════════════════
-   INIT
-═══════════════════════════════════════ */
-(async function init() {
-  await load(); // ✨ ADICIONE A PALAVRA "await" AQUI 
-  await new Promise(r => setTimeout(r, 900));
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  render();
-})();
+
 // ✨ O MODAL DE EVOLUÇÃO (LIMIT BREAK) DOS PETS
 function openPetEvolutionModal(petId, petName) {
     if (!STATS.pets.evoLevel) STATS.pets.evoLevel = {};
@@ -8394,6 +8276,7 @@ function runBulkAction(itemId, actionStr) {
 
     openStoreModal(); 
 }
+
 async function factoryReset() {
     // 🛡️ Travas de Segurança
     if (!confirm("⚠️ ATENÇÃO EXTREMA: Isso vai apagar TODAS as palavras, Moedas, Pets e Nível do aplicativo! Tem certeza?")) return;
@@ -8435,6 +8318,17 @@ async function factoryReset() {
         alert("Erro ao formatar. Limpe o histórico do navegador manualmente.");
     }
 }
+
+/* ═══════════════════════════════════════
+   INIT
+═══════════════════════════════════════ */
+(async function init() {
+  await load(); // ✨ ADICIONE A PALAVRA "await" AQUI 
+  await new Promise(r => setTimeout(r, 900));
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  render();
+})();
 
 /* ═══════════════════════════════════════
    🧠 MOTOR DE MEMÓRIA DE INTERFACE E GAVETAS (INTELIGENTE)
