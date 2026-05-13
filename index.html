@@ -1422,7 +1422,7 @@ function startSession(mode, filterVal = '', customArray = null, isFreeMode = fal
   // 🐉 O DADO DO MESTRE (D20): Sorteia se um Monstro vai invadir a sua revisão!
   // Regra: Só aparece nas revisões normais (SM-2), e se tiver pelo menos 3 cartas. Tem 25% de chance de acontecer.
   let bossIndex = -1;
-  if (!isFreeMode && pool.length >= 3 && Math.random() <= 0.90) {
+  if (!isFreeMode && pool.length >= 3 && Math.random() <= 0.60) {
       // Escolhe em qual turno o monstro vai pular na tela!
       bossIndex = Math.floor(Math.random() * pool.length);
   }
