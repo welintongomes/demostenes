@@ -1501,7 +1501,35 @@ function darLootDoChefe() {
     if (itemMsg) setTimeout(() => toast(itemMsg, 'var(--blue)'), 1500);
     setTimeout(() => toast(`🏆 +${pontosGanhos} Pontos do Coliseu conquistados!`, '#ff6b6b'), 2500);
     setTimeout(() => toast(`💰 O Baú jorrou ${goldGain} Moedas${petMsg}`, 'var(--gold)'), 4000);
+    // 📊 5. SENSORES DE MISSÕES E CONQUISTAS (Anota o seu progresso!)
     
+    // Atualiza as Conquistas de Prestígio
+    if (STATS.achievements && Array.isArray(STATS.achievements.list)) {
+        let achKills = STATS.achievements.list.find(a => a.id === 'ach_boss_kills');
+        if (achKills) achKills.progress++; // +1 Monstro Morto
+
+        let achPts = STATS.achievements.list.find(a => a.id === 'ach_boss_pts');
+        if (achPts) achPts.progress += pontosGanhos; // Soma os pontos que você ganhou agora
+    }
+
+    // Atualiza as Missões Diárias
+    if (Array.isArray(STATS.quests)) {
+        let qFight = STATS.quests.find(q => q.id === 'q_boss_fight');
+        if (qFight) qFight.progress++; // +1 Luta
+
+        let qWin = STATS.quests.find(q => q.id === 'q_boss_win');
+        if (qWin) qWin.progress++; // +1 Vitória
+    }
+
+    // Atualiza as Missões Semanais
+    if (Array.isArray(STATS.weeklyQuests)) {
+        let wBoss = STATS.weeklyQuests.find(q => q.id === 'w_boss');
+        if (wBoss) wBoss.progress++; // +1 Vitória na Semanal
+
+        // 👇 AQUI PARA A MISSÃO DOS PONTOS DE COLISEU!
+        let wBossPts = STATS.weeklyQuests.find(q => q.id === 'w_boss_pts');
+        if (wBossPts) wBossPts.progress += pontosGanhos;
+    }
     if (typeof shootConfetti === 'function') shootConfetti(); 
     if (typeof saveStats === 'function') saveStats();
 }
@@ -6632,7 +6660,10 @@ function generateDailyQuests() {
         // ⚡ As Novas Adrenalinas
         { id: 'q_timer', desc: 'Responda 15 cartas com o Relógio ativado ⏳', target: 15, rewardCoins: 100, rewardXP: 150 },
         { id: 'q_lightning', desc: 'Dê 5 Respostas Relâmpago (Muito Rápido!) ⚡', target: 5, rewardCoins: 150, rewardXP: 300 },
-        { id: 'q_event', desc: 'Responda 20 cartas durante um Evento 🎉', target: 20, rewardCoins: 120, rewardXP: 250 }
+        { id: 'q_event', desc: 'Responda 20 cartas durante um Evento 🎉', target: 20, rewardCoins: 120, rewardXP: 250 },
+        // 🏛️ MISSÕES DE ELITE (Coliseu dos Titãs)
+        { id: 'q_boss_fight', desc: 'Enfrente 1 Monstro no Coliseu 🐉', target: 1, rewardCoins: 100, rewardXP: 200 },
+        { id: 'q_boss_win', desc: 'Derrote 1 Monstro no Coliseu! 👑', target: 1, rewardCoins: 150, rewardXP: 300, isEpic: true } // isEpic vai ser o gatilho para dar o Ticket!
     ];
 
     // Se você tiver mais de uma categoria no app, adiciona a segunda no bolo do sorteio!
@@ -6676,6 +6707,9 @@ function generateWeeklyQuests() {
         { id: 'wq_add_words', desc: 'Adicione 30 novas palavras esta semana 🌍', target: 30, rewardCoins: 800, rewardXP: 2000 },
         { id: 'wq_smart_rev', desc: 'Revise 150 cartas na Revisão Inteligente 🔄', target: 150, rewardCoins: 1000, rewardXP: 2500 },
         { id: 'wq_syn_ant', desc: 'Acerte 50 cartas de Sinônimo/Antônimo 🗣️', target: 50, rewardCoins: 1200, rewardXP: 3000 },
+        // 🏛️ Missões Épicas Semanais
+        { id: 'w_boss', desc: 'Derrote 3 Titãs no Coliseu 🐉', target: 3, rewardCoins: 800, rewardXP: 1500, rewardTickets: 3 },
+        { id: 'w_boss_pts', desc: 'Acumule 100 Pontos do Coliseu 🏆', target: 100, rewardCoins: 1000, rewardXP: 2000, rewardTickets: 2 },
     ];
 
     possibleWeekly.sort(() => 0.5 - Math.random());
@@ -6684,9 +6718,8 @@ function generateWeeklyQuests() {
     STATS.weeklyQuests = possibleWeekly.slice(0, 6).map(q => ({ ...q, progress: 0, claimed: false }));
     if (typeof saveStats === 'function') saveStats();
 }
-// ✨ MOTOR DE PRESTÍGIO E CONQUISTAS (A Bolinha)
-// ✨ MOTOR DE PRESTÍGIO E CONQUISTAS (Inteligente e Auto-Atualizável)
-// ✨ GERENCIADOR DE CONQUISTAS (Blindado contra contas novas!)
+
+// ✨ GERENCIADOR DE CONQUISTAS (Inteligente e Auto-Atualizável, Blindado contra contas novas!)
 function manageAchievements() {
     if (!STATS) STATS = {};
     
@@ -6710,7 +6743,10 @@ function manageAchievements() {
         { id: 'ach_add_words', name: 'Criador de Mundos 🌍', desc: 'Adicione {X} novas palavras ao seu grimório', target: 500, progress: 0, claimed: false, rewardCoins: 3000, rewardXP: 10000 },
         { id: 'ach_quests', name: 'Herói de Atena 📜', desc: 'Resgate {X} missões diárias ou semanais', target: 50, progress: 0, claimed: false, rewardCoins: 3000, rewardXP: 8000 },
         { id: 'ach_smart', name: 'Revisor Implacável 🔄', desc: 'Revise {X} cartas na Revisão Inteligente', target: 800, progress: 0, claimed: false, rewardCoins: 2500, rewardXP: 7000 },
-        { id: 'ach_syn_ant', name: 'Mestre da Retórica 🗣️', desc: 'Acerte {X} cartas de Sinônimo ou Antônimo', target: 300, progress: 0, claimed: false, rewardCoins: 2000, rewardXP: 6000 }
+        { id: 'ach_syn_ant', name: 'Mestre da Retórica 🗣️', desc: 'Acerte {X} cartas de Sinônimo ou Antônimo', target: 300, progress: 0, claimed: false, rewardCoins: 2000, rewardXP: 6000 },
+        // ✨ NOVIDADE: AS CONQUISTAS DE PRESTÍGIO DO COLISEU!
+        { id: 'ach_boss_kills', name: 'Matador de Titãs 🗡️', desc: 'Derrote {X} Monstros no Coliseu', target: 50, progress: 0, claimed: false, rewardCoins: 6000, rewardXP: 20000, rewardTickets: 5 },
+        { id: 'ach_boss_pts', name: 'Glória Eterna 🏆', desc: 'Acumule {X} Pontos do Coliseu', target: 300, progress: 0, claimed: false, rewardCoins: 5000, rewardXP: 15000, rewardTickets: 3 }
     ];
 
     // 2. Cria a estrutura básica se for o primeiríssimo acesso do jogador
@@ -6760,6 +6796,7 @@ function manageAchievements() {
         if (typeof saveStats === 'function') saveStats();
     }
 }
+
 // ✨ INTERFACE: O Mural Triplo (Diárias, Semanais e Conquistas)
 // ✨ FUNÇÃO AUXILIAR: Abre e fecha as gavetas dentro do Modal
 window.toggleQuestBox = function(id, btnId) {
@@ -6882,16 +6919,30 @@ function openQuestsModal() {
     openModal(html);
 }
 
-// ✨ MOTOR DE PAGAMENTO DAS CONQUISTAS
+// ✨ MOTOR DE PAGAMENTO DAS CONQUISTAS (Atualizado com Tickets do Coliseu)
 function claimAchievement(index) {
     const q = STATS.achievements.list[index];
     if (q && q.progress >= q.target && !q.claimed) {
         q.claimed = true;
+        
+        // 1. Recebe o Ouro e o XP normais
         STATS.moedas = (STATS.moedas || 0) + q.rewardCoins;
         STATS.earnedXP = (STATS.earnedXP || 0) + q.rewardXP;
         
+        // 🎟️ 2. RECEBE OS TICKETS (Se a conquista tiver essa recompensa)
+        if (q.rewardTickets && q.rewardTickets > 0) {
+            if (!STATS.inventory) STATS.inventory = {};
+            STATS.inventory.bossTickets = (STATS.inventory.bossTickets || 0) + q.rewardTickets;
+            
+            // Aviso com atraso para não sumir rápido da tela
+            setTimeout(() => {
+                if (typeof toast === 'function') toast(`🎟️ Você ganhou +${q.rewardTickets} Ticket(s) do Coliseu!`, '#ff4444');
+            }, 1500); 
+        }
+
         if (typeof saveStats === 'function') saveStats();
         if (typeof shootConfetti === 'function') shootConfetti();
+        
         toast('🏆 Conquista Épica Resgatada!', '#00f5ff');
         
         const moedasEl = document.getElementById('hMoedas');
@@ -6902,6 +6953,7 @@ function claimAchievement(index) {
     }
 }
 // ✨ MOTOR UNIVERSAL DE PAGAMENTO
+// ✨ MOTOR UNIVERSAL DE PAGAMENTO (Agora suporta Tickets Variáveis e Épicos)
 function claimQuest(index, type = 'daily') {
     const qList = type === 'weekly' ? STATS.weeklyQuests : STATS.quests;
     const q = qList[index];
@@ -6911,6 +6963,24 @@ function claimQuest(index, type = 'daily') {
         STATS.moedas = (STATS.moedas || 0) + q.rewardCoins;
         STATS.earnedXP = (STATS.earnedXP || 0) + q.rewardXP;
         
+        // 🎟️ LÓGICA DE TICKETS: Verifica se dá Múltiplos Tickets (Semanais) ou 1 Ticket (Épica Diária)
+        let ticketsGanhos = 0;
+        if (q.rewardTickets && q.rewardTickets > 0) {
+            ticketsGanhos = q.rewardTickets;
+        } else if (q.isEpic) {
+            ticketsGanhos = 1;
+        }
+
+        if (ticketsGanhos > 0) {
+            if (!STATS.inventory) STATS.inventory = {};
+            STATS.inventory.bossTickets = (STATS.inventory.bossTickets || 0) + ticketsGanhos;
+            
+            // Aviso com atraso de 1.5s para não ser engolido pelo Toast principal!
+            setTimeout(() => {
+                if (typeof toast === 'function') toast(`🎟️ Você ganhou +${ticketsGanhos} Ticket(s) do Coliseu!`, '#ff4444');
+            }, 1500);
+        }
+
         if (typeof saveStats === 'function') saveStats();
         if (typeof shootConfetti === 'function') shootConfetti();
         toast(`🎁 Recompensa ${type === 'weekly' ? 'Semanal' : 'Diária'} Resgatada!`, 'gold');
@@ -6930,10 +7000,12 @@ function claimQuest(index, type = 'daily') {
                 }
             }
         }
+        
         if (typeof saveStats === 'function') saveStats();
         openQuestsModal(); 
     }
 }
+
 // ✨ SISTEMA LIVE-OPS: EVENTOS POR TURNO E MARATONAS
 function runEventManager() {
     if (!STATS) return;
@@ -7108,6 +7180,7 @@ function playGacha() {
         { id: 'doubleCoins', name: 'Cargas de Néctar 🍷', weight: 12, qty: 5, type: 'inv', color: '#e024ff' },
         { id: 'doubleXp', name: 'Cargas de Mnemósine 💧', weight: 12, qty: 5, type: 'inv', color: '#00e5ff' },
         { id: 'boxBronze', name: 'Ânfora de Bronze 📦', weight: 8, qty: 1, type: 'inv', color: '#cd7f32' },
+        { id: 'bossTickets', name: 'Ticket do Coliseu 🎟️', weight: 5, qty: 1, type: 'inv', color: '#ff4444' },
         { id: 'boxPrata', name: 'Caixa de Pandora 📦', weight: 3, qty: 1, type: 'inv', color: '#c0c0c0' }, // Raro
         { id: 'boxOuro', name: 'Baú do Olimpo 🎁', weight: 1, qty: 1, type: 'inv', color: '#ffcc00' },    // Épico
         { id: 'petCrystals', name: 'Cristal de Quíron 💎', weight: 1, qty: 1, type: 'inv', color: '#2ecc71' } // Épico
