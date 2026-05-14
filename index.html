@@ -2611,7 +2611,8 @@ if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType
   return html;
 }
 
-// ✨ O MODO DITADO CEGO - 100% VOZ (Corrigido)
+// ✨ O MODO DITADO CEGO - 100% VOZ (Agora entende Sinônimos e Antônimos!)
+// ✨ O MODO DITADO CEGO - 100% VOZ (Agora com a UI Inteligente!)
 function buildBlindMode(card) {
   const sess = studySession;
   const answered = sess.blindAnswered;
@@ -2619,12 +2620,26 @@ function buildBlindMode(card) {
   const defLang = card.langDef || 'pt-BR';  
 
   if (!answered && !sess.blindAudioPlayed) {
-      // setTimeout(() => ouvirPalavra(clean(card.definition), defLang), 300);
       sess.blindAudioPlayed = true;
   }
-// ✨ A MÁGICA DA COR: (Removi a duplicação que existia na função anterior)
+  
   if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
-  const typeText = card.cardType === 'sinônimo' ? `Tem como ${hl('sinônimo')}:` : (card.cardType === 'antônimo' ? `Tem como ${hl('antônimo')}:` : 'Significa:');
+  
+  const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+  
+  let instrucaoTela = 'Escute o significado e <b>fale</b> a palavra correspondente.';
+  if (card.cardType === 'sinônimo') instrucaoTela = 'Escute a palavra e diga algum <b>sinônimo</b> para ela.';
+  if (card.cardType === 'antônimo') instrucaoTela = 'Escute a palavra e diga um <b>antônimo</b> para ela.';
+
+  const btnAudioAction = isRel 
+      ? `ouvirPalavra(studySession.queue[studySession.current].word, '${ansLang}')` 
+      : `ouvirPalavra(clean(studySession.queue[studySession.current].definition), '${defLang}')`;
+  const btnAudioLabel = isRel ? '🔊 Repetir Palavra' : '🔊 Repetir Definição';
+
+  // ✨ CORREÇÃO: Puxa as respostas certas da Definição para mostrar na tela
+  let respostasCertas = card.word;
+  if (card.cardType === 'sinônimo') respostasCertas = card.synonyms || card.definition;
+  if (card.cardType === 'antônimo') respostasCertas = card.antonyms || card.definition;
 
   return `
     <div class="card" style="margin-bottom:12px; background: #1a1a1a; border: 1px solid var(--gold2);">
@@ -2632,21 +2647,20 @@ function buildBlindMode(card) {
         <div class="fc-type" style="margin-bottom:8px; color:var(--gold2); font-weight:bold; letter-spacing:1px">🎧 DITADO CEGO</div>
         <div style="font-size:35px; margin-bottom:10px; opacity:0.8">👤</div>
         <div class="fc-definition" style="font-size:15px;line-height:1.4;color:var(--stone3)">
-          ${answered ? `<span style="color:var(--gold2); font-size:24px">${esc(card.word)}</span>` : 'Escute o significado e <b>fale</b> a palavra correspondente.'}
+          ${answered ? `<span style="color:var(--gold2); font-size:24px">${esc(respostasCertas)}</span>` : instrucaoTela}
         </div>
       </div>
     </div>
     ${!answered ? `
     <div style="display:flex; justify-content:center; margin-bottom:12px">
-       <button class="btn ghost sm" onclick="ouvirPalavra(clean(studySession.queue[studySession.current].definition), studySession.queue[studySession.current].langDef || 'pt-BR')" style="border-color:var(--gold2); color:var(--gold2)"><span style="font-size:18px">🔊</span> Repetir Definição</button>
+       <button class="btn ghost sm" onclick="${btnAudioAction}" style="border-color:var(--gold2); color:var(--gold2)"><span style="font-size:18px">🔊</span> ${btnAudioLabel}</button>
     </div>
     
-    <!-- ✨ CAMPO ÚNICO: EXCLUSIVAMENTE POR VOZ -->
     <div style="margin-bottom:12px; padding:12px; background:rgba(212,175,55,0.1); border-radius:var(--r); border:1px dashed var(--gold2)">
        <div style="font-size:12px; color:var(--gold2); margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; font-weight:bold; text-align:center;">Pronuncie a Resposta (Obrigatório)</div>
        <div style="display:flex; gap:8px; flex-direction:column;">
          <button class="btn" onclick="startDictation('blindInput', '${ansLang}', this)" style="padding:12px; font-size:16px; background:var(--gold2); border:none; color:var(--bg); cursor:pointer; font-weight:bold">
-            🎙️ Tocar para Falar
+           🎙️ Tocar para Falar
          </button>
          <input class="inp" id="blindInput" readonly placeholder="A sua voz aparecerá aqui..." style="background:rgba(0,0,0,0.5); border-color:var(--gold2); color:var(--gold2); text-align:center; font-style:italic; font-size:16px; pointer-events:none">
        </div>
@@ -2654,9 +2668,9 @@ function buildBlindMode(card) {
     <button class="btn gold" style="width:100%;padding:12px; font-weight:bold" onclick="checkBlind()">CONFIRMAR RESPOSTA →</button>
     ` : `
     <div class="type-result ${sess.blindCorrect ? 'ok' : 'fail'}" style="margin-bottom:10px">
-      ${sess.blindCorrect ? '✓ Excelente!' : `✗ A palavra era: ${esc(card.word)}`} 
+      ${sess.blindCorrect ? '✓ Excelente!' : `✗ A resposta era: ${esc(respostasCertas)}`} 
       <div style="font-size:13px;margin-top:4px;color:var(--stone2)">
-        Significa: <b>${esc(clean(card.definition))}</b>
+        ${isRel ? `Palavra Falada: <b>${esc(card.word)}</b>` : `Significa: <b>${esc(clean(card.definition))}</b>`}
       </div>
     </div>
     ${getRatingRowHtml(sess.blindCorrect, 'Correto ✓')}`}
@@ -3018,20 +3032,35 @@ function buildClozeMode(card) {
   if (!sess.clozeSetup) {
     let text = "", blanks = [], poolWords = [], isRelList = false;
 
+    // ✨ O SISTEMA DE FILTRAGEM PERFEITO (Copiado do Múltipla Escolha)
     let pool = typeof W !== 'undefined' ? W.filter(w => w.id !== card.id) : [];
-    let sameCat = pool.filter(w => w.category === card.category);
-    let langStrict = sameCat.filter(w => w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
-    let langType   = sameCat.filter(w => w.cardType === card.cardType);
+    
+    let langStrict = pool.filter(w => w.category === card.category && w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
+    let langType   = pool.filter(w => w.category === card.category && w.cardType === card.cardType);
+    let langOnly   = pool.filter(w => w.category === card.category); // <-- A Trava do Idioma!
+    
+    let t1 = pool.filter(w => w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
+    let t2 = pool.filter(w => w.cardType === card.cardType);
 
-    let othersCards = langStrict.length >= 4 ? langStrict : (langType.length >= 4 ? langType : sameCat);
+    // Cascata de perfeição
+    let othersCards = langStrict.length >= 4 ? langStrict 
+                    : (langType.length >= 4 ? langType 
+                    : (langOnly.length >= 4 ? langOnly 
+                    : (t1.length >= 4 ? t1 
+                    : (t2.length >= 4 ? t2 : pool))));
 
-    let isCatEnglish = card.category && (card.category.toLowerCase().includes('inglês') || card.category.toLowerCase().includes('english') || card.category.toLowerCase() === 'en' || card.category.toLowerCase().includes('ingles'));
-    let fakeWordsRel = isCatEnglish ? ["actually", "perhaps", "however", "therefore", "besides"] : ["inefável", "assertivo", "prolixo", "efêmero", "pragmático"];
-    let fakeWordsNormal = isCatEnglish ? ["actually", "nevertheless", "therefore", "although", "furthermore", "meanwhile", "otherwise", "perhaps"] : ["intrínseco", "efêmero", "pragmático", "eloquente", "inefável", "prolixo", "sagaz", "peculiar"];
+    // 🧠 GERA OS BOTÕES CERTOS: Ensina a função a extrair os sinônimos da sua Definição!
+    let rawValids = typeof getValidAnswers === 'function' ? getValidAnswers(card) : [];
+    
+    if (isRel) {
+        let extraStr = (card.cardType === 'sinônimo' ? (card.synonyms||'') : (card.antonyms||'')) + ',' + (card.definition||'');
+        let extras = extraStr.split(',').map(s => s.trim()).filter(s => s !== '');
+        rawValids = [...rawValids, ...extras]; // Junta tudo!
+    }
+    
+    const validsLimpos = [...new Set(rawValids.map(v => v.trim()))].filter(v => v.length > 0);
 
-    const rawValids = typeof getValidAnswers === 'function' ? getValidAnswers(card) : [];
-    const validsLimpos = rawValids.map(v => v.trim()).filter(v => v.length > 0);
-
+    // 1. LÓGICA PARA SINÔNIMOS / ANTÔNIMOS
     if (isRel && !card.example && !card.contextPhrase) {
       isRelList = true;
       const numBlanks = Math.min(3, validsLimpos.length);
@@ -3039,14 +3068,19 @@ function buildClozeMode(card) {
       text = Array(numBlanks).fill('___').join(' &nbsp;•&nbsp; ');
       
       let others = othersCards.flatMap(w => w.cardType === 'sinônimo' || w.cardType === 'antônimo' ? getValidAnswers(w) : [w.word]);
+      
+      // ✨ O SEGREDO AQUI: Se faltar distrator, puxa SÓ da mesma categoria (langOnly)
       if (others.length < 6) {
-          others = [...others, ...fakeWordsRel]; 
-          if (others.length < 6) others = [...others, ...pool.map(w => w.word)];
+          let backup = langOnly.length > 0 ? langOnly : pool;
+          others = [...others, ...backup.map(w => w.word)];
       }
 
       let fakes = [...new Set(others)].filter(opt => !validsLimpos.map(norm).includes(norm(opt))).sort(() => Math.random() - 0.5).slice(0, 5);
       poolWords = [...blanks, ...fakes];
-    } else {
+      
+    } 
+    // 2. LÓGICA PARA LACUNAS NORMAIS / FRASES
+    else {
       text = card.contextPhrase || (isRel ? card.example : card.definition); 
       let matches = [...text.matchAll(/\*([^*]+)\*/g)];
       if (matches.length > 0) {
@@ -3070,10 +3104,48 @@ function buildClozeMode(card) {
          text = newTextArr.join(' ');
       }
       
-      let others = othersCards.map(w => w.word);
-      if (others.length < 8) {
-          others = [...others, ...fakeWordsNormal]; 
-          if (others.length < 8) others = [...others, ...pool.map(w => w.word)];
+      let others = [];
+      let textoVeioDaDefinicao = !card.contextPhrase && !isRel;
+
+      if (textoVeioDaDefinicao) {
+          // 🧠 EXTRATOR DE DISTRATORES DE OURO (Sem lixo, sem frases, só palavras fortes)
+          const extrairPalavrasOuro = (w) => {
+              let listaOuro = [];
+              
+              // 1. Tenta pegar Sinônimos e Antônimos primeiro (são as iscas mais perfeitas possíveis!)
+              if (w.synonyms) listaOuro.push(...w.synonyms.split(',').map(s => s.trim().split(' ')[0]));
+              if (w.antonyms) listaOuro.push(...w.antonyms.split(',').map(s => s.trim().split(' ')[0]));
+              
+              // 2. Limpa a definição inteira de qualquer lixo (HTML, hifens e pontuações)
+              let defLimpa = (w.definition || '').replace(/<[^>]*>?/gm, ' ') // Arranca códigos HTML (ex: <b>, <br>)
+                                                 .replace(/[.,!?;:"'()[\]{}*\-]/g, ' '); // Troca pontuação por espaço
+              
+              // 3. Corta tudo e filtra: Só aceita palavras com 5 letras ou mais (mata o "como", "para", "com", etc)
+              let palavrasDePeso = defLimpa.split(/\s+/).filter(x => x.length >= 5);
+              
+              // 4. Pega só as 2 palavras mais difíceis (maiores) daquela definição para não poluir o jogo
+              palavrasDePeso.sort((a, b) => b.length - a.length);
+              if (palavrasDePeso[0]) listaOuro.push(palavrasDePeso[0]);
+              if (palavrasDePeso[1]) listaOuro.push(palavrasDePeso[1]);
+              
+              return listaOuro;
+          };
+
+          // Varre as cartas do mesmo idioma roubando as melhores palavras!
+          othersCards.forEach(w => others.push(...extrairPalavrasOuro(w)));
+          
+          if (others.length < 8) {
+              let backup = langOnly.length > 0 ? langOnly : pool;
+              backup.forEach(w => others.push(...extrairPalavrasOuro(w)));
+          }
+      } else {
+          // Se a frase é de Contexto (INGLÊS), continua usando as palavras normais em inglês (w.word)
+          others = othersCards.map(w => w.word);
+          
+          if (others.length < 8) {
+              let backup = langOnly.length > 0 ? langOnly : pool;
+              others = [...others, ...backup.map(w => w.word)];
+          }
       }
       
       const numFakes = Math.max(4, 7 - blanks.length); 
@@ -3087,46 +3159,62 @@ function buildClozeMode(card) {
     sess.clozeValidAlternatives = {};
     let extraValids = [];
     
+    // 1. JOGO DE LISTA SOLTA ("Selecione 3 sinônimos...")
+    if (isRelList) {
+        extraValids.push(...validsLimpos); 
+    }
+    
+    // 2. JOGO DE FRASES ("Preencha com um sinônimo/antônimo:")
+    // 2. JOGO DE FRASES ("Preencha com um sinônimo/antônimo:")
     blanks.forEach((b, i) => {
-        sess.clozeValidAlternatives[i] = [norm(b)]; 
+        let aceitosParaEstaLacuna = [norm(b)]; // Por padrão, aceita a palavra exata do buraco
         
-        // 🚨 SE FOR SINÔNIMO/ANTÔNIMO: DELETA A PALAVRA ORIGINAL! 🚨
-        if (norm(b) === norm(card.word) && isRel) {
-            sess.clozeValidAlternatives[i] = []; // Esvazia! Só aceita o que vier da lista abaixo!
+        // 🧠 A MÁGICA: Injeta os Sinônimos/Antônimos nos botões e no corretor!
+        if (isRel && !isRelList) {
             
-            validsLimpos.forEach(v => {
-                let vNorm = norm(v);
-                if (!sess.clozeValidAlternatives[i].includes(vNorm)) {
-                    sess.clozeValidAlternatives[i].push(vNorm);
-                    extraValids.push(v); // Guarda para criar o botão
-                }
-            });
+            // Puxa a lista MESTRA que já juntou o card.definition, card.synonyms e getValidAnswers!
+            let palavrasRelacionadas = validsLimpos;
+            
+            // 1. Adiciona essas palavras no corretor invisível (Aceita qualquer uma delas como certa!)
+            aceitosParaEstaLacuna.push(...palavrasRelacionadas.map(norm));
+            
+            // 2. Joga essas palavras para a tela virarem botões jogáveis!
+            extraValids.push(...palavrasRelacionadas);
         }
+        
+        sess.clozeValidAlternatives[i] = aceitosParaEstaLacuna; 
     });
 
+    // Junta tudo (botões da frase + botões de sinônimo + distratores)
     poolWords = [...poolWords, ...extraValids];
     
-    // 🚨 BANIMENTO VISUAL TOTAL DA PALAVRA ORIGINAL 🚨
-    if (isRel) {
-        poolWords = poolWords.filter(w => norm(w) !== norm(card.word));
-    }
-
-    sess.clozeText = text; 
-    sess.clozeAnswers = blanks; 
-    
-    // Limpa botões duplicados perfeitamente
+    // ✨ LIMPEZA PERFEITA E BANIMENTO DE OURO
     let finalPool = [];
     let seenNorms = new Set();
+    
     poolWords.forEach(w => {
         let n = norm(w);
-        if(!seenNorms.has(n)) {
+        
+        // 🛡️ O SEGURANÇA: Se o cartão é de Relação (Sinônimo ou Antônimo), 
+        // a Palavra Principal NUNCA pode virar botão na tela para não estragar o desafio!
+        let isPalavraProibida = isRel ? (n === norm(card.word)) : false; 
+        
+        // Garante que não adicione botão vazio, não repita, e barre a proibida!
+        if (n && !seenNorms.has(n) && !isPalavraProibida) { 
             seenNorms.add(n);
             finalPool.push(w);
         }
     });
     
+    sess.clozeText = text; 
+    sess.clozeAnswers = blanks; 
+    
+    // Cria os botões embaralhados
     sess.clozePool = finalPool.map((w,i)=>({id:i, word: w.replace(/[.,!?;:"'()]/g, '').trim()})).sort(() => Math.random() - 0.5);
-    sess.clozeUserAnswers = []; sess.clozeIsRelList = isRelList; sess.clozeSetup = true;
+    
+    sess.clozeUserAnswers = []; 
+    sess.clozeIsRelList = isRelList; 
+    sess.clozeSetup = true;
   }
   
   const answered = sess.clozeAnswered;
@@ -3345,16 +3433,35 @@ function rateCard(quality) {
   };
 
   // ⚔️ O MOTOR DE BATALHA DO CHEFÃO
+  // ⚔️ O MOTOR DE BATALHA DO CHEFÃO
   if (sess.bossActive) {
       if (quality >= 2) {
-          sess.bossHp--;
+          // 🎲 LÓGICA DO ESCUDO DO BOSS (25% de chance de defesa se o escudo estiver inteiro)
+          if (Math.random() < 0.25 && !sess.bossEscudoQuebrado) {
+              sess.bossEscudoQuebrado = true; // Quebra o escudo para o próximo ataque!
+              if (typeof toast === 'function') toast('🛡️ O Boss defendeu o ataque! O escudo quebrou!', 'var(--gold)');
+              if (typeof triggerScreenShake === 'function') triggerScreenShake();
+          } else {
+              // ACERTOU LIMPO!
+              sess.bossHp--;
+              sess.bossEscudoQuebrado = false; // Reseta o escudo para os próximos turnos
+              if (sess.bossHp > 0) {
+                  if (typeof toast === 'function') toast('🗡️ Acerto Direto! O Monstro sangra! (-1 HP)', 'var(--green)');
+              }
+          }
+
           if (sess.bossHp > 0) {
-              // ACERTOU MAS O MONSTRO NÃO MORREU (O Monstro prepara o contra-ataque!)
-              if (typeof toast === 'function') toast('🗡️ Acerto Crítico! O Monstro sangra! (-1 HP)', 'var(--green)');
-              
+              // ACERTOU (Ou Boss defendeu) MAS O MONSTRO NÃO MORREU (O Monstro prepara o contra-ataque!)
               sess.bossTurn++;
-              const bossAttacks = ['cloze', 'blind', 'spell', 'type', 'revchoice'];
-              sess.currentAdaptiveMode = bossAttacks[sess.bossTurn % bossAttacks.length];
+              
+              // 🔄 MUDANÇA DE FORMA (O Monstro troca para um modo diferente aleatório)
+              const bossAttacks = ['cloze', 'blind', 'spell', 'type', 'scramble']; // Adicionei scramble para mais caos
+              let novoModo;
+              do {
+                  novoModo = bossAttacks[Math.floor(Math.random() * bossAttacks.length)];
+              } while (novoModo === sess.currentAdaptiveMode); // Garante que não vai repetir o golpe atual
+              
+              sess.currentAdaptiveMode = novoModo;
               
               limparTela(); // Limpa a tela para o contra-ataque
               setTimeout(playQuestionAudio, 200);
@@ -3375,10 +3482,21 @@ function rateCard(quality) {
           } else {
               sess.playerHp--;
               if (typeof toast === 'function') toast('🩸 O Monstro te feriu! (-1 HP)', 'var(--red)');
+              if (typeof triggerScreenShake === 'function') triggerScreenShake();
           }
 
           if (sess.playerHp > 0) {
-              // SOBREVIVEU! A pergunta reseta para tentar de novo!
+              // SOBREVIVEU! A pergunta reseta E O MONSTRO MUDA DE ESTRATÉGIA!
+              
+              // 🔄 MUDANÇA DE FORMA (Mesmo você errando, ele não deixa você decorar o modo)
+              const bossAttacks = ['cloze', 'blind', 'spell', 'type', 'scramble'];
+              let novoModo;
+              do {
+                  novoModo = bossAttacks[Math.floor(Math.random() * bossAttacks.length)];
+              } while (novoModo === sess.currentAdaptiveMode);
+              
+              sess.currentAdaptiveMode = novoModo;
+
               limparTela();
               setTimeout(playQuestionAudio, 200);
               render();
@@ -3390,7 +3508,6 @@ function rateCard(quality) {
           }
       }
   }
-
   // --- LÓGICA NORMAL DO APLICATIVO (SM-2 E VIDAS) ---
   if (!sess.isFreeMode) {
       const hasInfLives = STATS.activeEvent && STATS.activeEvent.id === 'lives_inf';
@@ -3660,37 +3777,62 @@ function checkCloze() {
   // O Normalizador Paranoico trabalha no Corretor também!
   const norm = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[.,!?;:"'()]/g, '').toLowerCase().trim();
   
+  const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
+
+  // 🧠 LÓGICA MÁGICA DE RELAÇÕES (Só ativa se for a lista solta de botões, e não uma frase armada!)
   if (sess.clozeIsRelList) {
-    const valids = (typeof getValidAnswers === 'function' ? getValidAnswers(card) : []).map(norm);
-    const userClean = userWords.map(norm);
-    sess.clozeCorrect = userClean.length === expectedWords.length && userClean.every(w => valids.includes(w));
-  } else {
-    let allCorrect = true;
-    
-    if (userWords.length !== expectedWords.length) {
-      allCorrect = false;
-    } else {
-      for (let i = 0; i < expectedWords.length; i++) {
-        const uW = norm(userWords[i]); 
-        
-        // Puxa as regras que a tela de cima criou!
-        let validOptionsParaEstaLacuna = [];
-        if (sess.clozeValidAlternatives && sess.clozeValidAlternatives[i]) {
-            validOptionsParaEstaLacuna = sess.clozeValidAlternatives[i].map(norm);
-        } else {
-            validOptionsParaEstaLacuna = [norm(expectedWords[i])];
-        }
-        
-        // Compara com a lista validada (Onde "perspicaz" foi banido e "sagaz" é a única salvação!)
-        if (validOptionsParaEstaLacuna.includes(uW)) {
-            continue; 
-        }
-        
-        allCorrect = false; 
-        break;
+      // 1. Cria a piscina de Ouro com TUDO o que o jogador cadastrou!
+      let poolRespostas = [];
+      if (card.cardType === 'sinônimo') {
+          poolRespostas = ((card.synonyms ? card.synonyms + ',' : '') + (card.definition || '')).split(',').map(norm).filter(s => s !== '');
+      } else {
+          poolRespostas = ((card.antonyms ? card.antonyms + ',' : '') + (card.definition || '')).split(',').map(norm).filter(s => s !== '');
       }
-    }
-    sess.clozeCorrect = allCorrect;
+      
+      // Adiciona também o que a função getValidAnswers trouxer, só por segurança máxima
+      if (typeof getValidAnswers === 'function') {
+          poolRespostas.push(...getValidAnswers(card).map(norm));
+      }
+
+      const userClean = userWords.map(norm);
+      
+      // 2. Verifica se a quantidade de lacunas preenchidas está certa
+      if (userClean.length !== expectedWords.length) {
+          sess.clozeCorrect = false;
+      } else {
+          // 3. O VEREDICTO: Se TODAS as palavras que ele clicou existirem dentro da Piscina de Ouro, ele acerta!
+          // Não importa a ordem, não importa qual sinônimo ele escolheu!
+          sess.clozeCorrect = userClean.every(w => poolRespostas.includes(w));
+      }
+  } 
+  // 🧠 LÓGICA PARA CARTAS NORMAIS (Completar Frases/Contexto exato)
+  else {
+      let allCorrect = true;
+      
+      if (userWords.length !== expectedWords.length) {
+          allCorrect = false;
+      } else {
+          for (let i = 0; i < expectedWords.length; i++) {
+              const uW = norm(userWords[i]); 
+              
+              // Puxa as regras que a tela de cima criou!
+              let validOptionsParaEstaLacuna = [];
+              if (sess.clozeValidAlternatives && sess.clozeValidAlternatives[i]) {
+                  validOptionsParaEstaLacuna = sess.clozeValidAlternatives[i].map(norm);
+              } else {
+                  validOptionsParaEstaLacuna = [norm(expectedWords[i])];
+              }
+              
+              // Compara com a lista validada (Onde "perspicaz" foi banido e "sagaz" é a única salvação!)
+              if (validOptionsParaEstaLacuna.includes(uW)) {
+                  continue; 
+              }
+              
+              allCorrect = false; 
+              break;
+          }
+      }
+      sess.clozeCorrect = allCorrect;
   }
   
   sess.clozeAnswered = true; 
@@ -3700,19 +3842,65 @@ function checkCloze() {
 }
 
 function checkBlind() {
-  const sess = studySession; if (!sess || sess.blindAnswered) return;
-  const card = sess.queue[sess.current]; const inp = document.getElementById('blindInput'); if (!inp) return;
-  const normalizeTxt = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  
-  const ans = normalizeTxt(inp.value); 
-  const correctWord = normalizeTxt(card.word);
-  
-  sess.blindCorrect = ans === correctWord || levenshtein(ans, correctWord) <= 1;
-  sess.blindAnswered = true;
-  playSfx(sess.blindCorrect ? 'ok' : 'fail');
-  clearTimeout(sess.timerId); 
-  
-  render(); setTimeout(playAnswerAudio, 100);
+    const sess = studySession; 
+    if (!sess || sess.blindAnswered) return;
+    
+    const card = sess.queue[sess.current]; 
+    const inp = document.getElementById('blindInput'); 
+    if (!inp) return;
+
+    const normalizeTxt = (str) => (str || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[.,!?;:]/g, '')
+        .toLowerCase()
+        .trim();
+    
+    const ans = normalizeTxt(inp.value); 
+    const correctWord = normalizeTxt(card.word);
+    
+    let isCorrect = false;
+
+    // 🧠 SE FOR SINÔNIMO: A resposta JAMAIS será a palavra principal!
+    if (card.cardType === 'sinônimo') {
+        // Ele junta e procura nas opções que você salvou no Significado (Definition)
+        const pool = (card.synonyms ? card.synonyms + ',' : '') + (card.definition || '');
+        const lista = pool.split(',').map(normalizeTxt).filter(s => s !== '');
+        
+        for (let syn of lista) {
+            if (ans === syn || levenshtein(ans, syn) <= 1) {
+                isCorrect = true;
+                break;
+            }
+        }
+    } 
+    // 🧠 SE FOR ANTÔNIMO: Mesmo esquema!
+    else if (card.cardType === 'antônimo') {
+        const pool = (card.antonyms ? card.antonyms + ',' : '') + (card.definition || '');
+        const lista = pool.split(',').map(normalizeTxt).filter(s => s !== '');
+        
+        for (let ant of lista) {
+            if (ans === ant || levenshtein(ans, ant) <= 1) {
+                isCorrect = true;
+                break; 
+            }
+        }
+    } 
+    // SE FOR CARTÃO NORMAL: A resposta é a palavra correspondente!
+    else {
+        if (ans === correctWord || levenshtein(ans, correctWord) <= 1) {
+            isCorrect = true;
+        }
+    }
+    
+    sess.blindCorrect = isCorrect;
+    sess.blindAnswered = true;
+    
+    playSfx(sess.blindCorrect ? 'ok' : 'fail');
+    clearTimeout(sess.timerId); 
+    
+    render(); 
+    setTimeout(playAnswerAudio, 100);
 }
 
 function checkBoss() {
@@ -4816,7 +5004,7 @@ function openStoreModal() {
                         <div style="font-size:11px; color:var(--stone2); margin-top:2px;">dá uma dica aí, Sem Punição</div>
                         <div style="font-size:11px; margin-top:4px; color:var(--gold2);">Estoque: ${STATS.inventory.magicHints || 0}</div>
                      </div>
-                     ${getItemBtn(`buyItem('magicHints', 100)`, 100, 0, 'var(--gold2)', false, 'magicHints')}
+                     ${getItemBtn(`buyItem('magicHints', 300)`, 300, 0, 'var(--gold2)', false, 'magicHints')}
                   </div>
                 </div>
                 <!-- O NOVO TICKET DO COLISEU (Pode comprar com moedas) -->
@@ -4828,7 +5016,7 @@ function openStoreModal() {
                       <div style="font-size:11px; margin-top:4px; color:#ff4444;">Estoque: ${STATS.inventory.bossTickets || 0}</div>
                     </div>
                     <!-- Custa apenas 150 moedas, usa o sistema padrão -->
-                    ${getItemBtn(`buyItem('bossTickets', 250)`, 250, 0, '#ff4444', false, 'bossTickets')}
+                    ${getItemBtn(`buyItem('bossTickets', 550)`, 550, 0, '#ff4444', false, 'bossTickets')}
                   </div>
                 </div>
                 <div class="card" style="border-color:var(--green); margin:3px">
@@ -4838,7 +5026,7 @@ function openStoreModal() {
                         <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Próxima por favor, Nao afeta SM-2</div>
                         <div style="font-size:11px; margin-top:4px; color:var(--green);">Estoque: ${STATS.inventory.skips || 0}</div>
                      </div>
-                     ${getItemBtn(`buyItem('skips', 100)`, 100, 0, 'var(--green)', false, 'skips')}
+                     ${getItemBtn(`buyItem('skips', 300)`, 300, 0, 'var(--green)', false, 'skips')}
                   </div>
                 </div>
                 <div class="card" style="border-color:var(--stone); margin:3px">
@@ -4848,7 +5036,7 @@ function openStoreModal() {
                         <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Te Proteje caso Errar.</div>
                         <div style="font-size:11px; margin-top:4px; color:var(--stone);">Estoque: ${STATS.inventory.miniShields || 0}</div>
                      </div>
-                     ${getItemBtn(`buyItem('miniShields', 100)`, 100, 0, 'var(--stone)', false, 'miniShields')}
+                     ${getItemBtn(`buyItem('miniShields', 300)`, 300, 0, 'var(--stone)', false, 'miniShields')}
                   </div>
                 </div>
                 <div class="card" style="border-color:#00e5ff; margin:3px">
@@ -4858,7 +5046,7 @@ function openStoreModal() {
                         <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Dobro De Xp Consome 1 Por Carta</div>
                         <div style="font-size:11px; margin-top:4px; color:#00e5ff;">Cargas ativas: ${STATS.inventory.doubleXp || 0}</div>
                      </div>
-                     ${getItemBtn(`buyItem('doubleXp', 250, 20)`, 250, 5, '#00e5ff', false, 'doubleXp')}
+                     ${getItemBtn(`buyItem('doubleXp', 400, 20)`, 400, 5, '#00e5ff', false, 'doubleXp')}
                   </div>
                 </div>
                 <div class="card" style="border-color:#e024ff; margin:3px">
@@ -4868,7 +5056,7 @@ function openStoreModal() {
                         <div style="font-size:11px; color:var(--stone2); margin-top:2px;">Dobro De Moedas, 1 Por Carta</div>
                         <div style="font-size:11px; margin-top:4px; color:#e024ff;">Cargas ativas: ${STATS.inventory.doubleCoins || 0}</div>
                      </div>
-                     ${getItemBtn(`buyItem('doubleCoins', 250, 20)`, 250, 0, '#e024ff', false, 'doubleCoins')}
+                     ${getItemBtn(`buyItem('doubleCoins', 400, 20)`, 400, 0, '#e024ff', false, 'doubleCoins')}
                   </div>
                 </div>
                 <div class="card" style="border-color:var(--blue2); margin:3px">
@@ -4891,8 +5079,8 @@ function openStoreModal() {
                         <div style="font-size:11px; margin-top:4px; color:var(--red);">Vidas atuais: ${STATS.vidas}</div>
                      </div>
                      <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end">
-                        <button class="btn danger sm" style="padding:8px" onclick="buyLife()">100 🪙</button>
-                        ${STATS.vidas > 1 ? `<button class="btn ghost sm" style="padding:2px 6px; font-size:9px; color:var(--red); border-color:var(--red)" onclick="sellStoreItem('vidas', 100, false)">Vender: +30</button>` : ''}
+                        <button class="btn danger sm" style="padding:8px" onclick="buyLife()">500 🪙</button>
+                        ${STATS.vidas > 1 ? `<button class="btn ghost sm" style="padding:2px 6px; font-size:9px; color:var(--red); border-color:var(--red)" onclick="sellStoreItem('vidas', 500, false)">Vender: +166</button>` : ''}
                      </div>
                   </div>
                 </div>
@@ -5112,8 +5300,8 @@ function openStoreModal() {
                         nos Níveis 10, 20, 30...</div>
                       <div style="font-size:11px; margin-top:4px; color:#2ecc71;">Estoque: ${STATS.inventory.petCrystals || 0}</div>
                     </div>
-                    <!-- ✨ Botão Misto: 5000 Moedas + 45 Pontos, isPet=false -->
-                    ${getEliteItemBtn('petCrystals', 5000, 45, '#2ecc71', false)}
+                    <!-- ✨ Botão Misto: 9000 Moedas + 45 Pontos, isPet=false -->
+                    ${getEliteItemBtn('petCrystals', 9000, 45, '#2ecc71', false)}
                   </div>
                 </div>
 
@@ -5126,8 +5314,8 @@ function openStoreModal() {
                         principal subir de Prestígio.</div>
                       <div style="font-size:11px; margin-top:4px; color:#00f5ff;">Estoque: ${STATS.inventory.playerSparks || 0}</div>
                     </div>
-                    <!-- ✨ Botão Misto: 15000 Moedas + 85 Pontos, isPet=false -->
-                    ${getEliteItemBtn('playerSparks', 15000, 85, '#00f5ff', false)}
+                    <!-- ✨ Botão Misto: 25000 Moedas + 85 Pontos, isPet=false -->
+                    ${getEliteItemBtn('playerSparks', 25000, 85, '#00f5ff', false)}
                   </div>
                 </div>
 
@@ -6315,10 +6503,16 @@ function lerTelaCompleta(tempoDoRelogio) {
              falar(promptTxt, langPergunta);
              falar(isRel ? card.word : card.definition, isRel ? langPalavra : langDef);
         }
-        // ✨ NOVO: MODO DITADO CEGO (Sem revelar a resposta!)
+        // ✨ NOVO: MODO DITADO CEGO
         else if (activeMode === 'blind') {
-             falar("Ditado Cego. Fale a palavra correspondente para este significado:", langPergunta);
-             falar(card.definition, langDef);
+             const promptTxt = isRel 
+                ? `Ditado Cego. Fale um ${card.cardType} para a seguinte palavra:` 
+                : 'Ditado Cego. Escute o significado e fale a palavra correspondente:';
+                
+             falar(promptTxt, langPergunta);
+             
+             // Se for sinônimo/antônimo, lê a Palavra. Se for normal, lê a Definição.
+             falar(isRel ? card.word : card.definition, isRel ? langPalavra : langDef);
         }
         // ✨ NOVO: MODO BOSS PROVA FINAL (Lê as exigências dinâmicas)
         else if (activeMode === 'boss') {
