@@ -2223,80 +2223,42 @@ function buildChoiceMode(card) {
   const sess = studySession;
   
   if (!sess.choices) {
-    const valids = getValidAnswers(card);
+    const valids = typeof getValidAnswers === 'function' ? getValidAnswers(card) : [];
     const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
     
-    sess.validChoices = valids.sort(() => Math.random() - 0.5).slice(0, isRel ? 3 : 1);
+    // Define a quantidade de opções (6 para sinônimos/antônimos, 4 para definições normais)
     const totalOptions = isRel ? 6 : 4;
     
-    let pool = W.filter(w => w.id !== card.id);
-    const isLong = (c) => ['técnica', 'falácia', 'citação'].includes(c.cardType || 'normal');
+    // Escolhe as respostas corretas e já as embaralha
+    sess.validChoices = valids.sort(() => Math.random() - 0.5).slice(0, isRel ? 3 : 1);
     
-    // ✨ O NOVO SISTEMA DE FILTRAGEM (Prioridade Absoluta por Idioma/Categoria)
-    // O jogo procura opções no mesmo "idioma" comparando a categoria da carta atual.
+    // 🧠 A MÁGICA: CHAMA O CÉREBRO CENTRAL!
+    const amountNeeded = totalOptions - sess.validChoices.length;
+    const isFullDef = !isRel; // Se for normal, puxa definições. Se for relação, puxa palavras.
     
-    let langStrict = pool.filter(w => w.category === card.category && w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
-    let langType   = pool.filter(w => w.category === card.category && w.cardType === card.cardType);
-    let langOnly   = pool.filter(w => w.category === card.category);
-    
-    // Fallbacks originais (se a pessoa não tiver categorias, usa o padrão antigo)
-    let t1 = pool.filter(w => w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
-    let t2 = pool.filter(w => w.cardType === card.cardType);
-    let t3 = pool.filter(w => isLong(w) === isLong(card));
+    // O motor faz todo o trabalho pesado de idioma, tamanho e categoria em 1 linha
+    const wrongs = getSmartDistractors(card, sess.validChoices, amountNeeded, isFullDef);
 
-    // 🧠 A Inteligência: Escolhe as iscas na ordem de perfeição do idioma!
-    let othersCards = langStrict.length >= 3 ? langStrict 
-                    : (langType.length >= 3 ? langType 
-                    : (langOnly.length >= 3 ? langOnly 
-                    : (t1.length >= 3 ? t1 
-                    : (t2.length >= 3 ? t2 
-                    : (t3.length >= 3 ? t3 : pool)))));
-
-    let others = [];
-
-    // Extrai as opções da lista de elite
-    if (isRel) {
-      others = othersCards.flatMap(w => (w.cardType === 'sinônimo' || w.cardType === 'antônimo') ? getValidAnswers(w) : [w.word]);
-      
-      // Se faltar opções, preenche com palavras do MESMO IDIOMA (Categoria) primeiro!
-      if (others.length < totalOptions) {
-         let backup = langOnly.length > 0 ? langOnly : pool;
-         others = [...others, ...backup.map(w => w.word)];
-      }
-    } else {
-      others = othersCards.flatMap(w => (w.cardType === 'sinônimo' || w.cardType === 'antônimo') ? [] : getValidAnswers(w));
-      
-      if (others.length < totalOptions) {
-         let backup = langOnly.length > 0 ? langOnly : pool;
-         // Proteção para o 'clean' existir no ambiente
-         others = [...others, ...backup.filter(w => w.cardType !== 'sinônimo' && w.cardType !== 'antônimo').map(w => typeof clean === 'function' ? clean(w.definition) : (w.definition || w.word))];
-      }
-    }
-    
-    others = [...new Set(others)].filter(opt => !sess.validChoices.includes(opt));
-    
-    // 🛡️ Segurança Máxima: Se o jogador tiver pouquíssimas cartas cadastradas no total
-    // força o preenchimento com qualquer coisa para a tela não quebrar
-    if (others.length < (totalOptions - sess.validChoices.length)) {
-         let absoluteBackup = pool.map(w => isRel ? w.word : (typeof clean === 'function' && w.definition ? clean(w.definition) : (w.definition || w.word)));
-         others = [...new Set([...others, ...absoluteBackup])].filter(opt => !sess.validChoices.includes(opt));
-    }
-
-    const wrongs = others.sort(() => Math.random() - 0.5).slice(0, totalOptions - sess.validChoices.length);
+    // Junta as certas com as iscas de elite e embaralha tudo para a tela
     sess.choices = [...sess.validChoices, ...wrongs].sort(() => Math.random() - 0.5);
   }
   
   const answered = sess.choiceAnswered;
+  
+  // ✨ A MÁGICA DA COR (Atualiza o fundo do body para distinguir visualmente)
   if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
+  
   const typeLbl = card.cardType === 'sinônimo' ? `Selecione um ${hl('sinônimo')} para:` : (card.cardType === 'antônimo' ? `Selecione um ${hl('antônimo')} para:` : 'Qual a definição de:');
 
   return `
     <div class="card" style="margin-bottom:12px">
       <div class="card-body" style="text-align:center">
         <div class="fc-type" style="margin-bottom:10px">${typeLbl}</div>
-        ${typeof renderVisual === 'function' ? renderVisual(card) : ''} <div class="fc-word">${esc(card.word)}</div>
+        ${typeof renderVisual === 'function' ? renderVisual(card) : ''} 
+        <div class="fc-word">${esc(card.word)}</div>
       </div>
     </div>
+    
     <div id="choices" style="${sess.choices.length > 4 ? 'display:grid;grid-template-columns:1fr 1fr;gap:6px' : ''}">
       ${sess.choices.map((ch, i) => {
         let cls = 'choice-opt';
@@ -2306,7 +2268,7 @@ function buildChoiceMode(card) {
           else cls += ' reveal';
         }
         
-        // ✨ BÔNUS DE UX: Adiciona as letras de A a F nas alternativas!
+        // ✨ BÔNUS DE UX: Letras dinâmicas para as opções
         const letras = ['A', 'B', 'C', 'D', 'E', 'F'];
         
         return `<div class="${cls}" style="margin-bottom:8px; font-size:14px; padding:12px; display:flex; align-items:center;" onclick="${answered ? '' : `choiceAnswer(${i})`}">
@@ -2315,6 +2277,7 @@ function buildChoiceMode(card) {
 </div>`;
       }).join('')}
     </div>
+    
     ${answered ? `
     <div style="margin-top:6px">
       <div class="rating-row" style="margin-top:10px">
@@ -2329,46 +2292,23 @@ function buildRevChoiceMode(card) {
   
   if (!sess.revChoices) {
     const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
-    let pool = W.filter(w => w.id !== card.id);
-    const isLong = (c) => ['técnica', 'falácia', 'citação'].includes(c.cardType || 'normal');
-    
-    // ✨ O NOVO SISTEMA DE FILTRAGEM (Prioridade Absoluta por Idioma/Categoria)
-    let langStrict = pool.filter(w => w.category === card.category && w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
-    let langType   = pool.filter(w => w.category === card.category && w.cardType === card.cardType);
-    let langOnly   = pool.filter(w => w.category === card.category);
-
-    let t1 = pool.filter(w => w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
-    let t2 = pool.filter(w => w.cardType === card.cardType);
-    let t3 = pool.filter(w => isLong(w) === isLong(card));
-
-    // 🧠 A Inteligência: Escolhe as palavras falsas priorizando a mesma categoria (Idioma)
-    let othersCards = langStrict.length >= 3 ? langStrict 
-                    : (langType.length >= 3 ? langType 
-                    : (langOnly.length >= 3 ? langOnly 
-                    : (t1.length >= 3 ? t1 
-                    : (t2.length >= 3 ? t2 
-                    : (t3.length >= 3 ? t3 : pool)))));
-
-    // Extrai as palavras e garante que não haja repetições e nem a resposta certa no meio
-    let othersWords = [...new Set(othersCards.map(w => w.word))].filter(w => w !== card.word);
-
-    // 🛡️ Segurança: Se depois de filtrar não sobrarem 3 palavras falsas, puxa do baralho todo
-    if (othersWords.length < 3) {
-        let backupWords = [...new Set(pool.map(w => w.word))].filter(w => w !== card.word);
-        othersWords = [...othersWords, ...backupWords];
-    }
-
-    // Sorteia as 3 iscas e mistura com a palavra certa
-    const shuffled = othersWords.sort(() => Math.random() - .5).slice(0, 3);
-    sess.revChoices = [...shuffled, card.word].sort(() => Math.random() - .5);
     
     // ✨ LIMPANDO A PERGUNTA INVERSA COM SEGURANÇA:
     let def = typeof clean === 'function' && card.definition ? clean(card.definition) : (card.definition || "");
     if (isRel) {
-       const valids = getValidAnswers(card);
-       def = valids[Math.floor(Math.random() * valids.length)];
+       const valids = typeof getValidAnswers === 'function' ? getValidAnswers(card) : [];
+       if (valids.length > 0) {
+           def = valids[Math.floor(Math.random() * valids.length)];
+       }
     }
     sess.revChoicePrompt = def;
+
+    // 🧠 A MÁGICA: CHAMA O CÉREBRO CENTRAL!
+    // Queremos 3 iscas falsas. Como as opções são as palavras em si, passamos false no final.
+    const wrongs = getSmartDistractors(card, [card.word], 3, false);
+
+    // Junta a palavra certa com as iscas de elite e embaralha tudo
+    sess.revChoices = [...wrongs, card.word].sort(() => Math.random() - 0.5);
   }
   
   const answered = sess.revChoiceAnswered;
@@ -2397,7 +2337,7 @@ function buildRevChoiceMode(card) {
           else cls += ' reveal';
         }
         
-        // ✨ BÔNUS DE UX: Adiciona as letras de A a D com estilo elegante e alinha a palavra à esquerda
+        // ✨ BÔNUS DE UX: Letras dinâmicas e design polido
         const letras = ['A', 'B', 'C', 'D', 'E', 'F'];
         
         return `<div class="${cls}" style="margin-bottom:8px; padding:12px; display:flex; align-items:center;" onclick="${answered ? '' : `revChoiceAnswer(${i})`}">
@@ -2427,76 +2367,47 @@ function buildTFMode(card) {
     const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
     
     // ✨ LIMPANDO A RESPOSTA CORRETA:
-    const correctAnswers = getValidAnswers(card);
+    const correctAnswers = typeof getValidAnswers === 'function' ? getValidAnswers(card) : [];
     const correctDef = isRel ? correctAnswers[Math.floor(Math.random() * correctAnswers.length)] : (typeof clean === 'function' ? clean(card.definition) : card.definition);
 
-    if (!isCorrect && W.length > 1) {
-      let pool = W.filter(w => w.id !== card.id);
-      const isLong = (c) => ['técnica', 'falácia', 'citação'].includes(c.cardType || 'normal');
+    if (!isCorrect && typeof W !== 'undefined' && W.length > 1) {
       
-      // ✨ A CASCATA DE IDIOMAS (Prioridade Absoluta por Categoria)
-      let langStrict = pool.filter(w => w.category === card.category && w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
-      let langType   = pool.filter(w => w.category === card.category && w.cardType === card.cardType);
-      let langOnly   = pool.filter(w => w.category === card.category);
-
-      let t1 = pool.filter(w => w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
-      let t2 = pool.filter(w => w.cardType === card.cardType);
-      let t3 = pool.filter(w => isLong(w) === isLong(card));
-
-      // Pega do mais restrito para o mais genérico (precisamos de apenas 1 isca)
-      let othersCards = langStrict.length >= 1 ? langStrict 
-                      : (langType.length >= 1 ? langType 
-                      : (langOnly.length >= 1 ? langOnly 
-                      : (t1.length >= 1 ? t1 
-                      : (t2.length >= 1 ? t2 
-                      : (t3.length >= 1 ? t3 : pool)))));
-
-      let others = [];
+      // 🧠 CHAMA O CÉREBRO CENTRAL!
+      // Se for carta normal, puxa 1 Definição Inteira falsa. Se for relação, puxa 1 Palavra falsa.
+      const isFullDef = !isRel; 
       
-      if (isRel) {
-        others = othersCards.flatMap(w => (w.cardType === 'sinônimo' || w.cardType === 'antônimo') ? getValidAnswers(w) : [w.word]);
-        if (others.length === 0) {
-           let backup = langOnly.length > 0 ? langOnly : pool;
-           others = backup.map(w => w.word);
-        }
-      } else {
-        others = othersCards.flatMap(w => (w.cardType === 'sinônimo' || w.cardType === 'antônimo') ? [] : getValidAnswers(w));
-        // ✨ LIMPANDO OS DISTRATORES AQUI TAMBÉM:
-        if (others.length === 0) {
-           let backup = langOnly.length > 0 ? langOnly : pool;
-           others = backup.filter(w => w.cardType !== 'sinônimo' && w.cardType !== 'antônimo').map(w => typeof clean === 'function' ? clean(w.definition) : w.definition);
-        }
-      }
+      // Passamos TUDO que for correto para o cérebro banir as coincidências!
+      let fakeOptions = getSmartDistractors(card, [correctDef, ...correctAnswers], 1, isFullDef);
       
-      // Filtro vital: A afirmação "Falsa" não pode, por coincidência, ser idêntica à "Verdadeira"
-      others = [...new Set(others)].filter(opt => opt !== correctDef);
-      
-      if (others.length > 0) {
-          def = others[Math.floor(Math.random() * others.length)];
+      if (fakeOptions.length > 0) {
+          def = fakeOptions[0];
           sess.tfIsCorrect = false;
       } else {
           // Fallback de segurança extrema: se der erro e não achar NADA falso, vira verdadeira
           def = correctDef;
           sess.tfIsCorrect = true; 
       }
+      
     } else {
       sess.tfIsCorrect = true;
       def = correctDef;
     }
+    
     sess.tfDefinition = def;
     sess.tfSetup = true;
   }
   
   const answered = sess.tfAnswered;
   
-  // ✨ A MÁGICA DA COR: (Removi a duplicação que existia na função anterior)
+  // ✨ A MÁGICA DA COR:
   if (typeof atualizarCorDeFundo === 'function') atualizarCorDeFundo(card.cardType);
   const typeText = card.cardType === 'sinônimo' ? `Tem como ${hl('sinônimo')}:` : (card.cardType === 'antônimo' ? `Tem como ${hl('antônimo')}:` : 'Significa:');
 
   return `
     <div class="card" style="margin-bottom:12px;border:2px solid ${answered ? (sess.tfUserCorrect ? 'var(--green)' : 'var(--red)') : 'var(--border)'}">
       <div class="card-body" style="text-align:center;padding:24px 16px">
-        ${typeof renderVisual === 'function' ? renderVisual(card) : ''}<div class="fc-word" style="font-size:32px;margin-bottom:16px">${esc(card.word)}</div>
+        ${typeof renderVisual === 'function' ? renderVisual(card) : ''}
+        <div class="fc-word" style="font-size:32px;margin-bottom:16px">${esc(card.word)}</div>
         <div style="font-size:13px;color:var(--stone2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">${typeText}</div>
         <div class="fc-definition" style="font-size:18px;">"${esc(sess.tfDefinition)}"</div>
       </div>
@@ -3029,192 +2940,181 @@ function buildClozeMode(card) {
   // 🛡️ O Normalizador Paranoico (Ignora maiúsculas, acentos e pontuações)
   const norm = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[.,!?;:"'()]/g, '').toLowerCase().trim();
 
-  if (!sess.clozeSetup) {
-    let text = "", blanks = [], poolWords = [], isRelList = false;
+if (!sess.clozeSetup) {
+      let text = "", blanks = [], poolWords = [], isRelList = false;
+      let pool = typeof W !== 'undefined' ? W.filter(w => w.id !== card.id) : [];
 
-    // ✨ O SISTEMA DE FILTRAGEM PERFEITO (Copiado do Múltipla Escolha)
-    let pool = typeof W !== 'undefined' ? W.filter(w => w.id !== card.id) : [];
-    
-    let langStrict = pool.filter(w => w.category === card.category && w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
-    let langType   = pool.filter(w => w.category === card.category && w.cardType === card.cardType);
-    let langOnly   = pool.filter(w => w.category === card.category); // <-- A Trava do Idioma!
-    
-    let t1 = pool.filter(w => w.cardType === card.cardType && w.wordClass === card.wordClass && card.wordClass);
-    let t2 = pool.filter(w => w.cardType === card.cardType);
+      // 🛡️ O Normalizador Paranoico
+      const norm = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[.,!?;:"'()]/g, '').toLowerCase().trim();
 
-    // Cascata de perfeição
-    let othersCards = langStrict.length >= 4 ? langStrict 
-                    : (langType.length >= 4 ? langType 
-                    : (langOnly.length >= 4 ? langOnly 
-                    : (t1.length >= 4 ? t1 
-                    : (t2.length >= 4 ? t2 : pool))));
-
-    // 🧠 GERA OS BOTÕES CERTOS: Ensina a função a extrair os sinônimos da sua Definição!
-    let rawValids = typeof getValidAnswers === 'function' ? getValidAnswers(card) : [];
-    
-    if (isRel) {
-        let extraStr = (card.cardType === 'sinônimo' ? (card.synonyms||'') : (card.antonyms||'')) + ',' + (card.definition||'');
-        let extras = extraStr.split(',').map(s => s.trim()).filter(s => s !== '');
-        rawValids = [...rawValids, ...extras]; // Junta tudo!
-    }
-    
-    const validsLimpos = [...new Set(rawValids.map(v => v.trim()))].filter(v => v.length > 0);
-
-    // 1. LÓGICA PARA SINÔNIMOS / ANTÔNIMOS
-    if (isRel && !card.example && !card.contextPhrase) {
-      isRelList = true;
-      const numBlanks = Math.min(3, validsLimpos.length);
-      blanks = validsLimpos.sort(() => Math.random() - 0.5).slice(0, numBlanks);
-      text = Array(numBlanks).fill('___').join(' &nbsp;•&nbsp; ');
+      // 🧠 1. GERA AS RESPOSTAS CORRETAS PRIMEIRO
+      let rawValids = typeof getValidAnswers === 'function' ? getValidAnswers(card) : [];
+      const isRel = card.cardType === 'sinônimo' || card.cardType === 'antônimo';
       
-      let others = othersCards.flatMap(w => w.cardType === 'sinônimo' || w.cardType === 'antônimo' ? getValidAnswers(w) : [w.word]);
-      
-      // ✨ O SEGREDO AQUI: Se faltar distrator, puxa SÓ da mesma categoria (langOnly)
-      if (others.length < 6) {
-          let backup = langOnly.length > 0 ? langOnly : pool;
-          others = [...others, ...backup.map(w => w.word)];
+      if (isRel) {
+          let extraStr = (card.cardType === 'sinônimo' ? (card.synonyms||'') : (card.antonyms||'')) + ',' + (card.definition||'');
+          let extras = extraStr.split(',').map(s => s.trim()).filter(s => s !== '');
+          rawValids = [...rawValids, ...extras];
       }
+      const validsLimpos = [...new Set(rawValids.map(v => v.trim()))].filter(v => v.length > 0);
 
-      let fakes = [...new Set(others)].filter(opt => !validsLimpos.map(norm).includes(norm(opt))).sort(() => Math.random() - 0.5).slice(0, 5);
-      poolWords = [...blanks, ...fakes];
-      
-    } 
-    // 2. LÓGICA PARA LACUNAS NORMAIS / FRASES
-    else {
-      text = card.contextPhrase || (isRel ? card.example : card.definition); 
-      let matches = [...text.matchAll(/\*([^*]+)\*/g)];
-      if (matches.length > 0) {
-         matches.forEach(m => blanks.push(m[1].trim()));
-         text = text.replace(/\*([^*]+)\*/g, '___');
+      // 🧠 2. PREPARA A FRASE E AS LACUNAS
+      if (isRel && !card.example && !card.contextPhrase) {
+          isRelList = true;
+          const numBlanks = Math.min(3, validsLimpos.length);
+          blanks = validsLimpos.sort(() => Math.random() - 0.5).slice(0, numBlanks);
+          text = Array(numBlanks).fill('___').join(' &nbsp;•&nbsp; ');
       } else {
-         let words = text.split(/\s+/);
-         let eligible = words.filter(w => w.replace(/[.,!?;:"'()]/g, '').length > 4);
-         let selectedToHide = eligible.sort(() => Math.random() - 0.5).slice(0, 2); 
-         let newTextArr = [];
-         words.forEach(w => {
-           if (selectedToHide.includes(w)) {
-             let cleanWord = w.replace(/[.,!?;:"'()]/g, '');
-             blanks.push(cleanWord); 
-             newTextArr.push(w.replace(cleanWord, '___'));
-             selectedToHide.splice(selectedToHide.indexOf(w), 1);
-           } else {
-             newTextArr.push(w);
-           }
-         });
-         text = newTextArr.join(' ');
-      }
-      
-      let others = [];
-      let textoVeioDaDefinicao = !card.contextPhrase && !isRel;
-
-      if (textoVeioDaDefinicao) {
-          // 🧠 EXTRATOR DE DISTRATORES DE OURO (Sem lixo, sem frases, só palavras fortes)
-          const extrairPalavrasOuro = (w) => {
-              let listaOuro = [];
-              
-              // 1. Tenta pegar Sinônimos e Antônimos primeiro (são as iscas mais perfeitas possíveis!)
-              if (w.synonyms) listaOuro.push(...w.synonyms.split(',').map(s => s.trim().split(' ')[0]));
-              if (w.antonyms) listaOuro.push(...w.antonyms.split(',').map(s => s.trim().split(' ')[0]));
-              
-              // 2. Limpa a definição inteira de qualquer lixo (HTML, hifens e pontuações)
-              let defLimpa = (w.definition || '').replace(/<[^>]*>?/gm, ' ') // Arranca códigos HTML (ex: <b>, <br>)
-                                                 .replace(/[.,!?;:"'()[\]{}*\-]/g, ' '); // Troca pontuação por espaço
-              
-              // 3. Corta tudo e filtra: Só aceita palavras com 5 letras ou mais (mata o "como", "para", "com", etc)
-              let palavrasDePeso = defLimpa.split(/\s+/).filter(x => x.length >= 5);
-              
-              // 4. Pega só as 2 palavras mais difíceis (maiores) daquela definição para não poluir o jogo
-              palavrasDePeso.sort((a, b) => b.length - a.length);
-              if (palavrasDePeso[0]) listaOuro.push(palavrasDePeso[0]);
-              if (palavrasDePeso[1]) listaOuro.push(palavrasDePeso[1]);
-              
-              return listaOuro;
-          };
-
-          // Varre as cartas do mesmo idioma roubando as melhores palavras!
-          othersCards.forEach(w => others.push(...extrairPalavrasOuro(w)));
-          
-          if (others.length < 8) {
-              let backup = langOnly.length > 0 ? langOnly : pool;
-              backup.forEach(w => others.push(...extrairPalavrasOuro(w)));
-          }
-      } else {
-          // Se a frase é de Contexto (INGLÊS), continua usando as palavras normais em inglês (w.word)
-          others = othersCards.map(w => w.word);
-          
-          if (others.length < 8) {
-              let backup = langOnly.length > 0 ? langOnly : pool;
-              others = [...others, ...backup.map(w => w.word)];
+          text = card.contextPhrase || (isRel ? card.example : card.definition); 
+          let matches = [...text.matchAll(/\*([^*]+)\*/g)];
+          if (matches.length > 0) {
+              matches.forEach(m => blanks.push(m[1].trim()));
+              text = text.replace(/\*([^*]+)\*/g, '___');
+          } else {
+              let words = text.split(/\s+/);
+              let eligible = words.filter(w => w.replace(/[.,!?;:"'()]/g, '').length > 4);
+              let selectedToHide = eligible.sort(() => Math.random() - 0.5).slice(0, 2); 
+              let newTextArr = [];
+              words.forEach(w => {
+                  if (selectedToHide.includes(w)) {
+                      let cleanWord = w.replace(/[.,!?;:"'()]/g, '');
+                      blanks.push(cleanWord); 
+                      newTextArr.push(w.replace(cleanWord, '___'));
+                      selectedToHide.splice(selectedToHide.indexOf(w), 1);
+                  } else {
+                      newTextArr.push(w);
+                  }
+              });
+              text = newTextArr.join(' ');
           }
       }
+
+// 🧠 3. O MOTOR DE AFINIDADE CIENTÍFICA (O Fim da Mistura de Idiomas e Tamanhos!)
+      const textoVeioDaDefinicao = (!card.contextPhrase && !isRel);
+      let listaPontuada = [];
+
+      // 🎯 O DETETIVE DE FRASES (Conta quantas palavras a resposta tem)
+      let alvoStr = blanks.length > 0 ? blanks[0].trim() : "";
+      let qtdPalavrasAlvo = alvoStr ? alvoStr.split(/\s+/).length : 1;
+      let tamanhoAlvo = alvoStr ? alvoStr.length : 5;
+
+      pool.forEach(w => {
+          let pontuacaoBase = 0;
+          
+          // A BARREIRA DE IDIOMA (+1000 pontos)
+          let idiomaAlvo = textoVeioDaDefinicao ? card.langDef : card.langWord;
+          let idiomaIsca = textoVeioDaDefinicao ? w.langDef : w.langWord;
+          
+          if (idiomaIsca && idiomaAlvo && idiomaIsca === idiomaAlvo) pontuacaoBase += 1000;
+          else if (w.category === card.category) pontuacaoBase += 800; 
+
+          // DOMÍNIO DA CATEGORIA (+500) E TIPO (+300)
+          if (w.category === card.category) pontuacaoBase += 500;
+          if (w.cardType === card.cardType) pontuacaoBase += 300;
+
+          // 🛡️ SE A RESPOSTA FOR UMA FRASE (Mais de 1 palavra)
+          if (qtdPalavrasAlvo > 1) {
+              // Pega a palavra principal e os sinônimos inteiros (sem quebrar os espaços!)
+              let iscasPossiveis = [w.word];
+              if (w.synonyms) iscasPossiveis.push(...w.synonyms.split(',').map(s => s.trim()));
+              
+              iscasPossiveis.forEach(isca => {
+                  if(isca.length > 0) {
+                      let qtdIsca = isca.trim().split(/\s+/).length;
+                      let difTamanho = Math.abs(isca.length - tamanhoAlvo);
+                      
+                      // BÔNUS MASSIVO: Se a isca tiver a MESMA quantidade de palavras da resposta!
+                      let bonusFrase = (qtdIsca === qtdPalavrasAlvo) ? 600 : 0;
+                      
+                      listaPontuada.push({ palavra: isca, pontos: pontuacaoBase + Math.max(0, 100 - (difTamanho * 5)) + bonusFrase });
+                  }
+              });
+          } 
+          // 🛡️ SE A RESPOSTA FOR SÓ 1 PALAVRA (Extrai apenas as melhores palavras isoladas)
+          else {
+              if (textoVeioDaDefinicao || isRelList) { 
+                  let listaOuro = [];
+                  if (w.synonyms) listaOuro.push(...w.synonyms.split(',').map(s => s.trim().split(' ')[0]));
+                  if (w.antonyms) listaOuro.push(...w.antonyms.split(',').map(s => s.trim().split(' ')[0]));
+                  
+                  let defLimpa = (w.definition || '').replace(/<[^>]*>?/gm, ' ').replace(/[.,!?;:"'()[\]{}*\-]/g, ' ');
+                  let palavrasDePeso = defLimpa.split(/\s+/).filter(x => x.length >= 4).sort((a, b) => b.length - a.length);
+                  
+                  if (palavrasDePeso[0]) listaOuro.push(palavrasDePeso[0]);
+                  if (palavrasDePeso[1]) listaOuro.push(palavrasDePeso[1]);
+
+                  listaOuro.forEach(palavra => {
+                      let dif = Math.abs(palavra.length - tamanhoAlvo);
+                      listaPontuada.push({ palavra: palavra, pontos: pontuacaoBase + Math.max(0, 100 - (dif * 10)) });
+                  });
+              } else {
+                  // Só garante que a isca também tenha 1 palavra
+                  let iscaUnica = w.word.trim().split(/\s+/)[0]; 
+                  if (iscaUnica) {
+                      let dif = Math.abs(iscaUnica.length - tamanhoAlvo);
+                      listaPontuada.push({ palavra: iscaUnica, pontos: pontuacaoBase + Math.max(0, 100 - (dif * 10)) });
+                  }
+              }
+          }
+      });
+
+      // Ordena a arena para puxar as iscas com a maior nota possível!
+      listaPontuada.sort((a, b) => b.pontos - a.pontos);
+
+      // 🧠 4. SELEÇÃO DA ELITE
+      let fakes = [];
+      let vistos = new Set();
+      const numFakesNecessarios = isRelList ? 5 : Math.max(4, 7 - blanks.length);
+      const respostasBanidas = blanks.map(norm);
       
-      const numFakes = Math.max(4, 7 - blanks.length); 
-      const fakes = [...new Set(others)]
-        .filter(opt => !blanks.map(norm).includes(norm(opt)) && norm(opt) !== norm(card.word))
-        .sort(() => Math.random() - 0.5).slice(0, numFakes);
+      for (let item of listaPontuada) {
+          let n = norm(item.palavra);
+          // O distrator não pode ser a própria resposta, nem ser a palavra original do card
+          if (n && !vistos.has(n) && !respostasBanidas.includes(n) && n !== norm(card.word)) {
+              vistos.add(n);
+              fakes.push(item.palavra);
+              if (fakes.length >= numFakesNecessarios) break; // Para quando tiver os botões suficientes
+          }
+      }
 
       poolWords = [...blanks, ...fakes];
-    }
 
-    sess.clozeValidAlternatives = {};
-    let extraValids = [];
-    
-    // 1. JOGO DE LISTA SOLTA ("Selecione 3 sinônimos...")
-    if (isRelList) {
-        extraValids.push(...validsLimpos); 
-    }
-    
-    // 2. JOGO DE FRASES ("Preencha com um sinônimo/antônimo:")
-    // 2. JOGO DE FRASES ("Preencha com um sinônimo/antônimo:")
-    blanks.forEach((b, i) => {
-        let aceitosParaEstaLacuna = [norm(b)]; // Por padrão, aceita a palavra exata do buraco
-        
-        // 🧠 A MÁGICA: Injeta os Sinônimos/Antônimos nos botões e no corretor!
-        if (isRel && !isRelList) {
-            
-            // Puxa a lista MESTRA que já juntou o card.definition, card.synonyms e getValidAnswers!
-            let palavrasRelacionadas = validsLimpos;
-            
-            // 1. Adiciona essas palavras no corretor invisível (Aceita qualquer uma delas como certa!)
-            aceitosParaEstaLacuna.push(...palavrasRelacionadas.map(norm));
-            
-            // 2. Joga essas palavras para a tela virarem botões jogáveis!
-            extraValids.push(...palavrasRelacionadas);
-        }
-        
-        sess.clozeValidAlternatives[i] = aceitosParaEstaLacuna; 
-    });
+      // 🧠 5. A LÓGICA DE ACEITAÇÃO INTELIGENTE (Os seus sinônimos válidos)
+      sess.clozeValidAlternatives = {};
+      let extraValids = [];
+      
+      if (isRelList) extraValids.push(...validsLimpos); 
+      
+      blanks.forEach((b, i) => {
+          let aceitosParaEstaLacuna = [norm(b)]; 
+          if (isRel && !isRelList) {
+              let palavrasRelacionadas = validsLimpos;
+              aceitosParaEstaLacuna.push(...palavrasRelacionadas.map(norm));
+              extraValids.push(...palavrasRelacionadas);
+          }
+          sess.clozeValidAlternatives[i] = aceitosParaEstaLacuna; 
+      });
 
-    // Junta tudo (botões da frase + botões de sinônimo + distratores)
-    poolWords = [...poolWords, ...extraValids];
-    
-    // ✨ LIMPEZA PERFEITA E BANIMENTO DE OURO
-    let finalPool = [];
-    let seenNorms = new Set();
-    
-    poolWords.forEach(w => {
-        let n = norm(w);
-        
-        // 🛡️ O SEGURANÇA: Se o cartão é de Relação (Sinônimo ou Antônimo), 
-        // a Palavra Principal NUNCA pode virar botão na tela para não estragar o desafio!
-        let isPalavraProibida = isRel ? (n === norm(card.word)) : false; 
-        
-        // Garante que não adicione botão vazio, não repita, e barre a proibida!
-        if (n && !seenNorms.has(n) && !isPalavraProibida) { 
-            seenNorms.add(n);
-            finalPool.push(w);
-        }
-    });
-    
-    sess.clozeText = text; 
-    sess.clozeAnswers = blanks; 
-    
-    // Cria os botões embaralhados
-    sess.clozePool = finalPool.map((w,i)=>({id:i, word: w.replace(/[.,!?;:"'()]/g, '').trim()})).sort(() => Math.random() - 0.5);
-    
-    sess.clozeUserAnswers = []; 
-    sess.clozeIsRelList = isRelList; 
-    sess.clozeSetup = true;
+      poolWords = [...poolWords, ...extraValids];
+      
+      // ✨ LIMPEZA FINAL
+      let finalPool = [];
+      let seenNorms = new Set();
+      poolWords.forEach(w => {
+          let n = norm(w);
+          let isPalavraProibida = isRel ? (n === norm(card.word)) : false; 
+          if (n && !seenNorms.has(n) && !isPalavraProibida) { 
+              seenNorms.add(n);
+              finalPool.push(w);
+          }
+      });
+      
+      sess.clozeText = text; 
+      sess.clozeAnswers = blanks; 
+      sess.clozePool = finalPool.map((w,i)=>({id:i, word: w.replace(/[.,!?;:"'()]/g, '').trim()})).sort(() => Math.random() - 0.5);
+      sess.clozeUserAnswers = []; 
+      sess.clozeIsRelList = isRelList; 
+      sess.clozeSetup = true;
   }
   
   const answered = sess.clozeAnswered;
@@ -4800,6 +4700,7 @@ function confirmClearAll() {
     W = []; save(); toast('Léxico limpo.'); render();
   });
 }
+
 // ✨ LOJA: MERCADO DE ATENAS E ITENS (AGORA COM CONSUMIVEIS, VIDAS, MINI ESCUDOS, LOOT BOXES, PETS AGORA EM GAVETAS COM MEMÓRIA)
 function openStoreModal() {
   
@@ -5341,6 +5242,7 @@ function buyLife() {
    openStoreModal(); 
    updateHeader();
 }
+
 // ✨ SISTEMA DE PETS MÍTICOS (Compra, Equipamento e Comida)
 function buyPet(petId, price) {
    if ((STATS.moedas || 0) < price) { 
@@ -5386,6 +5288,7 @@ function feedPet(price, charges) {
    openStoreModal(); 
    updateHeader();
 }
+
 function buyItem(itemType, cost, amount = 1) {
    if ((STATS.moedas || 0) < cost) { toast('Moedas insuficientes!', 'err'); triggerScreenShake(); return; }
    STATS.moedas -= cost;
@@ -8517,7 +8420,95 @@ async function factoryReset() {
         alert("Erro ao formatar. Limpe o histórico do navegador manualmente.");
     }
 }
+// 🧠 O MOTOR DE AFINIDADE UNIVERSAL (O Cérebro Central)
+function getSmartDistractors(card, correctAnswers, amountNeeded, needFullDefinition = false) {
+    let pool = typeof W !== 'undefined' ? W.filter(w => w.id !== card.id) : [];
+    let listaPontuada = [];
+    
+    // O Normalizador
+    const norm = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[.,!?;:"'()]/g, '').toLowerCase().trim();
 
+    let alvoStr = correctAnswers.length > 0 ? correctAnswers[0].trim() : "";
+    let qtdPalavrasAlvo = alvoStr ? alvoStr.split(/\s+/).length : 1;
+    let tamanhoAlvo = alvoStr ? alvoStr.length : 5;
+    let respostasBanidas = correctAnswers.map(norm);
+
+    pool.forEach(w => {
+        let pontuacaoBase = 0;
+        
+        // A Barreira de Idioma
+        let idiomaAlvo = needFullDefinition ? card.langDef : card.langWord;
+        let idiomaIsca = needFullDefinition ? w.langDef : w.langWord;
+        
+        if (idiomaIsca && idiomaAlvo && idiomaIsca === idiomaAlvo) pontuacaoBase += 1000;
+        else if (w.category === card.category) pontuacaoBase += 800; // Fallback caso não tenha idiomas
+
+        // O Domínio
+        if (w.category === card.category) pontuacaoBase += 500;
+        if (w.cardType === card.cardType) pontuacaoBase += 300;
+
+        let iscasPossiveis = [];
+
+        if (needFullDefinition) {
+            // MODO VERDADEIRO/FALSO E ESCOLHA (Puxa definições inteiras)
+            let defLimpa = typeof clean === 'function' ? clean(w.definition) : w.definition;
+            if (defLimpa) iscasPossiveis.push(defLimpa);
+        } else {
+            // MODO LACUNAS (Puxa palavras e fragmentos curtos)
+            iscasPossiveis.push(w.word);
+            if (w.synonyms) iscasPossiveis.push(...w.synonyms.split(',').map(s => s.trim()));
+            if (w.antonyms) iscasPossiveis.push(...w.antonyms.split(',').map(s => s.trim()));
+            
+            // Extração de Ouro só se for uma única palavra
+            if (qtdPalavrasAlvo === 1) {
+                 let defL = (w.definition || '').replace(/<[^>]*>?/gm, ' ').replace(/[.,!?;:"'()[\]{}*\-]/g, ' ');
+                 let pPeso = defL.split(/\s+/).filter(x => x.length >= 4).sort((a, b) => b.length - a.length);
+                 if (pPeso[0]) iscasPossiveis.push(pPeso[0]);
+                 if (pPeso[1]) iscasPossiveis.push(pPeso[1]);
+            }
+        }
+
+        // 🛡️ O ESPELHO VISUAL (Aqui resolvemos o problema da "Peculiaridade")
+        iscasPossiveis.forEach(isca => {
+            if (isca && isca.length > 0) {
+                let qtdIsca = isca.trim().split(/\s+/).length;
+                let difTamanho = Math.abs(isca.length - tamanhoAlvo);
+                
+                let bonusEstrutura = 0;
+                
+                // Se o alvo é um textão (> 2 palavras), a isca TEM que ser textão.
+                if (qtdPalavrasAlvo > 2 && qtdIsca > 2) bonusEstrutura += 1500;
+                // Se o alvo é palavra curta, a isca TEM que ser palavra curta.
+                if (qtdPalavrasAlvo <= 2 && qtdIsca <= 2) bonusEstrutura += 1500;
+                // Se bater exato a contagem de palavras
+                if (qtdIsca === qtdPalavrasAlvo) bonusEstrutura += 800;
+
+                // Penalidade cruel: Se a diferença de caracteres for muito grande, despenca a nota
+                let penalidade = difTamanho * 25;
+
+                let notaFinal = pontuacaoBase + bonusEstrutura - penalidade;
+                
+                listaPontuada.push({ palavra: isca, pontos: notaFinal });
+            }
+        });
+    });
+
+    // Ordena a arena: Os mais perfeitos primeiro!
+    listaPontuada.sort((a, b) => b.pontos - a.pontos);
+
+    let fakes = [];
+    let vistos = new Set();
+    
+    for (let item of listaPontuada) {
+        let n = norm(item.palavra);
+        if (n && !vistos.has(n) && !respostasBanidas.includes(n) && n !== norm(card.word)) {
+            vistos.add(n);
+            fakes.push(item.palavra);
+            if (fakes.length >= amountNeeded) break; 
+        }
+    }
+    return fakes;
+}
 /* ═══════════════════════════════════════
    INIT
 ═══════════════════════════════════════ */
