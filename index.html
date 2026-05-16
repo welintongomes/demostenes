@@ -6,30 +6,39 @@
 <title>Demóstenes — Mestre da Retórica</title>
 <style>
 :root {
-  --bg: #0e0d0b;
-  --bg2: #141210;
-  --bg3: #1c1a16;
-  --bg4: #242018;
+  /* 🌌 Paleta Noturna Premium (Menos fadiga ocular, mais profundidade) */
+  --bg: #121212; 
+  --bg2: #1a1a1a;
+  --bg3: #222222;
+  --bg4: #2a2a2a;
+  
+  /* ✨ Ouros Retóricos (Mantidos, pois são a assinatura visual do app) */
   --gold: #c9a84c;
   --gold2: #e8c96a;
   --gold3: #f5e0a0;
+  
+  /* 📜 Tons de Pedra e Tinta (Leitura confortável) */
   --stone: #8c8070;
   --stone2: #b0a090;
   --stone3: #d4c8b8;
-  --ink: #e8e0d4;
-  --ink2: #c8bfb0;
+  --ink: #e4e4e4; 
+  --ink2: #cccccc;
   --ink3: #9a9080;
+  
+  /* 🔴🟢 Feedback Imersivo e Sutil */
   --red: #c0392b;
   --red2: #e74c3c;
   --green: #27ae60;
   --green2: #2ecc71;
   --blue: #2471a3;
   --blue2: #3498db;
+  
+  /* 🔲 Bordas e Geometria */
   --border: rgba(201,168,76,.15);
   --border2: rgba(201,168,76,.3);
   --border3: rgba(201,168,76,.5);
-  --r: 4px;
-  --r2: 8px;
+  --r: 6px; /* Bordas levemente mais arredondadas para modernidade */
+  --r2: 12px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Crimson Pro',Georgia,serif;overflow:hidden;touch-action:manipulation;}
@@ -53,11 +62,13 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Crimson
 .hstat-lbl{font-size:9px;color:var(--stone);text-transform:uppercase;letter-spacing:1px;margin-top:1px;}
 
 /* ── TABS ── */
-#tabs{display:flex;background:var(--bg3);align-items: center;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
+#tabs{display:flex;background:var(--bg3);align-items:center;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
 #tabs::-webkit-scrollbar{display:none;}
-.tab{flex:1;min-width:60px;padding:3px 2px;font-family:'Cinzel',serif;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--stone);cursor:pointer;text-align:center;border-bottom:2px solid transparent;transition:all .2s;user-select:none;white-space:nowrap;}
-.tab.on{color:var(--gold2);border-color:var(--gold);}
+.tab{flex:1;min-width:60px;padding:12px 4px;font-family:'Cinzel',serif;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--stone);cursor:pointer;text-align:center;border-bottom:2px solid transparent;transition:all 0.3s ease;user-select:none;white-space:nowrap;}
+.tab.on{color:var(--gold2);border-color:var(--gold);background: rgba(201,168,76,.03);}
 .tab:active{opacity:.7;}
+.tab:hover:not(.on){color: var(--stone3);}
+
 
 /* ── BODY ── */
 #body{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px;}
